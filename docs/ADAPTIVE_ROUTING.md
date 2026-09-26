@@ -107,15 +107,15 @@ Measured with llama.cpp's prompt cache (`llama-server`, Qwen2.5-1.5B Q4_K_M, M4 
 
 | Turn | Sources in system: prefilled tokens, ms | Sources in user turn: prefilled tokens, ms |
 |---|---|---|
-| 1 | 463, 1815 | 492, 1986 (+9%) |
-| 2 | 176, 717 | 183, 829 (+16%) |
-| 3 | 296, 1198 | 255, 1177 |
-| 4 | 203, 843 | 128, 537 (−36%) |
-| 5 | 324, 1303 | 207, 867 (−33%) |
-| 6 | 354, 1468 | 194, 806 (−45%) |
-| **Sum** | **7343 ms** | **6203 ms (−16%)** |
+| 1 | 474, 1924 | 472, 1791 (−7%) |
+| 2 | 176, 701 | 183, 740 (+6%) |
+| 3 | 296, 1219 | 255, 1013 (−17%) |
+| 4 | 203, 835 | 128, 514 (−38%) |
+| 5 | 324, 1302 | 207, 853 (−34%) |
+| 6 | 354, 1435 | 194, 806 (−44%) |
+| **Sum** | **7416 ms** | **5716 ms (−23%)** |
 
-The gain grows with conversation length (history before the previous question is reused); the first two turns pay for the longer source rules. Quality gate: the s32 A/B by the evaluation owner must not regress before this merges.
+(Source rules shortened so the first question costs no more than before; an earlier, longer version measured +9%/+16% on turns 1-2.) The gain grows with conversation length (history before the previous question is reused); Quality gate: the s32 A/B by the evaluation owner must not regress before this merges.
 
 ## Memory check (`src/inference/memoryFit.ts`)
 
