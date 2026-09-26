@@ -43,3 +43,10 @@ TL;DR: the literal test from Vitalik's post (2026-09-26) plus his domain. 40 ite
 | `travel-practical` | 10 | Wikivoyage country/city article + author notes |
 
 Food grading is objective (`scripts/lib/venues.mjs`): count distinct venues named in the answer that exist in the OSM gold for that city and diet; an item passes with ≥ 3. A venue missing from OSM is unverified, not necessarily wrong. Large cities keep "Eat" in district articles on Wikivoyage, so the Wikivoyage lists are sparse; OSM is the primary gold. `node dataset/build-v2.mjs --skip-fetch` rebuilds the JSONL from the committed gold files; `--refetch <ids>` / `--voyage-only <ids>` refresh snapshots (set `OVERPASS_URL` to use a mirror when the main instance rate-limits).
+
+## cryptopack: v1.1 "20 crypto questions" (`questions.cryptopack.jsonl`)
+
+TL;DR: answer quality of the default model with the Ethereum and cryptography pack installed (`boar-crypto.sqlite`, HF `r4topunk/boar-packs@b309ba9`). 20 items copied verbatim (id, category, query, gold) from the knowledge workstream's retrieval set (`source_url` names the branch and commit), so retrieval recall and answer quality use the same questions. `crypto-named-001` is the exact prompt from Vitalik's post.
+
+- `provenance` keeps the original authoring note; `notes` is empty on purpose: the judge sees no author key points, only the two blinded answers (the reference is the key).
+- `gold` sources include `eips` and `bips`; the runner's KB-hit column only checks `enwiki` titles.

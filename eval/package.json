@@ -13,7 +13,8 @@
     "test": "cd .. && npx vitest run eval/scripts"
   },
   "dependencies": {
-    "tsx": "^4.23.15",
-    "node-llama-cpp": "3.21.1"
+    "fzstd": "^0.1.1",
+    "node-llama-cpp": "3.21.1",
+    "tsx": "^4.23.15"
   }
 }

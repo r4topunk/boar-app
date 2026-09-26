@@ -24,6 +24,7 @@
  * Usage (from repo root):
  *   npx --prefix eval tsx eval/runner/desktop.ts --model qwen2.5-1.5b-instruct-q4km \
  *     [--dataset v1] [--ids exp-001,cmp-002] [--limit N] [--threads 4] [--gpu] [--corpus bundled|none] [--out path]
+ *     [--pack /path/boar-crypto.sqlite]   (format-2 knowledge pack; needs a source tree with src/rag/wikiPack.ts)
  *     [--seed 42] [--timeout-ms 120000] [--thought-budget 256] [--sources system|user]   (omit --gpu for CPU-only, e.g. models larger than the Metal working set)
  */
 import { mkdirSync, readFileSync, existsSync, writeFileSync, appendFileSync, createReadStream } from "node:fs";
@@ -109,6 +110,7 @@ function args() {
     threads: Number(get("--threads", "4")),
     gpu: a.includes("--gpu"),
     corpus: get("--corpus", "bundled") as "bundled" | "none",
+    pack: get("--pack"),
     sources: get("--sources", "system") as "system" | "user",
     out: get("--out"),
     seed: Number(get("--seed", "42")),
@@ -130,9 +132,50 @@ function bundledCorpus(): Doc[] {
   return raw.map((d) => ({ ...d, id: `wiki-min-${slug(d.title)}` }));
 }
 
+/** A format-2 pack hit (src/rag/wikiPack.ts PackHit), typed loosely so this file compiles on trees without it. */
+type PackHit = { chunkId: number; articleId: number; title: string; source: string; section?: string; text: string; url?: string; license?: string; score: number; via?: string };
+type OpenPack = { id: string; sha256: string; searchDetailed(q: string, o: { k?: number; queryVec?: Float32Array }): Promise<{ hits: PackHit[] }> };
+
+// Mirrors src/rag/packs.ts packHitToChunk (feat/knowledge); packs.ts imports expo modules, so it cannot load in Node.
+const PACK_SOURCE_LABEL: Record<string, string> = {
+  enwiki: "Wikipedia", enwikivoyage: "Wikivoyage", enwikibooks: "Wikibooks", appropedia: "Appropedia", usgov: "US government",
+  eips: "Ethereum EIPs/ERCs", ethspecs: "Ethereum specs", ethereumorg: "ethereum.org", bips: "Bitcoin BIPs",
+};
+function packHitToChunk(packId: string, h: PackHit): RetrievedChunk {
+  const label = PACK_SOURCE_LABEL[h.source] ?? "Source";
+  const host = h.source === "enwikivoyage" ? "en.wikivoyage.org" : h.source === "enwikibooks" ? "en.wikibooks.org" : "en.wikipedia.org";
+  const url = h.url ?? `https://${host}/wiki/${encodeURIComponent(h.title.replace(/ /g, "_"))}`;
+  return {
+    chunkId: `pack:${packId}:${h.chunkId}`,
+    docId: `pack:${packId}:a${h.articleId}`,
+    title: h.source === "enwiki" ? h.title : `${label}: ${h.title}`,
+    body: h.section ? `${h.section}: ${h.text}` : h.text,
+    source: `${label} — ${url}${h.license ? ` (${h.license})` : ""}`,
+    score: h.score,
+    matchType: "lexical",
+  } as RetrievedChunk;
+}
+
+/** Opens a format-2 pack with the source tree's WikiPack (Node's sqlite + fzstd, as in eval/retrieval/recall.test.ts). */
+async function openPack(path: string): Promise<OpenPack> {
+  const wikiPackModule = "../../src/rag/wikiPack", sqliteModule = "../../src/rag/testing/nodeSqlite";
+  let WikiPack: any, nodeSqliteDatabase: any;
+  try {
+    ({ WikiPack } = await import(wikiPackModule));
+    ({ nodeSqliteDatabase } = await import(sqliteModule));
+  } catch (e: any) {
+    throw new Error(`--pack needs a source tree with src/rag/wikiPack.ts and src/rag/testing/nodeSqlite.ts (feat/knowledge): ${e?.message ?? e}`);
+  }
+  const { decompress } = await import("fzstd");
+  const pack = await WikiPack.open(nodeSqliteDatabase(path), decompress);
+  const id = path.split("/").pop()!.replace(/\.sqlite$/, "");
+  return { id, sha256: await sha256File(path), searchDetailed: (q, o) => pack.searchDetailed(q, o) };
+}
+
 class DesktopKnowledgeBase {
   private db = new DatabaseSync(":memory:");
   private vectors: Array<{ doc: Doc; vec: Float32Array }> = [];
+  packs: OpenPack[] = [];
 
   constructor(private embed: (text: string) => Promise<Float32Array>) {
     // Same FTS5 table as src/rag/db.ts (default tokenizer, no stemmer).
@@ -152,7 +195,7 @@ class DesktopKnowledgeBase {
     if (dirty) { mkdirSync(dirname(cacheFile), { recursive: true }); writeFileSync(cacheFile, JSON.stringify(cache)); }
   }
 
-  /** Mirrors src/rag/retrieve.ts retrieve() without knowledge packs. */
+  /** Mirrors src/rag/retrieve.ts retrieve(); with --pack, the format-2 pack path of feat/knowledge (no format-1 packs). */
   async retrieve(query: string, topK: number): Promise<RetrievedChunk[]> {
     const limit = topK * 2;
     const qvec = await this.embed(query);
@@ -172,7 +215,15 @@ class DesktopKnowledgeBase {
         .sort((a, b) => b.score - a.score),
       MIN_SEMANTIC_SIMILARITY,
     ).slice(0, limit);
-    return fuseRetrievalResults(lexical, semantic, topK);
+    if (!this.packs.length) return fuseRetrievalResults(lexical, semantic, topK);
+    // Large-pack passages from articles the question names come first, in the pack's own order;
+    // its keyword hits compete with everything else.
+    const wiki = await Promise.all(this.packs.map(async (p) => ({ id: p.id, hits: (await p.searchDetailed(query, { k: topK, queryVec: qvec })).hits })));
+    const named = wiki.flatMap((w) => w.hits.filter((h) => h.via === "title").map((h) => packHitToChunk(w.id, h)));
+    const wikiLexical = wiki.flatMap((w) => w.hits.filter((h) => h.via !== "title").map((h) => packHitToChunk(w.id, h)));
+    const fused = fuseRetrievalResults([...lexical, ...wikiLexical], semantic, topK);
+    const seen = new Set(named.map((c) => c.chunkId));
+    return [...named, ...fused.filter((c) => !seen.has(c.chunkId))].slice(0, Math.max(topK, named.length));
   }
 }
 
@@ -297,13 +348,15 @@ async function main() {
 
   const kb = new DesktopKnowledgeBase(embed);
   if (opt.corpus === "bundled") await kb.index(bundledCorpus(), join(EVAL_DIR, ".cache", "embeddings-bundled.json"));
+  if (opt.pack) kb.packs.push(await openPack(opt.pack));
+  const packTag = kb.packs.map((p) => `__pack-${p.id}`).join("");
 
   const loadStart = performance.now();
   const model = await llama.loadModel({ modelPath, gpuLayers: opt.gpu ? "auto" : 0, useMlock: false });
   const modelLoadMs = performance.now() - loadStart;
 
   const runId = `desktop-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-  const out = opt.out ?? join(EVAL_DIR, "results", "runs", opt.dataset, `${opt.model}__${opt.corpus}${opt.sources === "user" ? "__sources-user" : ""}.jsonl`);
+  const out = opt.out ?? join(EVAL_DIR, "results", "runs", opt.dataset, `${opt.model}__${opt.corpus}${packTag}${opt.sources === "user" ? "__sources-user" : ""}.jsonl`);
   mkdirSync(dirname(out), { recursive: true });
   const done = new Set(existsSync(out) ? readFileSync(out, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l).queryId) : []);
   const systemPrompt = getPersonality(PERSONALITY_ID).systemPrompt;
@@ -385,6 +438,7 @@ async function main() {
       runner: "desktop",
       hardware,
       corpus: opt.corpus,
+      packs: kb.packs.map((p) => ({ id: p.id, sha256: p.sha256 })),
       retrievalMs,
       seed: opt.seed,
       // 1-min load average at the end of the query: latency from a busy host is flagged in the report.
