@@ -101,7 +101,21 @@ Kept chunks are ordered by relevance (that order is the `[n]` numbering) and a c
 
 Token counts are approximate (4 chars/token) in tests; on device `receipt.ctxTokens` is llama.cpp's own count.
 
-**KV reuse of the system prompt:** already automatic. llama.rn keeps the last completion's KV cache and re-evaluates from the first differing token (`find_common_prefix_length`, `cpp/rn-completion.cpp`). With the current prompt layout, ~156 of 220 tokens of a follow-up question's prompt are a shared prefix (`prompt.test.ts`). Putting sources after the history was tried and gained ~6%, not worth the change. Loading another model (deep tier, verifier) drops the cache.
+**KV reuse: sources in the user's turn** (`src/routing/prompt.ts`, v1.1 item 5). llama.rn keeps the last completion's KV cache and re-evaluates from the first differing token (`find_common_prefix_length`, `cpp/rn-completion.cpp`). With sources in the system message, every question changed the prompt near the top. Now the system prompt is static and the sources travel in the user's turn inside `<sources>…</sources>` (also the prompt-injection boundary: text there is data, and a `</sources>` inside a source is neutralized).
+
+Measured with llama.cpp's prompt cache (`llama-server`, Qwen2.5-1.5B Q4_K_M, M4 CPU 4 threads, median of 3, a 6-question conversation with real compressed Wikipedia sources; script `scripts/cache-bench.sh`):
+
+| Turn | Sources in system: prefilled tokens, ms | Sources in user turn: prefilled tokens, ms |
+|---|---|---|
+| 1 | 463, 1815 | 492, 1986 (+9%) |
+| 2 | 176, 717 | 183, 829 (+16%) |
+| 3 | 296, 1198 | 255, 1177 |
+| 4 | 203, 843 | 128, 537 (−36%) |
+| 5 | 324, 1303 | 207, 867 (−33%) |
+| 6 | 354, 1468 | 194, 806 (−45%) |
+| **Sum** | **7343 ms** | **6203 ms (−16%)** |
+
+The gain grows with conversation length (history before the previous question is reused); the first two turns pay for the longer source rules. Quality gate: the s32 A/B by the evaluation owner must not regress before this merges.
 
 ## Memory check (`src/inference/memoryFit.ts`)
 

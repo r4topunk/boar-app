@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { assembleChatMessages, assemblePrompt } from "../rag/pure";
 import { formatPlacesAnswer } from "./geo";
+import { buildAnswerMessages, buildAnswerPrompt } from "./prompt";
 
 // Models copy a literal "[n]" from the instructions into their answers
 // (Qwen3-4B ended 82/96 eval answers with it), so no prompt may contain one.
@@ -13,6 +14,9 @@ describe("no literal [n] citation placeholder", () => {
       ...assembleChatMessages("q", src).map((m) => m.content),
       assemblePrompt("q", []),
       ...assembleChatMessages("q", []).map((m) => m.content),
+      buildAnswerPrompt("q", src),
+      ...buildAnswerMessages("q", src).map((m) => m.content),
+      ...buildAnswerMessages("q", []).map((m) => m.content),
     ];
     for (const t of texts) expect(t).not.toContain("[n]");
     expect(assemblePrompt("q", src)).toContain("like [1] or [2]");
