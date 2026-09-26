@@ -107,15 +107,15 @@ Measured with llama.cpp's prompt cache (`llama-server`, Qwen2.5-1.5B Q4_K_M, M4 
 
 | Turn | Sources in system: prefilled tokens, ms | Sources in user turn: prefilled tokens, ms |
 |---|---|---|
-| 1 | 474, 1924 | 472, 1791 (−7%) |
-| 2 | 176, 701 | 183, 740 (+6%) |
-| 3 | 296, 1219 | 255, 1013 (−17%) |
-| 4 | 203, 835 | 128, 514 (−38%) |
-| 5 | 324, 1302 | 207, 853 (−34%) |
-| 6 | 354, 1435 | 194, 806 (−44%) |
-| **Sum** | **7416 ms** | **5716 ms (−23%)** |
+| 1 | 474, 1888 | 481, 1938 (+3%) |
+| 2 | 176, 709 | 203, 826 (+16%) |
+| 3 | 296, 1216 | 275, 1170 (−4%) |
+| 4 | 203, 872 | 148, 618 (−29%) |
+| 5 | 324, 1328 | 227, 938 (−29%) |
+| 6 | 354, 1477 | 214, 913 (−38%) |
+| **Sum** | **7491 ms** | **6404 ms (−15%)** |
 
-(Source rules shortened so the first question costs no more than before; an earlier, longer version measured +9%/+16% on turns 1-2.) The gain grows with conversation length (history before the previous question is reused); Quality gate: the s32 A/B by the evaluation owner must not regress before this merges.
+History of this layout: a shorter version without the general-knowledge fallback measured −23% but made Qwen3-4B refuse (s32: correct 50% → 22%); the fallback only in the system prompt still refused 9/32 and answered Portuguese in English. The fallback and language rule now sit in a short fixed line right after `</sources>`, paid on every turn (~15 tokens). The gain grows with conversation length (history before the previous question is reused); Quality gate: the s32 A/B by the evaluation owner must not regress before this merges.
 
 ## Memory check (`src/inference/memoryFit.ts`)
 
