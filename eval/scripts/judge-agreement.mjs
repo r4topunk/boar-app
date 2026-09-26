@@ -19,12 +19,19 @@ const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("
 const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : "n/a");
 const pct = (x) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : "n/a");
 
-const COMPARISONS = [
+const V1_COMPARISONS = [
   { label: "Qwen3-4B vs Qwen2.5-1.5B (direct)", file: "qwen3-4b-instruct-2507-q4km__bundled__vs__qwen2.5-1.5b-instruct-q4km__bundled", sides: ["4B", "1.5B"] },
   { label: "Qwen2.5-1.5B vs reference", file: "qwen2.5-1.5b-instruct-q4km__bundled__vs__claude-code__opus", sides: ["1.5B", "ref"] },
   { label: "Qwen3-4B vs reference", file: "qwen3-4b-instruct-2507-q4km__bundled__vs__claude-code__opus", sides: ["4B", "ref"] },
   { label: "Sources in user turn vs in system (1.5B)", file: "qwen2.5-1.5b-instruct-q4km__bundled__sources-user__vs__qwen2.5-1.5b-instruct-q4km__bundled__sources-system", sides: ["user", "system"] },
 ];
+// v1.1 "20 crypto questions": the default model with and without the Ethereum and cryptography pack.
+const CRYPTOPACK_COMPARISONS = [
+  { label: "Qwen3-4B + crypto pack vs reference", file: "qwen3-4b-instruct-2507-q4km__bundled__pack-boar-crypto__vs__claude-code__opus", sides: ["4B+pack", "ref"] },
+  { label: "Qwen3-4B (no pack) vs reference", file: "qwen3-4b-instruct-2507-q4km__bundled__vs__claude-code__opus", sides: ["4B", "ref"] },
+  { label: "Qwen3-4B + crypto pack vs Qwen3-4B (direct)", file: "qwen3-4b-instruct-2507-q4km__bundled__pack-boar-crypto__vs__qwen3-4b-instruct-2507-q4km__bundled", sides: ["4B+pack", "4B"] },
+];
+const COMPARISONS = dataset === "cryptopack" ? CRYPTOPACK_COMPARISONS : V1_COMPARISONS;
 
 function combined(dir, file) {
   const byQ = {};

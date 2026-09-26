@@ -22,6 +22,7 @@ const p90 = (xs) => percentile([...xs].sort((x, y) => x - y), 0.9);
 const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : "n/a");
 const pct = (x) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : "n/a");
 
+const questionCount = readJsonl(join(EVAL_DIR, "dataset", `questions.${dataset}.jsonl`)).length;
 const refs = readJsonl(join(EVAL_DIR, "references", dataset, `${refName}.jsonl`)).filter((r) => r.ok);
 const runsDir = join(EVAL_DIR, "results", "runs", dataset);
 // --systems a,b: report only these runs (the runs dir also holds A/B variants and exploratory models).
@@ -131,7 +132,7 @@ for (const r of rows) {
   const j = r.judged;
   lines.push(`| ${r.label} | ${r.pairs.length} | ${j ? `${fmt(j.qualityRatio)} (${fmt(j.qualityRatioCI[0])}–${fmt(j.qualityRatioCI[1])})` : "not judged"} | ${j ? pct(r.correctRate) : "–"} | ${j ? `${pct(j.boarWin)} / ${pct(j.tie)} / ${pct(j.refWin)}` : "–"} | ${j ? `${fmt(j.winScore)} (${fmt(j.winScoreCI[0])}–${fmt(j.winScoreCI[1])})` : "–"} | ${j ? pct(j.positionConsistency) : "–"} | ${fmt(r.medianTotalS, 1)} (${fmt(r.p90TotalS, 1)}) | ${fmt(r.medianTtftS, 1)} | ${fmt(r.medianTokPerSec, 0)} | ${pct(r.kbHit)} | ${pct(r.successRate)} |`);
 }
-lines.push(`| Reference (Opus + web search) | – | 1.00 | ${pct(refCorrect)} | – | – | – | ${fmt(refMedianS, 1)} | – | – | – | ${pct(refInScope.length / Math.max(1, subsetIds ? subsetIds.size : 96))} |`, "");
+lines.push(`| Reference (Opus + web search) | – | 1.00 | ${pct(refCorrect)} | – | – | – | ${fmt(refMedianS, 1)} | – | – | – | ${pct(refInScope.length / Math.max(1, subsetIds ? subsetIds.size : questionCount))} |`, "");
 lines.push("Quality ratio = mean rubric score of the BOAR answer / mean rubric score of the reference answer (rubric: " + RUBRIC.map(([k]) => k).join(", ") + ", 1–5 each). Win score = wins + ½ ties. CIs are percentile bootstrap over questions (2,000 resamples, seeded).", "");
 
 if (rows.some((r) => r.jev)) {
