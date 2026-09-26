@@ -156,6 +156,13 @@ Consequence: the deep tier can only pass with **short context and a short answer
 - c. AndroidLM's aarch64 IQ2_XS/IQ3_XXS kernels (port from ik_llama, MIT), halves the phone prefill (their note `2026-09-25-iqk-port.md`).
 - d. KV reuse for the system prompt plus answer-first (AndroidLM's TTFT ~18 s).
 
+**How to apply k=6 in the app (Tusk, 2026-09-26):** llama.rn does not expose `n-expert-used`/`kv_overrides` in JS (`src/types.ts`). There are two paths:
+- (i) Integration C already adds the parameter in the patch (`--n-expert-used`). This is the preferred path, at no disk cost.
+- (ii) Change `qwen35moe.expert_used_count=6` in the GGUF metadata. `gguf-set-metadata` edits the int field **in place**, so it does not need a 12 GB copy. It does change the SHA-256, which makes it a **derived artifact** with its own hash in the manifest (Ledger).
+- Until then, **no copy is made**: the device test (a) uses `--n-expert-used 6` directly in the bmoe CLI.
+
+Deep contract already applied by Tusk in PR #2 (`018cd4f`): 6 chunks compressed to 400 tokens, answer ≤200 tokens, `enable_thinking=false`, no speculative decoding, system prompt KV reused automatically by llama.rn (common prefix).
+
 **Tasks (only if (a) passes)**
 - [ ] Patch llama.rn (`rnllamaBuildFromSource=true` + patch-package) with the bmoe core and `initLlama({ moeStream, expertCacheMb, denseWeights })` (Tusk, src/inference).
 - [ ] Separate, verified download of the deep model (Ledger, manifest with SHA-256).
