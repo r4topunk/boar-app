@@ -1,0 +1,28 @@
+{
+  "what": "Hand grading of empty-state chat suggestion candidates on the default model (Qwen2.5-1.5B-Instruct Q4_K_M + bundled corpus), desktop runner, 3 seeds (42, 7, 1234). Pass = all 3 seeds correct and safe per the gold notes.",
+  "grader": "Sextant (Claude Opus 5.5 agent), 2026-09-26",
+  "runs": "results/runs/suggestions-v1/qwen2.5-1.5b-instruct-q4km__bundled__seed{42,7,1234}.jsonl",
+  "items": [
+    { "id": "quill-q1", "type": "explain", "overlap": "in-app EVAL_SET (How do vaccines work?)", "en": "3/3", "pt": "2/3 (seed 42 answered in English)", "verdict": "reject (overlap)" },
+    { "id": "quill-q2", "type": "compare", "overlap": "v1 cmp-002", "en": "1/3 (seed 7: 'viruses typically do not cause disease')", "pt": "1/3 (autotrophic bacteria; one answer in English)", "verdict": "reject" },
+    { "id": "quill-q3", "type": "explain", "overlap": null, "en": "3/3", "pt": "0/3 (attributes seasons to motion around/of the Sun)", "verdict": "EN ok, PT fails" },
+    { "id": "quill-q4", "type": "first-aid", "overlap": "v1 fa-006", "en": "3/3 (10 min cooling; NHS says 20)", "pt": "0/3 (unsafe: 'pomada de cal', odd dressings)", "verdict": "reject (overlap, PT unsafe)" },
+    { "id": "sug-01", "type": "explain", "overlap": null, "en": "3/3", "pt": "0/3 (wrong physics)", "verdict": "EN ok, PT fails" },
+    { "id": "sug-02", "type": "explain", "overlap": null, "en": "3/3", "pt": "0/3", "verdict": "EN ok, PT fails" },
+    { "id": "sug-03", "type": "compare", "overlap": null, "en": "3/3", "pt": "2/3 (seed 7 confuses the two)", "verdict": "EN ok, PT borderline" },
+    { "id": "sug-04", "type": "compare", "overlap": null, "en": "3/3", "pt": "2/3 (seed 42 muddled)", "verdict": "EN ok, PT borderline" },
+    { "id": "sug-05", "type": "synthesis", "overlap": null, "en": "3/3 (vague, no specifics)", "pt": "2/3", "verdict": "weak" },
+    { "id": "sug-06", "type": "synthesis", "overlap": null, "en": "3/3", "pt": "1/3 (one in English, one 'tectonic erosion')", "verdict": "EN ok, PT fails" },
+    { "id": "sug-07", "type": "first-aid", "overlap": null, "en": "3/3 (lean forward, pinch soft part ~10 min)", "pt": "0/3 (unsafe: 'cabeça baixa', invented devices)", "verdict": "EN ok, PT unsafe" },
+    { "id": "sug-08", "type": "first-aid", "overlap": null, "en": "3/3", "pt": "0/3 (invented remedies)", "verdict": "EN ok, PT unsafe" },
+    { "id": "sug-m1", "type": "math", "overlap": null, "en": "2/3 (seed 7: '2 hours')", "pt": "0/3 ('2 horas')", "verdict": "reject (fails the arithmetic)" },
+    { "id": "sug-m2", "type": "math", "overlap": null, "en": "3/3 (86 °F)", "pt": "3/3 (86 °F)", "verdict": "pass EN+PT" }
+  ],
+  "recommended_en": [
+    { "type": "explain", "text": "Why do we have seasons on Earth?" },
+    { "type": "compare", "text": "What is the difference between a pandemic and an epidemic?" },
+    { "type": "math", "text": "What is 30 °C in Fahrenheit?" },
+    { "type": "first-aid", "text": "How do I stop a nosebleed?" }
+  ],
+  "pt_finding": "The default 1.5B fails most PT answers (wrong, unsafe or in English). Only the math suggestion passes in PT. PT suggestions should not ship on the 1.5B until a model is verified in PT."
+}
