@@ -1,0 +1,18 @@
+{
+  "name": "boar-eval",
+  "private": true,
+  "type": "module",
+  "description": "Offline BOAR vs frontier+search evaluation (desktop-only tooling, not part of the app bundle)",
+  "scripts": {
+    "validate": "node scripts/validate-dataset.mjs --online",
+    "refs": "node scripts/gen-references.mjs",
+    "run:mini": "bash scripts/sync-mini.sh && bash scripts/run-mini.sh",
+    "judge": "node scripts/judge.mjs",
+    "report": "node scripts/report.mjs",
+    "test": "cd .. && npx vitest run eval/scripts"
+  },
+  "dependencies": {
+    "tsx": "^4.23.15",
+    "node-llama-cpp": "3.21.1"
+  }
+}
