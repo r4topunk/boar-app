@@ -11,7 +11,7 @@
  */
 import { defaultContextSize, llamaEngine } from "../inference/LlamaEngine";
 import { retrieve } from "../rag/retrieve";
-import { assemblePrompt, assembleChatMessages } from "../rag/pure";
+import { buildAnswerMessages, buildAnswerPrompt } from "./prompt";
 import { ModelManager } from "../models/ModelManager";
 import { MODEL_CATALOG } from "../models/manifest";
 import { listDiscoveredModels } from "../models/discoveredModels";
@@ -57,8 +57,9 @@ export const { answer, deepen } = createAnswerer({
   listInstalledLlms,
   getActiveModelId: () => getActiveModelId("llm"),
   runMultipass: runDeepResearch,
-  assemblePrompt,
-  assembleChatMessages,
+  // Sources in the user's turn: static system prompt, reusable KV cache (v1.1 item 5).
+  assemblePrompt: buildAnswerPrompt,
+  assembleChatMessages: buildAnswerMessages,
   now: () => performance.now(),
   contextSize: defaultContextSize,
   getGeoProviders: () => geoProviders,

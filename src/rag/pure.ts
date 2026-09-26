@@ -392,12 +392,12 @@ export function assembleChatMessages(
  * Personality.styleReminder). Only this turn carries it: history keeps the
  * user's own words, and retrieval searches the question alone.
  */
-function styleSection(styleReminder: string | undefined): string {
+export function styleSection(styleReminder: string | undefined): string {
   const s = styleReminder?.trim();
   return s ? `\n\n(Response style: ${s})` : "";
 }
 
-const GROUNDING_INSTRUCTION =
+export const GROUNDING_INSTRUCTION =
   "You have no ability to control real-world devices or take physical actions — no alarms, " +
   "lights, thermostats, timers, or any other device or system. You can only respond with text. " +
   "Treat greetings and casual small talk conversationally and briefly, not as a command or task. " +
