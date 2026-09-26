@@ -1,0 +1,20 @@
+C01 B A vague, omits transformers; B correct and complete
+C02 B both right; A wrongly says UDP has no error detection (it has a checksum)
+C03 A B vague
+C04 B A has errors (Senate veto, emperor appointed by Senate, bicameral)
+C05 A B says hydrogen (wrong)
+C06 B A affirms the myth
+C07 A B wrong offset
+C08 B A wrong (Adaptive, accident detection)
+C09 A B gives a wrong reason
+C10 A B unsafe/incoherent steps
+C11 A B wrong on both parts
+C12 B A says 75% died
+C13 tie both list the 10 correctly
+C14 tie both Suriname; A adds French Guiana nuance
+C15 B A refuses
+C16 tie both correct the false premise
+C17 B A mostly defers, generic
+C18 A B omits calling emergency and AED
+C19 tie both answer both parts correctly
+C20 tie both correct on the mechanism

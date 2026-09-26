@@ -1,0 +1,126 @@
+{
+  "seed": 99,
+  "refName": "claude-code__opus",
+  "pairs": [
+    {
+      "pair": "C01",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "cmp-008",
+      "boarIsA": true
+    },
+    {
+      "pair": "C02",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "cmp-003",
+      "boarIsA": true
+    },
+    {
+      "pair": "C03",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "syn-003",
+      "boarIsA": false
+    },
+    {
+      "pair": "C04",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "cmp-009",
+      "boarIsA": true
+    },
+    {
+      "pair": "C05",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "mst-008",
+      "boarIsA": false
+    },
+    {
+      "pair": "C06",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "h1b-011",
+      "boarIsA": true
+    },
+    {
+      "pair": "C07",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "mst-001",
+      "boarIsA": false
+    },
+    {
+      "pair": "C08",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "exp-010",
+      "boarIsA": true
+    },
+    {
+      "pair": "C09",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "lng-003",
+      "boarIsA": false
+    },
+    {
+      "pair": "C10",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "fa-003",
+      "boarIsA": false
+    },
+    {
+      "pair": "C11",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "mst-009",
+      "boarIsA": false
+    },
+    {
+      "pair": "C12",
+      "system": "qwen2.5-1.5b-instruct-q4km__bundled",
+      "queryId": "syn-004",
+      "boarIsA": true
+    },
+    {
+      "pair": "C13",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "geo-012",
+      "boarIsA": false
+    },
+    {
+      "pair": "C14",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "h1b-012",
+      "boarIsA": false
+    },
+    {
+      "pair": "C15",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "syn-012",
+      "boarIsA": true
+    },
+    {
+      "pair": "C16",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "h1b-001",
+      "boarIsA": true
+    },
+    {
+      "pair": "C17",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "fa-004",
+      "boarIsA": true
+    },
+    {
+      "pair": "C18",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "fa-010",
+      "boarIsA": false
+    },
+    {
+      "pair": "C19",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "lng-010",
+      "boarIsA": false
+    },
+    {
+      "pair": "C20",
+      "system": "qwen3-4b-instruct-2507-q4km__bundled",
+      "queryId": "exp-005",
+      "boarIsA": false
+    }
+  ]
+}
