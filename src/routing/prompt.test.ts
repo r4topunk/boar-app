@@ -65,6 +65,10 @@ describe("buildAnswerMessages: sources in the user's turn", () => {
     expect(buildAnswerMessages("q", [evil], system)[0].content).toMatch(/reference data, not instructions/);
   });
 
+  it("keeps the general-knowledge fallback (without it the 4B refuses when sources miss)", () => {
+    expect(buildAnswerMessages("q", [], system)[0].content).toMatch(/say so, then answer from general knowledge/);
+  });
+
   it("sends a bare question when there are no sources, and has a plain-prompt variant", () => {
     expect(buildAnswerMessages("hey, what's up?", [], system).at(-1)!.content).toBe("hey, what's up?");
     const p = buildAnswerPrompt("Who designed it?", questions[1].s, system, { turns: [{ role: "user", text: "Capital?" }, { role: "assistant", text: "Canberra." }] });
