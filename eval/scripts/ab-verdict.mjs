@@ -32,6 +32,15 @@ const correct = (ps) => ps.filter((p) => p.boar.correctness >= 4).length / Math.
 const runs = (n) => readJsonl(join(EVAL_DIR, "results", "runs", dataset, `${n}.jsonl`));
 const cites = (n) => runs(n).filter((r) => /\[\d+\]/.test(r.answer)).length;
 const literalN = (n) => runs(n).filter((r) => /\[n\]/.test(r.answer)).length;
+// Short answers that only say the sources do not cover the question (no real answer).
+const refusals = (n) => runs(n).filter((r) => /do(es)? not contain|don.t cover|do not (include|mention)|not (in|covered by) the (provided )?(sources|context)/i.test(r.answer) && r.answer.length < 400).length;
+// Portuguese questions answered mostly in English (function-word count heuristic).
+const qLang = Object.fromEntries(readJsonl(join(EVAL_DIR, "dataset", `questions.${dataset}.jsonl`)).map((q) => [q.id, q.lang]));
+const ptInEnglish = (n) => {
+  const pt = runs(n).filter((r) => qLang[r.queryId] === "pt-BR");
+  const bad = pt.filter((r) => (r.answer.match(/\b(the|and|is|are|of|provided|sources)\b/gi) ?? []).length > (r.answer.match(/\b(o|a|os|as|de|do|da|que|é|são|para)\b/gi) ?? []).length);
+  return `${bad.length}/${pt.length}`;
+};
 const sections = [];
 let anyRegressed = false;
 for (const [judge, dir] of [["Claude", "judgments"], ["Jev", "judgments-jev"]]) {
@@ -68,6 +77,8 @@ Pre-registered criterion (written before any judge ran): regression if the direc
 |---|---|---|
 | Answers citing [1], [2]… | ${cites(A)}/32 | ${cites(B)}/32 |
 | Answers with a literal "[n]" | ${literalN(A)}/32 | ${literalN(B)}/32 |
+| Refusals ("the sources do not cover it", no answer) | ${refusals(A)}/32 | ${refusals(B)}/32 |
+| Portuguese questions answered in English | ${ptInEnglish(A)} | ${ptInEnglish(B)} |
 
 ${sections.join("\n")}
 Scope: quality only. TTFT with prompt-cache reuse is measured by the engine owner (llama-server cache_prompt, multi-turn); this runner builds a fresh context per question.
