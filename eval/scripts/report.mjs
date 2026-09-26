@@ -123,7 +123,13 @@ writeFileSync(join(outDir, `${name}.quality-latency.svg`), chart(points, refMedi
 // ---------------------------------------------------------------- markdown
 const lines = [];
 lines.push(`# BOAR eval: ${name}`, "");
-lines.push(`TL;DR: quality of on-device answers relative to a frontier model with web search, and seconds per answer. Dataset \`${dataset}\`, scope \`${subset}\` (${subsetIds ? subsetIds.size : "all"} questions). Regenerate with \`npm --prefix eval run report\`.`, "");
+lines.push(`TL;DR: quality of on-device answers relative to a frontier model with web search, and seconds per answer. Dataset \`${dataset}\`, scope \`${subset}\` (${subsetIds ? subsetIds.size : "all"} questions). Regenerate with \`node eval/scripts/report.mjs ${a.join(" ")}\` (all official reports: \`npm --prefix eval run report:official\`).`, "");
+// Headline: every judged system in one sentence each, both judges, so the main number is never typed by hand.
+const headline = rows.filter((r) => r.judged).sort((x, y) => y.judged.qualityRatio - x.judged.qualityRatio).map((r) =>
+  `- **${r.label}** reaches **${pct(r.judged.qualityRatio)}** of the reference's rubric score (95% CI ${pct(r.judged.qualityRatioCI[0])}–${pct(r.judged.qualityRatioCI[1])}, Claude judge, ${r.pairs.length} questions)` +
+  (r.jev ? ` / **${pct(r.jev.qualityRatio)}** (${pct(r.jev.qualityRatioCI[0])}–${pct(r.jev.qualityRatioCI[1])}, Jev judge, ${r.jevN})` : "") +
+  ` in **${fmt(r.medianTotalS, 1)} s** median per answer, vs ${fmt(refMedianS, 1)} s for the reference. Correct answers: ${pct(r.correctRate)} (reference ${pct(refCorrect)}).`);
+if (headline.length) lines.push("## Headline", "", ...headline, "", "The reference wins almost every head-to-head pair; the ratio measures how much of its quality BOAR keeps, offline and on device-class hardware.", "");
 lines.push(`![quality vs latency](./${name}.quality-latency.svg)`, "");
 lines.push("## Results", "");
 lines.push("| System | Judged | Quality ratio (95% CI) | Correct answers (correctness ≥ 4) | Win / tie / loss vs ref | Win score (95% CI) | Position-consistent | Median s (p90) | TTFT s | tok/s | KB hit | Success |");
