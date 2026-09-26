@@ -47,7 +47,8 @@ export function scoreFoodAnswer(answer, gold, { minRealVenues = 3 } = {}) {
     verifiedVenues: matched.length,
     verifiedDietVenues: matchedDiet.length,
     pass: matchedDiet.length >= minRealVenues,
-    deflects: deflects(answer),
+    // Only a deflection when nothing verifiable was named ("check HappyCow" inside a good list is fine).
+    deflects: matched.length === 0 && deflects(answer),
     matched: matched.map((m) => m.name),
   };
 }

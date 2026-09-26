@@ -2,7 +2,7 @@
 // Blind pairwise judge with Claude Code headless (`claude -p`, no tools), on the user's subscription.
 // Every pair runs in BOTH orders (A/B swapped) to measure position bias; the first order is drawn from a
 // recorded seed. Sequential, resumable (skips (queryId, order) already judged), stops on a rate limit.
-// Usage (from eval/): node scripts/judge.mjs --system qwen2.5-1.5b-instruct-q4km__bundled [--subset s32|all] [--seed 7]
+// Usage (from eval/): node scripts/judge.mjs --system qwen2.5-1.5b-instruct-q4km__bundled [--dataset v1] [--subset s32|all] [--categories a,b] [--seed 7]
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -17,7 +17,10 @@ const a = process.argv.slice(2);
 const get = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
 const dataset = get("--dataset", "v1");
 const system = get("--system");
-const refName = get("--ref", "claude-code__opus");
+// --against <runs file name>: compare two BOAR systems (e.g. deep vs fast tier) instead of BOAR vs the reference.
+// "boar" in the output rows is then --system and "ref" is --against.
+const against = get("--against");
+const refName = against ?? get("--ref", "claude-code__opus");
 const subset = get("--subset", "s32");
 const seed = Number(get("--seed", "7"));
 const judgeModel = get("--judge-model", "opus");
@@ -27,9 +30,14 @@ if (!system) throw new Error("--system <runs file name without .jsonl> is requir
 const readJsonl = (p) => readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
 const questions = Object.fromEntries(readJsonl(join(EVAL_DIR, "dataset", `questions.${dataset}.jsonl`)).map((q) => [q.id, q]));
 const boar = Object.fromEntries(readJsonl(join(EVAL_DIR, "results", "runs", dataset, `${system}.jsonl`)).map((r) => [r.queryId, r]));
-const ref = Object.fromEntries(readJsonl(join(EVAL_DIR, "references", dataset, `${refName}.jsonl`)).filter((r) => r.ok).map((r) => [r.id, r]));
+const ref = against
+  ? Object.fromEntries(readJsonl(join(EVAL_DIR, "results", "runs", dataset, `${against}.jsonl`)).filter((r) => r.outcome === "success").map((r) => [r.queryId, r]))
+  : Object.fromEntries(readJsonl(join(EVAL_DIR, "references", dataset, `${refName}.jsonl`)).filter((r) => r.ok).map((r) => [r.id, r]));
 
 let ids = subset === "all" ? Object.keys(questions) : JSON.parse(readFileSync(join(EVAL_DIR, "dataset", `subset.${subset}.${dataset}.json`), "utf8")).ids;
+// --categories a,b: judge only these categories (e.g. v2 food items are scored objectively, not by the judge).
+const categories = get("--categories")?.split(",");
+if (categories) ids = ids.filter((id) => categories.includes(questions[id]?.category));
 const missing = ids.filter((id) => !boar[id] || !ref[id]);
 if (missing.length) console.warn(`skipping ${missing.length} ids without both answers: ${missing.join(",")}`);
 ids = ids.filter((id) => boar[id] && ref[id]);
