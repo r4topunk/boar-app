@@ -9,6 +9,29 @@
 
 <!--TLDR-->
 
+## 0. North star: how Vitalik evaluates (2026-09-26)
+
+He tested BOAR, AndroidLM and Field Atlas ([post](https://x.com/VitalikButerin/status/2103762130554204651); full report in `review/ETH_NODE_INTEGRATION.md`):
+
+> "Definitely getting much better than the one I tried to build myself 2 months ago. But also still **much slower and less effective at difficult questions than the models that can run on a laptop**."
+>
+> "It's weakest at specialized travel-related queries (eg. my eval is 'Tell me the best vegan restaurants in [city I am currently in]', unfortunately none of these performed well on that)"
+
+What it means for the deep tier:
+
+| Fact | Consequence for deep |
+|---|---|
+| The only MoE app (AndroidLM, Qwen3.6-35B-A3B) got the best answer, but took **~5 min** (answer 130 s at 3.2 tok/s + "source check" 162 s at 1.1 tok/s, per the screenshot). That is what "much slower" describes | **Quality without speed fails his test.** Deep must not repeat AndroidLM's profile: an answer ≥2 min is a loss, even when it is right |
+| His reference is "models that can run on a laptop" (on his own machine he runs `qwen3.8-flash-next` next to 100+ GB of Wikipedia/Gutenberg/papers) | We will not match a laptop on speed. The bar we can beat is **quality per second compared with the other apps** |
+| The literal eval (vegan restaurants in the current city) is **retrieval of local data** (OSM `diet:vegan`, Wikivoyage Eat), not model size | Deep does not solve the #1 failure. P1 (POI/OSM pack) comes first. Deep only enters when the fast tier is not enough |
+| BOAR got the post-quantum question wrong because of **wrong retrieval** (RSA/factoring sources), not only because of the 1.5B model | A 35B on top of wrong sources still answers wrong. Retrieval quality (P3) is a prerequisite for deep being worth anything |
+
+Hard rules for deep derived from this (they go into the success criteria, §7):
+1. **Time budget per answer:** TTFT ≤15 s and full answer ≤60 s with ~200–250 tokens, i.e. **≥4 tok/s sustained with no thermal collapse**. No second pass at 1 tok/s (AndroidLM's "source check").
+2. **Show the time** (P2): tok/s and seconds visible, answer streaming token by token, instant snippet already on screen while deep generates.
+3. **Opt-in and routed:** deep only on "go deeper" or multi-step synthesis. Lookups and travel go to snippet/POI + fast tier.
+4. If on a real device deep does not meet (1), **it does not go into the bounty submission**. It stays a flagged experiment. Zero effect on the critical path.
+
 ## 1. Objective
 
 Give Boar an optional "go deeper" tier that answers the questions a 1–4B model gets wrong: synthesis, comparison and multi-step reasoning. It runs a MoE of ~35B total parameters and ~3B active, with the weights on flash and only the routed experts read per token. That is the direction Vitalik pointed at (big MoE, most of it on disk).
