@@ -24,7 +24,7 @@ cmake -S . -B build-metal -G Ninja -DCMAKE_BUILD_TYPE=Release                   
 
 # 2. model (sha256 96b9c0af5c77a4ecaabe3983175112b5ece763261c1ece12b2494b692a70dad7, same file as AndroidLM)
 curl -L -o ~/boar/shared-models/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf \
-  https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf
+  https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf  # pinned commit; removed from the mini 2026-09-26, see ADR §9
 
 # 3. matrix (one job at a time), then summarize
 bash bench-mini.sh ~/boar/shared-models/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf qwen36-q2kxl mmap s1500 s3000 s5000 s3000k6

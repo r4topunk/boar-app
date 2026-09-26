@@ -1,12 +1,13 @@
 # ADR 0001: "deep" tier (MoE with experts streamed from flash)
 
-- Status: **Proposed** (spike; nothing in `src/` changes until approved). Recommendation: **do not integrate yet; validate on a device first**
+- Status: **Deferred: out of v1.1** (Boar, 2026-09-26). Nothing in `src/` changes. The tier reopens only through one of the triggers in §9.
 - Date: 2026-09-26
 - Author: Caldera (spike/moe-deep)
 - Related: `spikes/deep-tier/SOTA.md` (state of the art with sources), `spikes/deep-tier/README.md` (how to reproduce), `review/androidlm.md` (competitor)
 
 ## TL;DR
 
+- **Outcome (2026-09-26): deferred.** The deep tier is out of v1.1. The measured model was removed from the mini to free disk, and it can be fetched again from the pinned URL in §9. The reopen triggers are in §9.
 - **Recommendation: Qwen3.6-35B-A3B with expert streaming (BigMoeOnEdge) is the right deep-tier engine and model, but it does NOT go into the bounty submission now.** With the context the RAG uses today (~1.3k tokens), TTFT is 40–58 s even on a Mac mini M4, and on a phone the prefill is slower. That fails the speed bar Vitalik set ("much slower… than the models that can run on a laptop").
 - Measured on the M4 (4 threads, CPU, 1,310-token prompt): streaming gives **6.3–7.3 tok/s of decode** (8.7 tok/s with k=6), **28–41 tok/s of prefill** and **TTFT 40–58 s**. It reads 18–93 MiB of flash per token (cache of 5000→1500 MiB). The dense weights are 1.63 GiB, the experts 9.80 GiB, and each token reads ~314 MiB when there is no cache.
 - **Blocking risk found:** the process's peak footprint is **10.7 GiB with a 1.3k-token prompt** (5.95 GiB with 19 tokens), whatever the cache or ubatch. Prefill holds the union of experts. On iOS that is jetsam, and on 12 GB Android it risks an OOM kill. This has to be fixed before any integration.
@@ -191,6 +192,29 @@ If 1–4 fail: **rollback** (below) and the tier stays out of the submission. If
 - The llama.rn patch lives in `patches/` (patch-package). Rollback means removing the patch and going back to the prebuilt llama.rn (`rnllamaBuildFromSource=false`).
 - The model lives in its own file (≤13.2 GB) and deleting it frees the disk. Corpus and indexes do not depend on it.
 - Trigger for automatic rollback on the device: decode <2 tok/s for 3 consecutive answers, or a low-memory kill. The router falls back to the fast tier and marks deep as unavailable on that device.
+
+## 9. Triggers to reopen
+
+The tier stays shelved until **at least one** trigger below fires. Any of them restarts from §6 option (a) (device run), never from integration.
+
+| # | Trigger | Why it changes the answer | Who notices |
+|---|---|---|---|
+| T1 | A real 12 GB Android device reaches the device lab (Pixel 8/9 Pro class) | §6 (a) can finally be run. It is the only missing measurement | Piston / Boar |
+| T2 | BigMoeOnEdge (or llama.cpp upstream) ships a prefill with bounded staging, so the peak footprint on a ~1.3k-token prompt drops to ≤8 GiB | Removes the §4.2 blocker for Android and iOS | Caldera (watch upstream) |
+| T3 | Sextant's s32 in no-think shows deep beating fast in ≥60% of the deep questions (§7 criterion 5) | Proves there is quality to buy. Without it, speed does not matter | Sextant |
+| T4 | A MoE with ≤2B active params and quality ≥ Qwen3.6-35B-A3B no-think appears that fits in RAM (≤6 GB file), so no streaming is needed | The deep tier becomes an ordinary model swap for Tusk, not an engine project | Caldera / Sextant |
+| T5 | The phone prefill for Qwen3.6 UD-Q2_K_XL reaches ≥100 tok/s (for example the iqk aarch64 kernels, §6 option c) | TTFT ≤15 s with 1.3k tokens becomes plausible without cutting the context to 400 | Caldera |
+| T6 | Product decision: the bounty or the roadmap asks for a "go deeper" mode explicitly (after the 2026-10-24 scope freeze, v1.2 at the earliest) | Scope, not tech | Boar / user |
+
+**Reopen checklist (in order, each step is a go/no-go):**
+1. Ask Boar for disk (≥13 GB free on the mini, above the 20 GB floor) and fetch the model again with the pinned URL below. Check the sha256.
+2. Rerun `bench-mini.sh` through the `heavy` queue with the same matrix (§4.1) to confirm that nothing regressed on the current BigMoeOnEdge commit.
+3. Run §6 (a) on the device, then check §7 criteria 1–4. Only then open the §6 tasks.
+
+**Artifact to re-fetch** (removed from `~/boar/shared-models/` on the mini on 2026-09-26 to free disk):
+- `Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf`, 12,290,628,576 B, sha256 `96b9c0af5c77a4ecaabe3983175112b5ece763261c1ece12b2494b692a70dad7`
+- URL pinned to the Hugging Face commit (checked with the HF `paths-info` API on 2026-09-26; the LFS oid matches the sha256): `https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf`
+- Still on the mini (small): the bmoe/llama.cpp builds in `~/boar/spikes/bmoe`, `~/boar/spikes/.venv`, `~/boar/spikes/results/`.
 
 ## UNKNOWN
 
