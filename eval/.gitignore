@@ -1,3 +1,6 @@
 .cache/
 node_modules/
 results/_quarantine/
+results/*.log
+results/runs/**/*.invalid-*.jsonl
+results/runs/**/*.pre-*.jsonl
