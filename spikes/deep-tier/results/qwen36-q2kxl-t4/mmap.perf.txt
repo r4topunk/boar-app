@@ -1,0 +1,6 @@
+generation: 128 tokens, 0.089 s/token (11.290 tok/s)
+compute: 57.6% CPU occupancy (0.2040 cpu-s/token over 4 threads), 982.27 major faults/token
+prefill: 1310 tokens, 90.762 s (14.4 tok/s) | model load 9.271 s | TTFT 100.033 s
+mode: mmap. Expert streaming is OFF on a MoE model (qwen35moe), so this run is a baseline, not this engine: add --moe-stream --overlap to stream the routed experts from flash.
+          9047883776  maximum resident set size
+           455779688  peak memory footprint

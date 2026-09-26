@@ -61,7 +61,8 @@ def main():
             dec = rows[WARMUP:] if len(rows) > WARMUP else rows
             cfg = "mmap" if meta.get("moe_stream") == "0" else (
                 f"stream cache={meta.get('cache_mb')} k={meta.get('n_expert_used')}")
-            p = perf(c.with_suffix(".log"))
+            log = c.with_suffix(".log")
+            p = perf(log if log.exists() else c.with_suffix(".perf.txt"))
             print(
                 f"| {d.name}/{c.stem} | {cfg} | {p.get('gen_tok_s','?')} | {med(dec,'wall_ms'):.0f} | "
                 f"{med(dec,'io_ms'):.0f} | {med(dec,'stall_ms'):.0f} | {med(dec,'compute_ms'):.0f} | "

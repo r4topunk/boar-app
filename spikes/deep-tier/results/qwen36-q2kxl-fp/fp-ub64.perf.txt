@@ -1,0 +1,9 @@
+bmoe: dense-weights=anon — 1670 MiB in 613 anon buffers
+bmoe: expert streaming ON  n_expert=256 o_direct=1 io_threads=4 cache=1500 MiB shards=1
+generation: 128 tokens, 0.207 s/token (4.833 tok/s)
+compute: 51.0% CPU occupancy (0.4222 cpu-s/token over 4 threads), 0.00 major faults/token
+prefill: 1310 tokens, 118.900 s (11.0 tok/s) | model load 11.151 s | TTFT 130.051 s
+mode: expert streaming, cache 1500 MiB, dense anon, overlap
+moe-overlap: stall 0.110 s/token (flash reads overlapped with FFN compute)
+          6415663104  maximum resident set size
+         11518920752  peak memory footprint

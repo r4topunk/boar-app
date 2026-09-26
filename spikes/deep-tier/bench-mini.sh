@@ -54,6 +54,11 @@ for c in "${CONFIGS[@]}"; do
     s3000)    stream s3000 3000 ;;
     s5000)    stream s5000 5000 ;;
     s3000k6)  stream s3000k6 3000 --n-expert-used 6 ;;
+    # footprint diagnostics: is the ~10.8 GiB peak the prefill union of experts?
+    fp-short) run fp-short "$CLI" -m "$MODEL" -t "$THREADS" -n 32 -c 4096 --chatml --no-think \
+                -p "What is a mixture of experts?" --moe-stream --cache-mb 1500 --io-threads 4 \
+                --overlap --dense-weights anon --csv "$OUT/fp-short.csv" ;;
+    fp-ub64)  stream fp-ub64 1500 --ubatch 64 ;;
     *) echo "unknown config $c" >&2; exit 2 ;;
   esac
 done

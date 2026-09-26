@@ -1,0 +1,16 @@
+Sat Sep 26 17:47:05 -03 2026
+17:47  up 19:44, 3 users, load averages: 3.84 4.04 4.33
+vm.swapusage: total = 5120.00M  used = 3759.62M  free = 1360.38M  (encrypted)
+System-wide memory free percentage: 79%
+ %CPU    RSS COMM
+100.7 187648 /Users/r4to/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell
+100.3 161152 /Users/r4to/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell
+ 32.1 549664 /Users/r4to/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell
+ 24.3  68288 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/153.0.8010.53/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper
+ 21.2 406992 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/153.0.8010.53/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)
+ 12.0 326624 node
+  9.9  18720 /sbin/launchd
+--- after
+Sat Sep 26 17:50:02 -03 2026
+17:50  up 19:47, 3 users, load averages: 6.01 5.08 4.72
+vm.swapusage: total = 10240.00M  used = 8370.06M  free = 1869.94M  (encrypted)

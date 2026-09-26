@@ -1,0 +1,16 @@
+Sat Sep 26 17:30:41 -03 2026
+17:30  up 19:28, 3 users, load averages: 2.06 3.11 4.48
+vm.swapusage: total = 5120.00M  used = 3838.88M  free = 1281.12M  (encrypted)
+System-wide memory free percentage: 81%
+ %CPU    RSS COMM
+ 28.1  71104 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/153.0.8010.53/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper
+ 24.2 390192 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/153.0.8010.53/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)
+ 11.5  26656 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+  6.0  17232 /System/Library/ExtensionKit/Extensions/NeptuneOneWallpaper.appex/Contents/MacOS/NeptuneOneWallpaper
+  5.2  27584 /Applications/Docker.app/Contents/Resources/bin/docker
+  2.7  40432 /System/Library/Frameworks/VideoToolbox.framework/Versions/A/XPCServices/VTDecoderXPCService.xpc/Contents/MacOS/VTDecoderXPCService
+  2.3  43552 /Users/r4to/.hermes/hermes-agent/venv/bin/python3
+--- after
+Sat Sep 26 17:39:05 -03 2026
+17:39  up 19:36, 3 users, load averages: 3.70 4.53 4.71
+vm.swapusage: total = 6144.00M  used = 5581.94M  free = 562.06M  (encrypted)

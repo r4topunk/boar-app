@@ -1,0 +1,4 @@
+| qwen35moe 35B.A3B Q2_K - Medium |  11.44 GiB |    34.66 B | BLAS       |       4 |           pp512 |         31.97 ± 4.58 |
+| qwen35moe 35B.A3B Q2_K - Medium |  11.44 GiB |    34.66 B | BLAS       |       4 |           tg128 |         20.11 ± 0.89 |
+          9585229824  maximum resident set size
+          1579640744  peak memory footprint

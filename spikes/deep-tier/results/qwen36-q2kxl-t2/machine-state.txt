@@ -1,0 +1,16 @@
+Sat Sep 26 17:15:40 -03 2026
+17:15  up 19:13, 3 users, load averages: 4.89 4.61 6.33
+vm.swapusage: total = 6144.00M  used = 5631.62M  free = 512.38M  (encrypted)
+System-wide memory free percentage: 66%
+ %CPU    RSS COMM
+ 99.7 104256 /Users/r4to/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell
+ 99.3  87440 /Users/r4to/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell
+ 23.0  60352 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/153.0.8010.53/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper
+ 15.3 244880 /Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/153.0.8010.53/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)
+  7.8  20320 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+  5.2  16160 /System/Library/ExtensionKit/Extensions/NeptuneOneWallpaper.appex/Contents/MacOS/NeptuneOneWallpaper
+  3.9 231824 node
+--- after
+Sat Sep 26 17:24:51 -03 2026
+17:24  up 19:22, 3 users, load averages: 3.66 4.46 5.46
+vm.swapusage: total = 8192.00M  used = 7291.25M  free = 900.75M  (encrypted)

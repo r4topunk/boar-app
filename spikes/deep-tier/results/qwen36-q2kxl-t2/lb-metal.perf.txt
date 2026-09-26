@@ -1,0 +1,4 @@
+llama_bench: error: failed to run prompt
+          7866286080  maximum resident set size
+           273819080  peak memory footprint
+EXIT=1
