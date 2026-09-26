@@ -16,44 +16,61 @@ const dataset = get("--dataset", "v1");
 const A = get("--a", "qwen2.5-1.5b-instruct-q4km__bundled__sources-system");
 const B = get("--b", "qwen2.5-1.5b-instruct-q4km__bundled__sources-user");
 const ref = "claude-code__opus";
+const name = get("--name", "ab-sources-layout");
+const label = get("--label", "Qwen2.5-1.5B");
 const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : "n/a");
 const pct = (x) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : "n/a");
 
-function pairs(system, against) {
+function pairs(system, against, dir = "judgments") {
   const byQ = {};
-  for (const j of readJsonl(join(EVAL_DIR, "results", "judgments", dataset, `${system}__vs__${against}.jsonl`)).filter((j) => j.ok)) (byQ[j.queryId] ??= {})[j.order] = j;
+  for (const j of readJsonl(join(EVAL_DIR, "results", dir, dataset, `${system}__vs__${against}.jsonl`)).filter((j) => j.ok)) (byQ[j.queryId] ??= {})[j.order] = j;
   return Object.entries(byQ).filter(([, o]) => o.boarA && o.boarB).map(([queryId, o]) => ({ queryId, ...combineOrders(o.boarA.mapped, o.boarB.mapped) }));
 }
 const correct = (ps) => ps.filter((p) => p.boar.correctness >= 4).length / Math.max(1, ps.length);
 
-const direct = pairs(B, A);
-const d = summarize(direct, { seed: 31 });
-const vsA = pairs(A, ref), vsB = pairs(B, ref);
-const sA = summarize(vsA, { seed: 32 }), sB = summarize(vsB, { seed: 33 });
-const cA = correct(vsA), cB = correct(vsB);
-const regressDirect = d.winScoreCI[1] < 0.5;
-const regressCorrect = cA - cB > 0.10;
-const regressed = regressDirect || regressCorrect;
+const runs = (n) => readJsonl(join(EVAL_DIR, "results", "runs", dataset, `${n}.jsonl`));
+const cites = (n) => runs(n).filter((r) => /\[\d+\]/.test(r.answer)).length;
+const literalN = (n) => runs(n).filter((r) => /\[n\]/.test(r.answer)).length;
+const sections = [];
+let anyRegressed = false;
+for (const [judge, dir] of [["Claude", "judgments"], ["Jev", "judgments-jev"]]) {
+  const direct = pairs(B, A, dir);
+  if (!direct.length) { sections.push(`### Judge: ${judge}\n\nNot run.\n`); continue; }
+  const d = summarize(direct, { seed: 31 });
+  const vsA = pairs(A, ref, dir), vsB = pairs(B, ref, dir);
+  const haveRef = vsA.length && vsB.length;
+  const sA = haveRef ? summarize(vsA, { seed: 32 }) : null, sB = haveRef ? summarize(vsB, { seed: 33 }) : null;
+  const cA = haveRef ? correct(vsA) : NaN, cB = haveRef ? correct(vsB) : NaN;
+  const regressDirect = d.winScoreCI[1] < 0.5;
+  const regressCorrect = haveRef && cA - cB > 0.10;
+  const regressed = regressDirect || regressCorrect;
+  anyRegressed ||= regressed;
+  sections.push(`### Judge: ${judge} — ${regressed ? "REGRESSED" : "no regression"}
 
-const runs = (name) => readJsonl(join(EVAL_DIR, "results", "runs", dataset, `${name}.jsonl`));
-const cites = (name) => runs(name).filter((r) => /\[\d+\]/.test(r.answer)).length;
+Direct blind comparison B vs A (both orders, ${direct.length} questions): B wins ${pct(d.boarWin)}, ties ${pct(d.tie)}, loses ${pct(d.refWin)}; win score ${fmt(d.winScore)} (95% CI ${fmt(d.winScoreCI[0])}–${fmt(d.winScoreCI[1])}); position-consistent ${pct(d.positionConsistency)}.
 
-const md = `# A/B: sources in the user turn vs in the system prompt (v1.1 item 5)
-
-TL;DR: **${regressed ? "REGRESSED" : "NO REGRESSION"}** on ${direct.length} questions (v1 s32, Qwen2.5-1.5B, seed 42, same job and machine).
-
-| | A: sources in system (today) | B: sources in user turn (feat/prompt-cache) |
+${haveRef ? `| vs reference | A: sources in system | B: sources in user turn |
 |---|---|---|
-| Correct answers vs reference (correctness ≥ 4) | ${pct(cA)} | ${pct(cB)} |
-| Quality ratio vs reference (95% CI) | ${fmt(sA.qualityRatio)} (${fmt(sA.qualityRatioCI[0])}–${fmt(sA.qualityRatioCI[1])}) | ${fmt(sB.qualityRatio)} (${fmt(sB.qualityRatioCI[0])}–${fmt(sB.qualityRatioCI[1])}) |
-| Answers citing [n] | ${cites(A)}/32 | ${cites(B)}/32 |
+| Correct answers (correctness ≥ 4) | ${pct(cA)} | ${pct(cB)} |
+| Quality ratio (95% CI) | ${fmt(sA.qualityRatio)} (${fmt(sA.qualityRatioCI[0])}–${fmt(sA.qualityRatioCI[1])}) | ${fmt(sB.qualityRatio)} (${fmt(sB.qualityRatioCI[0])}–${fmt(sB.qualityRatioCI[1])}) |` : "Against-reference runs not available for this judge."}
 
-Direct blind comparison B vs A (both orders): B wins ${pct(d.boarWin)}, ties ${pct(d.tie)}, loses ${pct(d.refWin)}; win score ${fmt(d.winScore)} (95% CI ${fmt(d.winScoreCI[0])}–${fmt(d.winScoreCI[1])}); position-consistent ${pct(d.positionConsistency)}.
+Criterion: direct win-score CI entirely below 0.5 — ${regressDirect ? "met" : "not met"}; correct rate down more than 10 points — ${haveRef ? (regressCorrect ? "met" : "not met") : "not evaluated"}.
+`);
+}
+const md = `# A/B: sources in the user turn vs in the system prompt — ${label} (v1.1 item 5)
 
-Pre-registered criterion: regression if the direct win-score CI is entirely below 0.5 (${regressDirect ? "met" : "not met"}) or B's correct rate is more than 10 points below A's (${regressCorrect ? "met" : "not met"}).
+TL;DR: **${anyRegressed ? "REGRESSED (see judges below)" : "NO REGRESSION"}** on v1 s32 (${label}, seed 42, same job and machine). A = \`${A}\`, B = \`${B}\`.
 
-Scope: quality only. TTFT with prompt-cache reuse is measured by the engine owner (llama-server cache_prompt, multi-turn). The runner here builds a fresh context per question, so its TTFT does not show cache reuse. Layout B text is byte-identical to buildAnswerMessages (feat/prompt-cache bb43768) on this corpus (no \`</sources>\` in any source).
+Pre-registered criterion (written before any judge ran): regression if the direct B-vs-A win score 95% CI lies entirely below 0.5, or B's correct-answer rate vs the reference is more than 10 points below A's.
+
+| | A | B |
+|---|---|---|
+| Answers citing [1], [2]… | ${cites(A)}/32 | ${cites(B)}/32 |
+| Answers with a literal "[n]" | ${literalN(A)}/32 | ${literalN(B)}/32 |
+
+${sections.join("\n")}
+Scope: quality only. TTFT with prompt-cache reuse is measured by the engine owner (llama-server cache_prompt, multi-turn); this runner builds a fresh context per question.
 `;
-writeFileSync(join(EVAL_DIR, "reports", "ab-sources-layout.md"), md);
+writeFileSync(join(EVAL_DIR, "reports", `${name}.md`), md);
 console.log(md);
