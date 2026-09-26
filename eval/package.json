@@ -9,6 +9,7 @@
     "run:mini": "bash scripts/sync-mini.sh && bash scripts/run-mini.sh",
     "judge": "node scripts/judge.mjs",
     "report": "node scripts/report.mjs",
+    "report:official": "node scripts/report.mjs --subset all --name official-v1 --systems qwen3-4b-instruct-2507-q4km__bundled,qwen2.5-1.5b-instruct-q4km__bundled && node scripts/judge-agreement.mjs --subset all && node scripts/report-v2.mjs",
     "test": "cd .. && npx vitest run eval/scripts"
   },
   "dependencies": {

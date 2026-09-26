@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds eval/reports/<name>.md + quality-vs-latency SVG from runs, references, judgments, calibration and spend.
 // No model calls: it only reads result files, so the report is reproducible from the committed data.
-// Usage (from eval/): node scripts/report.mjs [--dataset v1] [--subset s32|all] [--name baseline-v1]
+// Usage (from eval/): node scripts/report.mjs [--dataset v1] [--subset s32|all] [--name baseline-v1] [--systems a,b]
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,12 +24,15 @@ const pct = (x) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : "n/a");
 
 const refs = readJsonl(join(EVAL_DIR, "references", dataset, `${refName}.jsonl`)).filter((r) => r.ok);
 const runsDir = join(EVAL_DIR, "results", "runs", dataset);
-const systems = readdirSync(runsDir).filter((f) => f.endsWith(".jsonl") && !/\.(pre-|invalid)/.test(f)).map((f) => f.replace(/\.jsonl$/, ""));
+// --systems a,b: report only these runs (the runs dir also holds A/B variants and exploratory models).
+const onlySystems = get("--systems")?.split(",");
+const systems = readdirSync(runsDir).filter((f) => f.endsWith(".jsonl") && !/\.(pre-|invalid)/.test(f)).map((f) => f.replace(/\.jsonl$/, ""))
+  .filter((s) => !onlySystems || onlySystems.includes(s));
 const subsetIds = subset === "all" ? null : new Set(JSON.parse(readFileSync(join(EVAL_DIR, "dataset", `subset.${subset}.${dataset}.json`), "utf8")).ids);
 
 /** Groups judgments per query and combines the two orders; queries with a single order are left out. */
-function pairsFor(system) {
-  const js = readJsonl(join(EVAL_DIR, "results", "judgments", dataset, `${system}__vs__${refName}.jsonl`)).filter((j) => j.ok && (!subsetIds || subsetIds.has(j.queryId)));
+function pairsFor(system, dir = "judgments") {
+  const js = readJsonl(join(EVAL_DIR, "results", dir, dataset, `${system}__vs__${refName}.jsonl`)).filter((j) => j.ok && (!subsetIds || subsetIds.has(j.queryId)));
   const byQ = {};
   for (const j of js) (byQ[j.queryId] ??= {})[j.order] = j;
   return Object.entries(byQ)
@@ -42,6 +45,7 @@ const rows = systems.map((system) => {
   const inScope = runs.filter((r) => !subsetIds || subsetIds.has(r.queryId));
   const ok = inScope.filter((r) => r.outcome === "success");
   const pairs = pairsFor(system);
+  const jevPairs = pairsFor(system, "judgments-jev");
   return {
     system,
     label: runs[0]?.configLabel ?? system,
@@ -57,6 +61,9 @@ const rows = systems.map((system) => {
     pairs,
     judged: pairs.length ? summarize(pairs, { seed: 11 }) : null,
     correctRate: pairs.length ? pairs.filter((p) => p.boar.correctness >= 4).length / pairs.length : NaN,
+    jev: jevPairs.length ? summarize(jevPairs, { seed: 11 }) : null,
+    jevN: jevPairs.length,
+    jevCorrectRate: jevPairs.length ? jevPairs.filter((p) => p.boar.correctness >= 4).length / jevPairs.length : NaN,
   };
 });
 
@@ -118,14 +125,22 @@ lines.push(`# BOAR eval: ${name}`, "");
 lines.push(`TL;DR: quality of on-device answers relative to a frontier model with web search, and seconds per answer. Dataset \`${dataset}\`, scope \`${subset}\` (${subsetIds ? subsetIds.size : "all"} questions). Regenerate with \`npm --prefix eval run report\`.`, "");
 lines.push(`![quality vs latency](./${name}.quality-latency.svg)`, "");
 lines.push("## Results", "");
-lines.push("| System | Quality ratio (95% CI) | Correct answers (correctness ≥ 4) | Win / tie / loss vs ref | Win score (95% CI) | Position-consistent | Median s (p90) | TTFT s | tok/s | KB hit | Success |");
-lines.push("|---|---|---|---|---|---|---|---|---|---|---|");
+lines.push("| System | Judged | Quality ratio (95% CI) | Correct answers (correctness ≥ 4) | Win / tie / loss vs ref | Win score (95% CI) | Position-consistent | Median s (p90) | TTFT s | tok/s | KB hit | Success |");
+lines.push("|---|---|---|---|---|---|---|---|---|---|---|---|");
 for (const r of rows) {
   const j = r.judged;
-  lines.push(`| ${r.label} | ${j ? `${fmt(j.qualityRatio)} (${fmt(j.qualityRatioCI[0])}–${fmt(j.qualityRatioCI[1])})` : "not judged"} | ${j ? pct(r.correctRate) : "–"} | ${j ? `${pct(j.boarWin)} / ${pct(j.tie)} / ${pct(j.refWin)}` : "–"} | ${j ? `${fmt(j.winScore)} (${fmt(j.winScoreCI[0])}–${fmt(j.winScoreCI[1])})` : "–"} | ${j ? pct(j.positionConsistency) : "–"} | ${fmt(r.medianTotalS, 1)} (${fmt(r.p90TotalS, 1)}) | ${fmt(r.medianTtftS, 1)} | ${fmt(r.medianTokPerSec, 0)} | ${pct(r.kbHit)} | ${pct(r.successRate)} |`);
+  lines.push(`| ${r.label} | ${r.pairs.length} | ${j ? `${fmt(j.qualityRatio)} (${fmt(j.qualityRatioCI[0])}–${fmt(j.qualityRatioCI[1])})` : "not judged"} | ${j ? pct(r.correctRate) : "–"} | ${j ? `${pct(j.boarWin)} / ${pct(j.tie)} / ${pct(j.refWin)}` : "–"} | ${j ? `${fmt(j.winScore)} (${fmt(j.winScoreCI[0])}–${fmt(j.winScoreCI[1])})` : "–"} | ${j ? pct(j.positionConsistency) : "–"} | ${fmt(r.medianTotalS, 1)} (${fmt(r.p90TotalS, 1)}) | ${fmt(r.medianTtftS, 1)} | ${fmt(r.medianTokPerSec, 0)} | ${pct(r.kbHit)} | ${pct(r.successRate)} |`);
 }
-lines.push(`| Reference (Opus + web search) | 1.00 | ${pct(refCorrect)} | – | – | – | ${fmt(refMedianS, 1)} | – | – | – | ${pct(refInScope.length / Math.max(1, subsetIds ? subsetIds.size : 96))} |`, "");
+lines.push(`| Reference (Opus + web search) | – | 1.00 | ${pct(refCorrect)} | – | – | – | ${fmt(refMedianS, 1)} | – | – | – | ${pct(refInScope.length / Math.max(1, subsetIds ? subsetIds.size : 96))} |`, "");
 lines.push("Quality ratio = mean rubric score of the BOAR answer / mean rubric score of the reference answer (rubric: " + RUBRIC.map(([k]) => k).join(", ") + ", 1–5 each). Win score = wins + ½ ties. CIs are percentile bootstrap over questions (2,000 resamples, seeded).", "");
+
+if (rows.some((r) => r.jev)) {
+  lines.push("## Second judge (Jev, another model family)", "");
+  lines.push("Same blinded pairs, rubric and A/B orders, judged by typesafe-ai/jev through the Vercel AI Gateway (eval time only). Agreement between the two judges: `reports/judges-" + dataset + "-" + subset + ".md`.", "");
+  lines.push("| System | n | Quality ratio (95% CI) | Correct answers | Win / tie / loss vs ref |", "|---|---|---|---|---|");
+  for (const r of rows.filter((r) => r.jev)) lines.push(`| ${r.label} | ${r.jevN} | ${fmt(r.jev.qualityRatio)} (${fmt(r.jev.qualityRatioCI[0])}–${fmt(r.jev.qualityRatioCI[1])}) | ${pct(r.jevCorrectRate)} | ${pct(r.jev.boarWin)} / ${pct(r.jev.tie)} / ${pct(r.jev.refWin)} |`);
+  lines.push("");
+}
 
 lines.push("## Rubric means", "");
 lines.push("| System | " + RUBRIC.map(([k]) => `${k} (BOAR / ref)`).join(" | ") + " |");
@@ -153,7 +168,9 @@ lines.push("- **Judge**: Claude Code headless with no tools, blind pairwise comp
 lines.push("- **Consumption**: runs on the user's Claude Code subscription; no API key, no gateway. Cost below is the CLI's list-price equivalent, not a charge.");
 lines.push("");
 lines.push("## Limitations", "");
-lines.push("- **Judge and reference are the same family (Claude).** Self-preference bias would favor the reference, so BOAR's ratio is, if anything, understated. A second judge family is not available without a paid API (forbidden for now).");
+lines.push(rows.some((r) => r.jev)
+  ? "- **The main judge and the reference are the same family (Claude).** Self-preference bias would favor the reference, so BOAR's ratio is, if anything, understated. The second judge (Jev, another family) is the check on that bias."
+  : "- **Judge and reference are the same family (Claude).** Self-preference bias would favor the reference, so BOAR's ratio is, if anything, understated.");
 lines.push("- Author notes in the dataset guide the judge; they can be incomplete or outdated for time-sensitive facts.");
 lines.push("- Desktop latency (Apple M4, Metal) is not phone latency; device numbers come from `scripts/eval-device.mjs`.");
 const busy = rows.filter((r) => r.maxLoad > 8);
