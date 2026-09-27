@@ -19,7 +19,7 @@ import { geoProvidersFrom } from "./src/routing/geoWiring";
 import { getCurrentPoint, getLocationFix } from "./src/services/location";
 import { installedPoiPacks, resolvePlace, searchPois } from "./src/rag/pois";
 import { POI_REGIONS } from "./src/rag/poiRegions";
-import { bootMark, bootTimed } from "./src/services/bootMarks";
+import { bootMark, bootTimed, perfLog } from "./src/services/bootMarks";
 
 // Offline places: without this, every places question answers "places pack not installed".
 registerGeoProviders(
@@ -41,7 +41,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // Boot timing (splash decision): how long the native splash covers the JS start. Read in logcat / Xcode.
 const BOOT_T0 = Date.now();
 bootMark("js-start");
-console.info(`[boot] js-start t=${BOOT_T0}`);
+perfLog(`[boot] js-start t=${BOOT_T0}`);
 
 function AppContent() {
   const t = useTokens();
@@ -62,7 +62,7 @@ function AppContent() {
   const ready = !!initialRoute && (fontsLoaded || !!fontError);
   useEffect(() => {
     if (!ready) return;
-    console.info(`[boot] hide after=${Date.now() - BOOT_T0}ms`);
+    perfLog(`[boot] hide after=${Date.now() - BOOT_T0}ms`);
     bootMark(fontError ? "splash-hide (font error)" : "splash-hide");
     SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
