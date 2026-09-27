@@ -50,7 +50,7 @@ if [ -n "$SHA" ] && T=$(mktemp -d) && git -C "$TREE" archive "$SHA" src | tar -x
   echo "$CIT2" | grep -q "CIT-2 PASS" || FAIL=1
   line "CIT-2 fixed case" "${CIT2:-not run}"
 else line "CIT-2 fixed case" "not run (no tree/sha in meta.json)"; FAIL=1; fi
-PTC=$(node scripts/pt-compact-check.mjs "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Jev, 1.5B.*//')
+PTC=$(node scripts/pt-compact-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Jev, 1.5B.*//')
 echo "$PTC" | grep -q '\*\*FAIL' && FAIL=1
 line "1.5B PT confident errors" "$PTC"
 line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (target, reported)"

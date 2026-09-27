@@ -2,7 +2,7 @@
 // The Compacto (1.5B) in PT (Boar, 20e8c65): its answers to the 41 PT v2 items (gate results/gates/<label>/pt-compact),
 // judged by Jev against the reference. Confident error = a model answer (not a refusal, not a health excerpt or fixed answer) with correctness <= 2.
 // Blocks above the fixed ceiling of 10 (the s32 ceiling); reports the uncited answers ("sem fonte citada") too.
-// Usage (from eval/): node scripts/pt-compact-check.mjs <label> [<label> ...]   (the last one is judged for the verdict)
+// Usage (from eval/): node scripts/pt-compact-check.mjs [<control-label>] <candidate-label>
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -12,7 +12,7 @@ import { normalizeRow } from "./lib/row-normalize.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const labels = process.argv.slice(2);
-const CEILING = 10;
+const CEILING = 10, MARGIN = 2;
 const REFUSAL = /(don't|do not) support this answer|n[ãa]o sustentam esta resposta|did(n't| not) find|n[ãa]o encontrei|no (reliable |good )?(offline )?source|won't (answer|give [^.]*) from memory/i;
 
 function measure(label) {
@@ -40,10 +40,13 @@ function measure(label) {
 }
 
 const res = labels.map((l) => [l, measure(l)]);
+// Boar 2026-09-27: blocks above the control's errors + 2 (one seed of noise); the fixed ceiling of 10 is a target.
 const last = res.at(-1)[1];
-const pass = last && last.errors.length <= CEILING;
+const control = res.length > 1 ? res[0][1] : null;
+const limit = control ? control.errors.length + MARGIN : CEILING;
+const pass = last && last.errors.length <= limit;
 const L = [`# Compacto (1.5B) in PT: ${labels.join(" vs ")}`, "",
-  `TL;DR: **${!last ? "NOT RUN" : pass ? "PASS" : "FAIL"}**: ${labels.at(-1)} has ${last?.errors.length ?? "?"} confident errors in PT (fixed ceiling ${CEILING}). Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with \`node eval/scripts/pt-compact-check.mjs ${labels.join(" ")}\`.`, "",
+  `TL;DR: **${!last ? "NOT RUN" : pass ? "PASS" : "FAIL"}**: ${labels.at(-1)} has ${last?.errors.length ?? "?"} confident errors in PT${control ? ` vs control ${control.errors.length} (blocks above ${limit})` : ""}; target <= ${CEILING}: ${last && last.errors.length <= CEILING ? "met" : "not met"}. Answered without a cited source: ${last?.uncited ?? "?"}${control ? ` (control ${control.uncited})` : ""}. Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with \`node eval/scripts/pt-compact-check.mjs ${labels.join(" ")}\`.`, "",
   "| Gate | Judged | Refusals | Engine answers (excerpt / fixed, not counted) | Model answers | Correct when answering | Confident errors | Answered without a cited source |", "|---|---|---|---|---|---|---|---|"];
 for (const [l, m] of res) L.push(m ? `| ${l} | ${m.n} | ${m.refusals} | ${m.engine} | ${m.answered} | ${m.answered ? Math.round((100 * m.correct) / m.answered) : 0}% | **${m.errors.length}** | ${m.uncited} |` : `| ${l} | not run | | | | | | |`);
 L.push("", ...res.filter(([, m]) => m).map(([l, m]) => `- ${l} confident errors: ${m.errors.join(", ") || "none"}`), "");
