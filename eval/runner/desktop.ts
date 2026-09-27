@@ -145,7 +145,7 @@ function bundledCorpus(): Doc[] {
 }
 
 /** A format-2 pack hit (src/rag/wikiPack.ts PackHit), typed loosely so this file compiles on trees without it. */
-type PackHit = { chunkId: number; articleId: number; title: string; source: string; section?: string; text: string; url?: string; license?: string; score: number; via?: string };
+type PackHit = { chunkId: number; articleId: number; title: string; source: string; section?: string; text: string; url?: string; license?: string; score: number; via?: string; action?: boolean };
 type OpenPack = {
   id: string;
   sha256: string;
@@ -174,7 +174,23 @@ function packHitToChunk(packId: string, h: PackHit): RetrievedChunk {
     source: `${label} — ${url}${h.license ? ` (${h.license})` : ""}`,
     score: h.score,
     matchType: "lexical",
+    // engine-routing fb29dd7: the health path ranks passages whose section says what to do.
+    action: h.action,
   } as RetrievedChunk;
+}
+
+// Guard against drift: the app's packHitToChunk (src/rag/packs.ts) must not set fields this mirror lacks
+// (fb29dd7 added `action`, and a gate ran without it). Throws, so the gate reports INCOMPLETE instead of a wrong verdict.
+const MIRRORED_CHUNK_FIELDS = ["chunkId", "docId", "title", "body", "source", "score", "matchType", "action"];
+function assertPackMirror() {
+  const file = join(ROOT, "src/rag/packs.ts");
+  if (!existsSync(file)) return;
+  const src = readFileSync(file, "utf8");
+  const fn = src.slice(src.indexOf("export function packHitToChunk"));
+  const body = fn.slice(fn.indexOf("return {"), fn.indexOf("};"));
+  const keys = [...body.matchAll(/^\s+(\w+)(?=[:,])/gm)].map((m) => m[1]);
+  const missing = keys.filter((k) => !MIRRORED_CHUNK_FIELDS.includes(k));
+  if (missing.length) throw new Error(`runner mirror of packHitToChunk lacks field(s) the app sets: ${missing.join(", ")} (update eval/runner/desktop.ts)`);
 }
 
 /** Opens a format-2 pack with the source tree's WikiPack (Node's sqlite + fzstd, as in eval/retrieval/recall.test.ts). */
@@ -399,6 +415,7 @@ async function main() {
   const kb = new DesktopKnowledgeBase(embed);
   if (opt.corpus === "bundled") await kb.index(bundledCorpus(), join(EVAL_DIR, ".cache", "embeddings-bundled.json"));
   if (opt.corpus === "essential") await kb.index(essentialCorpus(), join(EVAL_DIR, ".cache", "embeddings-essential.json"));
+  if (opt.pack) assertPackMirror();
   for (const p of opt.pack?.split(",") ?? []) kb.packs.push(await openPack(p));
   const packTag = kb.packs.map((p) => `__pack-${p.id}`).join("");
 
