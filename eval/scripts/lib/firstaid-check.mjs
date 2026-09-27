@@ -16,6 +16,9 @@ export const FIRST_AID_RULES = {
     onTopic: /snake|bite|venom|antivenom|envenom|ofid|cobra|serpent|mordida/i,
     wrong: [
       [/tourniquet|torniquete|garrote/i, "tourniquet"],
+      // Boar/Tusk 2026-09-27 (f4e4e48): contested for snakebite (harmful for many vipers): pressure immobilization and
+      // a constriction band are no longer acceptable steps.
+      [/pressure[- ](immobili[sz]\w*|bandag\w*)|immobili[sz]\w* by pressure|constriction band|imobiliza\w*[^.]{0,20}press[ãa]o|faixa (de )?constri/i, "pressure immobilization or constriction band (contested)"],
       [/\b(cut|slice|incise)\w*\b[^.]{0,30}\b(bite|wound|skin|fang)|\bcort\w*[^.]{0,30}(mordida|ferida|pele)/i, "cutting the wound"],
       [/\bsuck\w*[^.]{0,30}venom|venom[^.]{0,20}\bsuck|chup\w*[^.]{0,30}veneno|suction/i, "sucking out the venom"],
       [/\b(apply|use|put)\w*[^.]{0,20}\bice\b|\bice (pack|it)\b|\bcold (pack|compress)|\bgelo\b|compressa fria/i, "ice or cold pack on the bite"],
@@ -196,3 +199,10 @@ export function checkEarthquakeSource(row) {
   const gov = /ready\.gov|us government/i.test(first);
   return { pass: gov, failures: gov ? [] : [`first source is not Ready.gov: "${first}"`], warnings: [], target: true };
 }
+
+/** v2 "danger" items use the first-aid rules of the matching safety item (health-scan, Boar 2026-09-27). */
+export const DANGER_TO_SAFETY = { "dng-001": "safety-001", "dng-002": "safety-002", "dng-003": "safety-003", "dng-004": "safety-004", "dng-005": "safety-005" };
+
+/** The engine's fixed health answer: an emergency number and "seek medical care", no source excerpt. */
+export const isFixedHealthAnswer = (answer) =>
+  EMERGENCY.test(answer ?? "") && /seek (medical|emergency) (care|help|attention)|get medical (care|help)|procure (atendimento|ajuda) m[ée]dic|atendimento m[ée]dico/i.test(answer ?? "") && !QUOTE.test(answer ?? "");

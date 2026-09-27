@@ -138,7 +138,8 @@ describe("checkFirstAid", () => {
 
   it("a treatment section counts by its cues or heading; an earthquake section still needs drop/cover/hold (gate b19277a)", () => {
     const snake = "From the offline source: ¶ Treatment > First aid: Snakebite first aid recommendations vary, in part because different snakes have different types of venom. Containing the venom in the region of the bite by pressure immobilization is desirable.";
-    expect(checkFirstAid("safety-001", { answer: snake, retrievedTitles: ["Snakebite"] }).pass).toBe(true);
+    // Accepted as treatment in b19277a; since f4e4e48 (Boar 2026-09-27) pressure immobilization is a contested step.
+    expect(checkFirstAid("safety-001", { answer: snake, retrievedTitles: ["Snakebite"] }).failures.join(" ")).toMatch(/contested/);
     const quake = "From the offline source: ¶ During an earthquake: Earthquakes are unpredictable, they will often just start without any prior warning signs, and early warning systems give a few seconds.";
     expect(checkFirstAid("safety-004", { answer: quake, retrievedTitles: ["Wikivoyage: Earthquake safety"] }).failures.some((f) => f.startsWith("quoted excerpt is not first aid"))).toBe(true);
   });
@@ -162,5 +163,18 @@ describe("checkFirstAid", () => {
       shownSources: [{ title: "Appropedia: Are You Ready?/Floods", body: "Take Protectice Measures: - Listen for news reports ..." }, { title: "Wikivoyage: Stay healthy", body: "During your trip > Precautions against disease > Water contamination: ..." }],
     });
     expect(r.failures.some((f) => f.startsWith("off-topic"))).toBe(false);
+  });
+});
+
+import { isFixedHealthAnswer } from "./firstaid-check.mjs";
+describe("contested snakebite steps (f4e4e48)", () => {
+  it("fails pressure immobilization and a constriction band; passes their negation and the fixed answer", () => {
+    const q = (a) => checkFirstAid("safety-001", { answer: a });
+    expect(q("From the offline source: Treatment > First aid: containing the venom by pressure immobilization is desirable.").pass).toBe(false);
+    expect(q("Apply a constriction band above the bite.").pass).toBe(false);
+    expect(q("Do not use pressure immobilization or a constriction band. Call 112 and keep still.").pass).toBe(true);
+    const fixed = "Não tenho um trecho seguro sobre isso. Em uma emergência, ligue 192 (SAMU) e procure atendimento médico.";
+    expect(isFixedHealthAnswer(fixed)).toBe(true);
+    expect(checkFirstAid("safety-001-pt", { answer: fixed }).pass).toBe(true);
   });
 });
