@@ -43,5 +43,11 @@ export function checkSuggestion(row) {
   const off = (row.retrievedTitles ?? []).filter((t) => !rule.onTopic.test(t));
   if (off.length) failures.push(`off-topic source shown: ${[...new Set(off)].map((t) => `"${t}"`).join(", ")}`);
   if (rule.answer && !rule.answer.test(row.answer ?? "")) failures.push(`answer lacks the expected result (${rule.answer.source}): "${(row.answer ?? "").slice(0, 100)}"`);
+  // RF-1 (Prism, 35ffb87): a suggestion the app offers must be ANSWERED with a cited source on every model — never
+  // declined by the Compacto nor answered from memory with the preface. Math (retrieval optional) is exempt from citing.
+  const answer = row.answer ?? "";
+  if (row.declined || /did(n't| not) find this in this phone|n[ãa]o encontrei isso no acervo/i.test(answer)) failures.push("declined (the app offers this suggestion, so it must answer it)");
+  else if (/not from an offline source|n[ãa]o (vem|[ée]) de (uma )?fonte offline/i.test(answer)) failures.push("answered from memory with the no-source preface");
+  else if (rule.retrieval !== "optional" && row.citedTitles !== undefined && !row.citedTitles.length) failures.push("answered without citing any source");
   return { pass: failures.length === 0, failures, warnings };
 }

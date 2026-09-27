@@ -38,4 +38,14 @@ describe("checkSuggestion", () => {
     expect(checkSuggestion({ queryId: id("en"), suggestion: s1, rawRetrievedTitles: ["NFL preseason"], retrievedTitles: [] }).pass).toBe(false);
     expect(checkSuggestion({ queryId: id("en"), suggestion: s1, rawRetrievedTitles: ["Axial tilt"], retrievedTitles: ["Axial tilt"] }).pass).toBe(true);
   });
+
+  it("RF-1: an offered suggestion must be answered with a cited source, never declined or prefaced", () => {
+    const suggestion = { key: "q5", corpus: ["builtin"], expect: ["Monsoon"] };
+    const qid = suggestionId("What causes the monsoon?", "en");
+    const base = { queryId: qid, suggestion, rawRetrievedTitles: ["Monsoon"], retrievedTitles: ["Monsoon"] };
+    expect(checkSuggestion({ ...base, answer: "A monsoon is a seasonal wind reversal [1].", citedTitles: ["Monsoon"] }).pass).toBe(true);
+    expect(checkSuggestion({ ...base, answer: "I didn't find this in this phone's library.", declined: true, citedTitles: [] }).failures[0]).toMatch(/declined/);
+    expect(checkSuggestion({ ...base, answer: "This answer is not from an offline source. Monsoons…", citedTitles: [] }).failures[0]).toMatch(/preface/);
+    expect(checkSuggestion({ ...base, answer: "Monsoons are seasonal winds.", citedTitles: [] }).failures[0]).toMatch(/without citing/);
+  });
 });

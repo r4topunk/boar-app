@@ -71,7 +71,8 @@ while IFS=$'\t' read -r packid ids; do
     wiki-vital5) px="--pack \$VITAL"; NEED_VITAL=1 ;;
     *) echo "suggestions: corpus '$packid' is not available to the gate; its questions will be missing"; continue ;;
   esac
-  SUG_LINES+="runc --model \$SUG_MODEL --seed 1 --corpus bundled --dataset suggestions-gate --ids $ids $px --out \$O/suggestions__declared.jsonl"$'\n'
+  # RF-1: every model the app ships answers the suggestions (the Compacto declined 'monsoon' on 35ffb87).
+  SUG_LINES+="for sm in $MODELS; do runc --model \$sm --seed 1 --corpus bundled --dataset suggestions-gate --ids $ids $px --out \$O/suggestions__\${sm}.jsonl; done"$'\n'
 done < "$TMP/suggestions-plan.tsv"
 N_SUG=$(grep -c . "$TMP/questions.suggestions-gate.jsonl" || true)
 SUG_MODEL=qwen3-4b-instruct-2507-q4km
@@ -185,7 +186,7 @@ N_PLACES=$(( HAS_PLACES * N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.p
 N_CE=$(( N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.current-events.jsonl") ))
 N_KT=$(( N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.knowledge-topic.jsonl") ))
 N_PTT=$(( N_MODELS * N_CFG * $(grep -c . "$ROOT/eval/dataset/questions.pt-topic.jsonl") ))
-EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG + N_PLACES + N_CE + N_KT + N_PTT))
+EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG * N_MODELS + N_PLACES + N_CE + N_KT + N_PTT))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 N_TILE=$(cat "$OUT"/runs/places-tile__*.jsonl 2>/dev/null | grep -c . || true)
 GOT=$((GOT - N_TILE))  # tile rows exist only when the gazetteer hosts the tile; they are graded, not counted
