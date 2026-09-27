@@ -1,6 +1,6 @@
 # s32 gate check: candidate-715ffdd vs control-cc91653
 
-TL;DR: 4B FAIL · 1.5B FAIL. 4B: ratio within 3 points of the control on both judges and <= 2/32 refusals. 1.5B: correct-when-answering within 3 points and no more confident errors (refusal is a product decision, reported apart). Regenerate with `node eval/scripts/s32-gate-check.mjs control-cc91653 candidate-715ffdd`.
+TL;DR: 4B FAIL · 1.5B FAIL. 4B: ratio within 3 points of the control on both judges and <= 2/32 refusals. 1.5B: correct-when-answering within 3 points and no more confident errors (refusal is a product decision, reported apart). Judges: jev. Regenerate with `node eval/scripts/s32-gate-check.mjs control-cc91653 candidate-715ffdd --judges jev`.
 
 ## 4B
 

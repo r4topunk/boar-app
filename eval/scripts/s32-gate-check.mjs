@@ -13,7 +13,10 @@ import { fileURLToPath } from "node:url";
 import { combineOrders, summarize } from "./lib/judge-core.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
-const [control, candidate] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const [control, candidate] = args.filter((x, i) => !x.startsWith("--") && args[i - 1] !== "--judges");
+// --judges jev: decide on Jev alone (Claude kept for the final candidate; the judges agree ~91% on s32).
+const JUDGES = (args.includes("--judges") ? args[args.indexOf("--judges") + 1] : "claude,jev").split(",");
 if (!control || !candidate) throw new Error("usage: s32-gate-check.mjs <control-label> <candidate-label>");
 const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const REFUSAL = /did(n't| not) find|no (reliable |good )?(offline )?source|won't answer from memory|not (in|from) the offline library|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte/i;
@@ -54,16 +57,16 @@ for (const [name, model] of Object.entries(MODELS)) {
     L.push(`| Correct when answering (${j}) | ${pct(c[j]?.correctWhenAnswering)} | ${pct(k[j]?.correctWhenAnswering)} |`);
     L.push(`| Confident errors (${j}) | ${c[j]?.confidentErrors ?? "n/a"} | ${k[j]?.confidentErrors ?? "n/a"} |`);
   }
-  const missing = ["claude", "jev"].some((j) => !c[j] || !k[j]);
+  const missing = JUDGES.some((j) => !c[j] || !k[j]);
   let ok;
   if (missing) ok = null;
-  else if (name === "4B") ok = ["claude", "jev"].every((j) => k[j].ratio >= c[j].ratio - 0.03) && k.refusals <= 2;
-  else ok = ["claude", "jev"].every((j) => k[j].correctWhenAnswering >= c[j].correctWhenAnswering - 0.03 && k[j].confidentErrors <= c[j].confidentErrors);
+  else if (name === "4B") ok = JUDGES.every((j) => k[j].ratio >= c[j].ratio - 0.03) && k.refusals <= 2;
+  else ok = JUDGES.every((j) => k[j].correctWhenAnswering >= c[j].correctWhenAnswering - 0.03 && k[j].confidentErrors <= c[j].confidentErrors);
   if (ok === false) fail = true;
   verdicts.push(`${name} ${ok === null ? "INCOMPLETE (judgments missing)" : ok ? "PASS" : "FAIL"}`);
   L.push("", `Verdict ${name}: **${verdicts.at(-1).split(" ").slice(1).join(" ")}**`, "");
 }
-L.splice(2, 0, `TL;DR: ${verdicts.join(" · ")}. 4B: ratio within 3 points of the control on both judges and <= 2/32 refusals. 1.5B: correct-when-answering within 3 points and no more confident errors (refusal is a product decision, reported apart). Regenerate with \`node eval/scripts/s32-gate-check.mjs ${control} ${candidate}\`.`, "");
+L.splice(2, 0, `TL;DR: ${verdicts.join(" · ")}. 4B: ratio within 3 points of the control on both judges and <= 2/32 refusals. 1.5B: correct-when-answering within 3 points and no more confident errors (refusal is a product decision, reported apart). Judges: ${JUDGES.join(" + ")}. Regenerate with \`node eval/scripts/s32-gate-check.mjs ${args.join(" ")}\`.`, "");
 writeFileSync(join(EVAL_DIR, "reports", `s32-check-${control}-vs-${candidate}.md`), L.join("\n"));
 console.log(L.join("\n"));
 process.exit(fail ? 1 : 0);

@@ -18,4 +18,8 @@ TL;DR: v2 crypto and travel questions (30 EN + the same 30 in PT), `--corpus non
 | qwen2.5-1.5b-instruct-q4km | EN | 1 | 30 | **7%** (2%–21%) | 13% | 80% | – |
 | qwen2.5-1.5b-instruct-q4km | PT | 1 | 30 | **7%** (2%–21%) | 10% | 83% | 0% |
 
-Limits: 30 questions per language from two categories (crypto, travel), not a sample of every knowledge question; the judge compares each answer with the Opus + web search reference (PT answers against the English reference).
+## Scope and decision
+
+- **Scope: only crypto and travel knowledge questions** (v2), 30 per language. Other kinds (general science, history, how-to) were not measured and may do better from memory; do not generalize beyond these two categories.
+- The judge compares each answer with the Opus + web search reference (PT answers against the English reference).
+- Decision (Boar, 2026-09-27): the Compacto (1.5B) keeps refusing sourceless knowledge questions; the bar to revert was ~70% correct without a source.

@@ -56,6 +56,6 @@ for (const [judge, dir] of [["Jev", "judgments-jev"], ["Claude", "judgments"]]) 
   if (!rows.length) continue;
   L.push(`## ${judge}`, "", "| Model | Lang | Seeds | Answers | Correct (95% CI) | Partial | Wrong / nonsense | PT answered in English |", "|---|---|---|---|---|---|---|---|", ...rows, "");
 }
-L.push("Limits: 30 questions per language from two categories (crypto, travel), not a sample of every knowledge question; the judge compares each answer with the Opus + web search reference (PT answers against the English reference).", "");
+L.push("## Scope and decision", "", "- **Scope: only crypto and travel knowledge questions** (v2), 30 per language. Other kinds (general science, history, how-to) were not measured and may do better from memory; do not generalize beyond these two categories.", "- The judge compares each answer with the Opus + web search reference (PT answers against the English reference).", "- Decision (Boar, 2026-09-27): the Compacto (1.5B) keeps refusing sourceless knowledge questions; the bar to revert was ~70% correct without a source.", "");
 writeFileSync(join(EVAL_DIR, "reports", "nosource.md"), L.join("\n"));
 console.log(L.join("\n"));
