@@ -46,7 +46,10 @@ line "instant passage on topic" "$SNT$([ "${SNIPPET_TOPIC:-block}" = block ] || 
 SHA=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).sha)' "results/gates/$K/meta.json" 2>/dev/null)
 TREE=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).tree)' "results/gates/$K/meta.json" 2>/dev/null)
 if [ -n "$SHA" ] && T=$(mktemp -d) && git -C "$TREE" archive "$SHA" src | tar -x -C "$T"; then
-  CIT2=$(npx tsx scripts/cit2-fixed.mts "$T" 2>/dev/null | tail -1); rm -rf "$T"
+  CIT2=$(npx tsx scripts/cit2-fixed.mts "$T" 2>/dev/null | tail -1)
+  # PT answers written in English (Tusk), by the candidate's own passageLanguage; reported.
+  PTL=$(npx tsx scripts/pt-language.mts "$T" "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Reported, not.*//')
+  rm -rf "$T"
   echo "$CIT2" | grep -q "CIT-2 PASS" || FAIL=1
   line "CIT-2 fixed case" "${CIT2:-not run}"
 else line "CIT-2 fixed case" "not run (no tree/sha in meta.json)"; FAIL=1; fi
@@ -56,6 +59,7 @@ line "1.5B PT confident errors" "$PTC"
 HS=$(node scripts/health-scan.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
 echo "$HS" | grep -q '\*\*FAIL' && FAIL=1
 line "health scan (all answers)" "$HS"
+line "PT answers in English" "${PTL:-not run} (reported)"
 line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (target, reported)"
 line "VERDICT" "$([ $FAIL = 0 ] && echo PASS || echo FAIL)"
 exit $FAIL
