@@ -22,8 +22,8 @@ MODELS="${GATE_MODELS:-qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km}"
 PIPELINE="${GATE_PIPELINE:-app}"
 CORPUS="${GATE_CORPUS:-essential}"
 S32="${GATE_S32:-0}"
-S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/eval/dataset/subset.s32.v1.json")"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/eval/dataset/subset.s32.v1.json")"
 DEST="boar/gate/$LABEL"
 # Pinned packs (sha256 from the knowledge catalog: src/rag/preparedness.ts, src/rag/cryptoPack.ts).
 PREP_SHA=65dff5d9988a6fe2bffe17a4d3ab096a1a8f580d20b1ab18d0ada41bbbc0b4e8
