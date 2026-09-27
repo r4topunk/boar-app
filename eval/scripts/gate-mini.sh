@@ -173,7 +173,8 @@ if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run -
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
-ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP|LEXICON-NOT-LOADED" | tee "$TMP/remote.log" || true
+# HEAVY_CLASS=gate (Harbor 2026-09-27): short jobs (< 5 min) may pass a waiting gate.
+ssh "$HOST" "env HEAVY_CLASS=gate ~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP|LEXICON-NOT-LOADED" | tee "$TMP/remote.log" || true
 # 36499b2: the app's PT lexicon must have loaded (runner exits 3 otherwise), or nothing PT is measured.
 if grep -q "LEXICON-NOT-LOADED" "$TMP/remote.log"; then echo "GATE INCOMPLETE: the app's PT lexicon did not load (lexiconStatus)"; exit 2; fi
 
