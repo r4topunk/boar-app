@@ -54,4 +54,11 @@ describe("checkSuggestion", () => {
     expect(checkSuggestion({ queryId: qid, rawRetrievedTitles: [], retrievedTitles: [], answer: "30 °C = 86 °F.", modelCalled: false }).pass).toBe(true);
     expect(checkSuggestion({ queryId: qid, rawRetrievedTitles: [], retrievedTitles: [], answer: "30 °C is 86 °F.", modelCalled: true }).failures[0]).toMatch(/model/);
   });
+  it("judges the sources the card shows (cited), not every source in the prompt (98a47b4 nosebleed PT)", () => {
+    const row = { queryId: "sug-how-do-i-stop-a-nosebleed-pt", suggestion: { key: "q4", expect: ["Nosebleed", "Epistaxis", "Emergency bleeding control"], offered: true },
+      rawRetrievedTitles: ["Nosebleed", "Nosebleed", "Nosebleed"], retrievedTitles: ["Nosebleed", "Wikibooks: First Aid/External Bleeding"], citedTitles: ["Nosebleed"],
+      answer: "Da fonte offline (em inglês):\nTreatment: apply direct pressure [2]\n\nEm uma emergência, ligue 192." };
+    expect(checkSuggestion(row).failures.join(" ")).not.toMatch(/off-topic source shown/);
+    expect(checkSuggestion({ ...row, citedTitles: ["Wikibooks: First Aid/External Bleeding"] }).failures.join(" ")).toMatch(/off-topic source shown/);
+  });
 });

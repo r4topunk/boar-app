@@ -44,8 +44,9 @@ export function checkSuggestion(row) {
     if (!top3.length) failures.push("search returned nothing");
     else if (!top3.some((t) => rule.onTopic.test(t))) failures.push(`no on-topic source in the search top-3: ${top3.map((t) => `"${t}"`).join(", ")}`);
   }
-  // Same rule as health answers (accepted 2026-09-26): a source the answer shows must be on topic.
-  const off = (row.retrievedTitles ?? []).filter((t) => !rule.onTopic.test(t));
+  // Same rule as health answers (accepted 2026-09-26): a source the answer shows must be on topic. The card shows
+  // only the cited sources (done.cited), so judge those when the row has them (as pt-topic-check does).
+  const off = (row.citedTitles ?? row.retrievedTitles ?? []).filter((t) => !rule.onTopic.test(t));
   if (off.length) failures.push(`off-topic source shown: ${[...new Set(off)].map((t) => `"${t}"`).join(", ")}`);
   if (rule.answer && !rule.answer.test(row.answer ?? "")) failures.push(`answer lacks the expected result (${rule.answer.source}): "${(row.answer ?? "").slice(0, 100)}"`);
   // RF-1 (Prism, 35ffb87): a suggestion the app offers must be ANSWERED with a cited source on every model — never

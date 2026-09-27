@@ -7,27 +7,67 @@
       "key": "q8",
       "en": "What is a monsoon?",
       "pt": "O que é uma monção?",
-      "search": { "en": "pass (Monsoon #1)", "pt": "FAIL (top-3: Marcos Leonardo, Miss Cape Verde; 'monção' does not reach Monsoon)" },
-      "qwen3-4b-instruct-2507-q4km": { "en": "PASS 3/3 (extractive lead, cites Monsoon)", "pt": "FAIL 0/3 (no source; answers from memory with the uncited preface, direction of the winds wrong)" },
-      "qwen2.5-1.5b-instruct-q4km": { "en": "PASS 3/3 (extractive lead, cites Monsoon)", "pt": "FAIL 0/3 (Compacto declines: no on-topic source)" }
+      "search": {
+        "en": "pass (Monsoon #1)",
+        "pt": "FAIL (top-3: Marcos Leonardo, Miss Cape Verde; 'monção' does not reach Monsoon)"
+      },
+      "qwen3-4b-instruct-2507-q4km": {
+        "en": "PASS 3/3 (extractive lead, cites Monsoon)",
+        "pt": "FAIL 0/3 (no source; answers from memory with the uncited preface, direction of the winds wrong)"
+      },
+      "qwen2.5-1.5b-instruct-q4km": {
+        "en": "PASS 3/3 (extractive lead, cites Monsoon)",
+        "pt": "FAIL 0/3 (Compacto declines: no on-topic source)"
+      }
     },
     {
       "key": "q9",
       "en": "What is plate tectonics?",
       "pt": "O que é tectônica de placas?",
-      "search": { "en": "pass (Plate tectonics #1)", "pt": "pass (Plate tectonics #1 via retrieve:pt-en-terms)" },
-      "qwen3-4b-instruct-2507-q4km": { "en": "FAIL 2/3 (correct 3/3; seed 7 citation removed, uncited-warning)", "pt": "FAIL 0/3 (correct, but the on-topic guard drops the #1 source: grounding:off-topic-dropped-1, uncited)" },
-      "qwen2.5-1.5b-instruct-q4km": { "en": "FAIL 2/3 (correct 3/3; seed 42 uncited)", "pt": "FAIL 0/3 (guard drops the source, uncited; seed 7 'since the early 20th century' wrong, seed 42 invents 'tectônese')" }
+      "search": {
+        "en": "pass (Plate tectonics #1)",
+        "pt": "pass (Plate tectonics #1 via retrieve:pt-en-terms)"
+      },
+      "qwen3-4b-instruct-2507-q4km": {
+        "en": "FAIL 2/3 (correct 3/3; seed 7 citation removed, uncited-warning)",
+        "pt": "FAIL 0/3 (correct, but the on-topic guard drops the #1 source: grounding:off-topic-dropped-1, uncited)"
+      },
+      "qwen2.5-1.5b-instruct-q4km": {
+        "en": "FAIL 2/3 (correct 3/3; seed 42 uncited)",
+        "pt": "FAIL 0/3 (guard drops the source, uncited; seed 7 'since the early 20th century' wrong, seed 42 invents 'tectônese')"
+      }
     }
   ],
-  "langs": { "q8": ["en"], "q9": ["en", "pt"] },
+  "langs": {
+    "q8": [
+      "en"
+    ],
+    "q9": [
+      "en",
+      "pt"
+    ]
+  },
   "byModel": {
-    "qwen3-4b-instruct-2507-q4km": { "en": ["q8"], "pt": [] },
-    "qwen2.5-1.5b-instruct-q4km": { "en": ["q8"], "pt": [] }
+    "qwen3-4b-instruct-2507-q4km": {
+      "en": [
+        "q8"
+      ],
+      "pt": []
+    },
+    "qwen2.5-1.5b-instruct-q4km": {
+      "en": [
+        "q8"
+      ],
+      "pt": []
+    }
   },
   "engineFindings": [
     "q9 PT: search finds Plate tectonics at #1 (pt-en-terms) but the on-topic guard then drops it (grounding:off-topic-dropped-1 / instant:off-topic), so no PT answer is cited. Same shape likely for other PT questions whose source title is English.",
     "q8 PT: the PT lexicon has no 'monção' -> monsoon mapping.",
     "q9 EN: citation attribution is seed-dependent (added on some seeds, removed on others); candidate 98a47b4 (attribution by support) is measured in its gate."
-  ]
+  ],
+  "recheck98a47b4": {
+    "runs": "results/suggestions/runs-v3-98a47b4/<model>__bundled__seed{42,7,1234}.jsonl",
+    "result": "gate/candidate 98a47b4 (attribution by support): same answers and citations as 50d44a1 on every seed. q8 EN PASS 3/3 both models; q9 EN still 2/3 (4B seed 7 citation removed, 1.5B seed 42 uncited); q9 PT still 0/3 (source at #1 dropped by the on-topic guard). byModel unchanged."
+  }
 }
