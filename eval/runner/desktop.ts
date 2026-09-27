@@ -24,7 +24,7 @@
  * Usage (from repo root):
  *   npx --prefix eval tsx eval/runner/desktop.ts --model qwen2.5-1.5b-instruct-q4km \
  *     [--dataset v1] [--ids exp-001,cmp-002] [--limit N] [--threads 4] [--gpu] [--corpus bundled|none] [--out path]
- *     [--pack /path/boar-crypto.sqlite]   (format-2 knowledge pack; needs a source tree with src/rag/wikiPack.ts)
+ *     [--pack /path/a.sqlite,/path/b.sqlite]   (format-2 knowledge packs; needs a source tree with src/rag/wikiPack.ts)
  *     [--seed 42] [--timeout-ms 120000] [--thought-budget 256] [--sources system|user]   (omit --gpu for CPU-only, e.g. models larger than the Metal working set)
  */
 import { mkdirSync, readFileSync, existsSync, writeFileSync, appendFileSync, createReadStream } from "node:fs";
@@ -348,7 +348,7 @@ async function main() {
 
   const kb = new DesktopKnowledgeBase(embed);
   if (opt.corpus === "bundled") await kb.index(bundledCorpus(), join(EVAL_DIR, ".cache", "embeddings-bundled.json"));
-  if (opt.pack) kb.packs.push(await openPack(opt.pack));
+  for (const p of opt.pack?.split(",") ?? []) kb.packs.push(await openPack(p));
   const packTag = kb.packs.map((p) => `__pack-${p.id}`).join("");
 
   const loadStart = performance.now();
