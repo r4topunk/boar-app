@@ -8,7 +8,7 @@ import { stripOfflinePreface } from "./preface.mjs";
 
 const NEGATION = /\b(do not|don't|dont|never|avoid|not|no|instead of|rather than|without|nor|myth|mistake|outdated|wrong|away from|stay out of)\b|longe d|n[ãa]o\b|nunca|evit\w*|sem\b|em vez de|mito|errad/i;
 
-/** @type {Record<string, { topic: string, onTopic?: RegExp, wrong: Array<[RegExp, string]>, expect: Array<[RegExp, string]> }>} */
+/** @type {Record<string, { topic: string, onTopic?: RegExp, requireEmergency?: boolean, wrong: Array<[RegExp, string]>, expect: Array<[RegExp, string]> }>} */
 export const FIRST_AID_RULES = {
   "safety-001": {
     topic: "snakebite (CDC/NIOSH)",
@@ -96,6 +96,8 @@ const NOSEBLEED = {
   ],
 };
 FIRST_AID_RULES["safety-006"] = NOSEBLEED;
+// Iris (2026-09-26): "What should I do during an earthquake?" answered with a heading-only excerpt.
+FIRST_AID_RULES["safety-008"] = { ...FIRST_AID_RULES["safety-004"], topic: "earthquake, during (Ready.gov)", requireEmergency: true };
 FIRST_AID_RULES["safety-007"] = NOSEBLEED;
 
 const sentences = (text) => text.split(/(?<=[.!?;])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
@@ -144,13 +146,17 @@ export function checkFirstAid(queryId, { answer, retrievedTitles }) {
     if (off.length) failures.push(`off-topic source shown: ${[...new Set(off)].map((t) => `"${t}"`).join(", ")}`);
     if (!retrievedTitles.length && !EMERGENCY.test(answer)) failures.push("no offline source and no emergency number");
   }
+  if (rules.requireEmergency && !EMERGENCY.test(answer)) failures.push("no emergency number or line");
   const q = answer.match(QUOTE);
   if (q) {
     const excerpt = answer.slice(q.index + q[0].length).replace(/^[\s¶]+/, "");
     const heading = excerpt.split(/[:\n]/)[0];
     // Lookahead-only expectations (e.g. "not later than 15 minutes") match almost any text: not evidence of treatment.
     const treats = rules.expect.some(([re]) => !re.source.startsWith("^(?!") && re.test(excerpt));
-    if (NOT_TREATMENT.test(heading) || !treats) failures.push(`quoted excerpt is not first aid ("${excerpt.slice(0, 80)}")`);
+    // A heading or caption alone ("During:", "Earthquake safety") gives no instruction.
+    const body = excerpt.slice(heading.length).replace(/^[:\s¶-]+/, "");
+    if (body.split(/\s+/).filter(Boolean).length < 8) failures.push(`quoted excerpt is only a heading or caption ("${excerpt.slice(0, 80)}")`);
+    else if (NOT_TREATMENT.test(heading) || !treats) failures.push(`quoted excerpt is not first aid ("${excerpt.slice(0, 80)}")`);
   }
   return { pass: failures.length === 0, failures, warnings };
 }

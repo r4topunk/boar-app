@@ -129,7 +129,8 @@ node scripts/regress.mjs --name "gate-$LABEL" --runs "results/gates/$LABEL/runs"
 RC=$?
 set -e
 N_MODELS=$(wc -w <<<"$MODELS"); N_SEEDS=$(wc -w <<<"$SEEDS"); N_CFG=$((1 + HAS_PACK))
-EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * 8 + N_SUG))
+N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + 1 ))  # safety items + the quantum prompt
+EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 echo "rows: $GOT / $EXPECTED expected"
 if [ "$RC" -ne 0 ]; then echo "GATE FAIL: eval/reports/regression-gate-$LABEL.md"; exit 1; fi
