@@ -86,6 +86,11 @@ SUG_MODEL=qwen3-4b-instruct-2507-q4km
 if [ "$PIPELINE" = app ] && ! grep -q "export function createAnswerer" "$TMP/src/routing/answer.ts" 2>/dev/null; then echo "GATE INCOMPLETE: $REF has no src/routing/answer.ts createAnswerer (use GATE_PIPELINE=direct)"; exit 2; fi
 echo "gate $LABEL: tree $TREE @ $SHA, pipeline $PIPELINE, packs loadable: $HAS_PACK, seeds: $SEEDS"
 
+# Disk floor (Boar 2026-09-27): the mini keeps ~13 GB of permanent Android tooling, so the gate (~100 MB) needs 8 GB
+# free, checked here and before every runner call; below it the gate aborts as incomplete.
+DISK_FLOOR_GB="${GATE_DISK_FLOOR_GB:-8}"
+FREE_GB=$(ssh "$HOST" "df -g ~ | awk 'NR==2{print \$4}'")
+if [ "${FREE_GB:-0}" -lt "$DISK_FLOOR_GB" ]; then echo "GATE INCOMPLETE: $FREE_GB GB free on $HOST, floor $DISK_FLOOR_GB GB"; exit 2; fi
 ssh "$HOST" "mkdir -p ~/$DEST/assets ~/boar/gate/.cache"
 rsync -az --delete "$TMP/src/" "$HOST:$DEST/src/"
 rsync -az --delete "$TMP/assets/" "$HOST:$DEST/assets/"
@@ -123,7 +128,7 @@ if [ $HAS_PLACES = 1 ]; then
   echo "$BER_SHA  \$BER" | shasum -a 256 -c - || exit 3
 fi
 O=eval/results/gate-runs; mkdir -p \$O
-runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL "\$@"; rc=\$?; [ \$rc = 3 ] && { echo "LEXICON-NOT-LOADED \$*"; exit 3; }; [ \$rc = 0 ] || echo "RUNFAIL \$*"; }
+runc() { f=\$(df -g ~ | awk 'NR==2{print \$4}'); [ "\$f" -lt $DISK_FLOOR_GB ] && { echo "DISK-LOW \$f GB"; exit 5; }; npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL "\$@"; rc=\$?; [ \$rc = 3 ] && { echo "LEXICON-NOT-LOADED \$*"; exit 3; }; [ \$rc = 0 ] || echo "RUNFAIL \$*"; }
 run() { runc --corpus $CORPUS "\$@"; }
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
@@ -174,8 +179,9 @@ if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run -
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
 # HEAVY_CLASS=gate (Harbor 2026-09-27): short jobs (< 5 min) may pass a waiting gate.
-ssh "$HOST" "env HEAVY_CLASS=gate ~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP|LEXICON-NOT-LOADED" | tee "$TMP/remote.log" || true
+ssh "$HOST" "env HEAVY_CLASS=gate ~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP|LEXICON-NOT-LOADED|DISK-LOW" | tee "$TMP/remote.log" || true
 # 36499b2: the app's PT lexicon must have loaded (runner exits 3 otherwise), or nothing PT is measured.
+if grep -q "DISK-LOW" "$TMP/remote.log"; then echo "GATE INCOMPLETE: disk below $DISK_FLOOR_GB GB on $HOST during the runs"; exit 2; fi
 if grep -q "LEXICON-NOT-LOADED" "$TMP/remote.log"; then echo "GATE INCOMPLETE: the app's PT lexicon did not load (lexiconStatus)"; exit 2; fi
 
 OUT="$ROOT/eval/results/gates/$LABEL"
