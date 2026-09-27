@@ -23,7 +23,7 @@
  *
  * Usage (from repo root):
  *   npx --prefix eval tsx eval/runner/desktop.ts --model qwen2.5-1.5b-instruct-q4km \
- *     [--dataset v1] [--ids exp-001,cmp-002] [--limit N] [--threads 4] [--gpu] [--corpus bundled|none] [--out path]
+ *     [--dataset v1] [--ids exp-001,cmp-002] [--limit N] [--threads 4] [--gpu] [--corpus bundled|essential|none] [--out path]
  *     [--pack /path/a.sqlite,/path/b.sqlite]   (format-2 knowledge packs; needs a source tree with src/rag/wikiPack.ts)
  *     [--pipeline direct|app]   app = the tree's createAnswerer (src/routing/answer.ts): instant snippet, source
  *       compression, grounding guard and PT->EN terms, with this runner's retrieval and model injected as deps
@@ -111,7 +111,8 @@ function args() {
     limit: Number(get("--limit", "0")),
     threads: Number(get("--threads", "4")),
     gpu: a.includes("--gpu"),
-    corpus: get("--corpus", "bundled") as "bundled" | "none",
+    // essential = what the setup installs by default: corpus.json + corpus-standard + corpus-full (src/models/manifest.ts).
+    corpus: get("--corpus", "bundled") as "bundled" | "essential" | "none",
     pack: get("--pack"),
     pipeline: get("--pipeline", "direct") as "direct" | "app",
     sources: get("--sources", "system") as "system" | "user",
@@ -128,6 +129,14 @@ interface Doc { id: string; title: string; body: string; source: string }
 
 function slug(t: string) {
   return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+const ESSENTIAL_FILES = ["corpus-standard", "corpus-full"];
+function essentialCorpus(): Doc[] {
+  return [...bundledCorpus(), ...ESSENTIAL_FILES.flatMap((f) => {
+    const raw = JSON.parse(readFileSync(join(ROOT, `assets/corpus/${f}.json`), "utf8")) as Array<{ title: string; source: string; body: string }>;
+    return raw.map((d) => ({ ...d, id: `${f}-${slug(d.title)}` }));
+  })];
 }
 
 function bundledCorpus(): Doc[] {
@@ -355,6 +364,7 @@ async function main() {
 
   const kb = new DesktopKnowledgeBase(embed);
   if (opt.corpus === "bundled") await kb.index(bundledCorpus(), join(EVAL_DIR, ".cache", "embeddings-bundled.json"));
+  if (opt.corpus === "essential") await kb.index(essentialCorpus(), join(EVAL_DIR, ".cache", "embeddings-essential.json"));
   for (const p of opt.pack?.split(",") ?? []) kb.packs.push(await openPack(p));
   const packTag = kb.packs.map((p) => `__pack-${p.id}`).join("");
 
