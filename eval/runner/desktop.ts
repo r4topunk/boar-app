@@ -414,7 +414,7 @@ async function main() {
   const hardware = `${os.cpus()[0]?.model ?? "cpu"} ${opt.gpu ? "metal" : `cpu x${opt.threads}`}`;
 
   // --pipeline app: the tree's answerer decides retrieval use, compression, instant snippets and whether the model runs.
-  let answerer: any = null, appCtx: any = null, lastGen: GenResult | undefined, lastChunks: RetrievedChunk[] = [];
+  let answerer: any = null, appCtx: any = null, lastGen: GenResult | undefined, lastChunks: RetrievedChunk[] = [], promptChunks: RetrievedChunk[] = [];
   if (opt.pipeline === "app") {
     const answerModule = "../../src/routing/answer", personalityModule = "../../src/constants/personalities";
     const { createAnswerer } = await import(answerModule);
@@ -442,8 +442,9 @@ async function main() {
       listInstalledLlms: async () => [llm],
       getActiveModelId: async () => llm.id,
       runMultipass: async () => { throw new Error("multipass is not part of the eval"); },
-      assemblePrompt,
-      assembleChatMessages,
+      // Wrapped to keep the sources the model actually saw (after compression), for the citation-support metric.
+      assemblePrompt: (q: string, c: RetrievedChunk[], ...rest: any[]) => ((promptChunks = c), (assemblePrompt as any)(q, c, ...rest)),
+      assembleChatMessages: (q: string, c: RetrievedChunk[], ...rest: any[]) => ((promptChunks = c), (assembleChatMessages as any)(q, c, ...rest)),
       contextSize: () => N_CTX,
       deviceRamBytes: () => 8e9,
     });
@@ -461,17 +462,23 @@ async function main() {
     let chunks: RetrievedChunk[] = [];
     let retrievalMs = 0;
     let gen: GenResult | undefined;
-    let app: { text: string; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number } | undefined;
+    let app: { text: string; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }> } | undefined;
     try {
       if (answerer) {
-        lastGen = undefined; lastChunks = [];
+        lastGen = undefined; lastChunks = []; promptChunks = [];
         let appError: { code: string; message: string } | undefined;
         const res = await answerer.answer({ query: q.query }, (e: any) => { if (e.type === "done" && e.error) appError = e.error; }, appCtx).done;
         if (res.outcome === "error") throw new Error(`${appError?.code ?? "error"}: ${appError?.message ?? "answer failed"}`);
         gen = lastGen;
         chunks = lastChunks;
         retrievalMs = res.receipt?.retrievalMs ?? 0;
-        app = { text: res.text, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title), reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs };
+        const clip = (c: RetrievedChunk) => ({ title: c.title, body: c.body.slice(0, 2000) });
+        app = {
+          text: res.text, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title),
+          reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs,
+          // Citation audit: the model's own text before any post-processing, the sources in its prompt, and the shown ones.
+          modelText: (lastGen as GenResult | undefined)?.answer, promptSources: promptChunks.map(clip), shownSources: (res.sources ?? []).map(clip),
+        };
       } else {
         const r0 = performance.now();
         if (retrieveOn) chunks = await kb.retrieve(q.query, ANSWER_CONTEXT_CHUNKS);
@@ -534,6 +541,9 @@ async function main() {
       answerTier: app?.tier,
       modelCalled: app ? app.modelCalled : true,
       rawRetrievedTitles: app ? app.retrieved : undefined,
+      modelText: app?.modelText,
+      promptSources: app?.promptSources,
+      shownSources: app?.shownSources,
       retrievedTitles,
       expectedKbTitles,
       expectedKbHit: expectedKbTitles.length ? expectedKbTitles.every((t) => retrievedTitles.includes(t)) : null,

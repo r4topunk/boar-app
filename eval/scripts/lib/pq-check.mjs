@@ -15,6 +15,7 @@ const DENIAL = /\b(no|none of|nenhum)\b[^.]*\b(signature|assinatura|algorithm|al
 // Titles that are on topic for [1]: cryptography, signatures, post-quantum families.
 const ON_TOPIC = /cryptograph|criptograf|signature|assinatura|post-quantum|p[óo]s-qu[âa]ntic|quantum[- ]safe|lattice|hash-based|merkle|sphincs|falcon|dilithium|ml-dsa|slh-dsa|fn-dsa|xmss|\blms\b|nist|shor|public-key|digital signature|elliptic|rsa|ethereum eips|ethereum specs/i;
 const HEDGE = /\b(proven|definitive|single|universally|fully|guarantee[ds]?|widely)\b|comprovad|definitiv|garantid|amplamente/i;
+const REFUSAL = /did(n't| not) find|no (reliable |good )?(offline )?source|not (in|from) the offline library|won't answer from memory|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte|n[ãa]o est[áa] no acervo/i;
 const STANDARD = /ML-DSA|Dilithium|SLH-DSA|SPHINCS\+?|Falcon|FN-DSA|XMSS|\bLMS\b|Leighton-Micali/i;
 
 const sentences = (text) => text.split(/(?<=[.!?;:])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
@@ -47,6 +48,11 @@ export function checkQuantumAnswer({ answer, retrievedTitles = [] }) {
     else if (!ON_TOPIC.test(t)) failures.push(`cites off-topic source [${i}]: "${t}"`);
   }
   if (/\[n\]/.test(answer)) warnings.push("literal [n] placeholder instead of a source number");
+  // The Compacto refuses a sourceless knowledge question (engine-routing 6e5e9b7): honest, reported apart (Boar).
+  if (!retrievedTitles.length && REFUSAL.test(answer) && !STANDARD.test(answer)) {
+    warnings.push("honest refusal: no offline source");
+    return { pass: failures.length === 0, failures, warnings };
+  }
   if (!STANDARD.test(answer)) warnings.push("names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS");
   return { pass: failures.length === 0, failures, warnings };
 }

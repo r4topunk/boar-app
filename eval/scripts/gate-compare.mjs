@@ -28,7 +28,8 @@ function load(label) {
       const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
         : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : checkFirstAid(r.queryId, r);
       if (!res) continue;
-      const cell = ((out[cfg] ??= {})[r.queryId] ??= { pass: 0, n: 0, failures: [], modelCalled: 0 });
+      const cell = ((out[cfg] ??= {})[r.queryId] ??= { pass: 0, n: 0, failures: [], modelCalled: 0, refusals: 0 });
+      if (res.warnings?.some((w) => w.startsWith("honest refusal"))) cell.refusals++;
       cell.n++;
       if (res.pass) cell.pass++;
       else cell.failures.push(`seed ${r.seed}: ${res.failures[0]}`);
@@ -54,12 +55,12 @@ for (const cfg of configs) for (const it of items) {
   if (v === "PASS" && noModel.includes(it) && cb.modelCalled > 0) v = "FAIL (model called)";
   if (v.startsWith("FAIL")) fails++;
   if (v === "MISSING") missing++;
-  rows.push(`| ${cfg} | ${it} | ${fmt(ca)} | ${fmt(cb)} | ${v === "PASS" ? "PASS" : `**${v}**`} | ${cb ? `${cb.modelCalled}/${cb.n}` : "–"} | ${(cb?.failures ?? []).slice(0, 2).join("<br>").replace(/\|/g, "\\|") || "–"} |`);
+  rows.push(`| ${cfg} | ${it} | ${fmt(ca)} | ${fmt(cb)} | ${v === "PASS" ? "PASS" : `**${v}**`} | ${cb ? `${cb.modelCalled}/${cb.n}` : "–"} | ${cb?.refusals ? `${cb.refusals}/${cb.n}` : "–"} | ${(cb?.failures ?? []).slice(0, 2).join("<br>").replace(/\|/g, "\\|") || "–"} |`);
 }
 L.push(`TL;DR: candidate ${fails || missing ? `**FAIL** (${fails} item-configurations fail${missing ? `, ${missing} missing` : ""})` : "**PASS**"}. A cell passes only if every seed passes. Pipeline \`${B.meta.pipeline}\`, corpus \`${B.meta.corpus}\`, seeds ${B.meta.seeds}, models ${B.meta.models}.`, "");
 if (note) L.push(`> ${note}`, "");
 L.push(`- Control: \`${A.meta.ref}\` @ ${A.meta.sha} (${A.meta.at})`, `- Candidate: \`${B.meta.ref}\` @ ${B.meta.sha} (${B.meta.at})`, `- Packs (pinned sha256): ${Object.entries(B.meta.packs).map(([k, v]) => `${k} ${v.slice(0, 8)}…`).join(", ")}`, "");
-L.push("| Configuration | Item | Control (passing seeds) | Candidate | Candidate verdict | Model called | First failures |", "|---|---|---|---|---|---|---|", ...rows, "");
+L.push("| Configuration | Item | Control (passing seeds) | Candidate | Candidate verdict | Model called | Honest refusals | First failures |", "|---|---|---|---|---|---|---|---|", ...rows, "");
 // Model calls per health item (the app should quote the source instead of generating).
 const health = items.filter((i) => i.startsWith("safety-"));
 L.push("## Model calls per health item (candidate, calls / answers)", "", "| Configuration | " + health.join(" | ") + " |", "|---|" + health.map(() => "---").join("|") + "|");

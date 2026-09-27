@@ -76,4 +76,9 @@ describe("checkQuantumAnswer", () => {
     // Without naming any standard scheme, the same hedge is still a denial.
     expect(checkQuantumAnswer({ answer: "No signature algorithms are universally proven to be quantum resistant." }).pass).toBe(false);
   });
+
+  it("an honest refusal without sources passes and is labeled (Compacto, 6e5e9b7)", () => {
+    const r = checkQuantumAnswer({ answer: "I didn't find a good source for this in the offline library, so I won't answer from memory.", retrievedTitles: [] });
+    expect(r).toEqual({ pass: true, failures: [], warnings: ["honest refusal: no offline source"] });
+  });
 });
