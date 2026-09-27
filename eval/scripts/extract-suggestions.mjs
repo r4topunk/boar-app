@@ -15,22 +15,31 @@ const en = load("en"), pt = load("pt");
 // SUGGESTION_SOURCES entries, fields in any order: { key: "q1", corpus: [...], expect: [...], langs: ["en"] }
 const srcFile = join(root, "src/ui/chat/suggestions.ts");
 const sources = {};
+// SUGGESTION_VALIDATION.byModel: "<model id>": { en: [...], pt: [...] } = the keys each model is offered per language.
+const byModel = {};
 if (existsSync(srcFile)) {
   const text = readFileSync(srcFile, "utf8");
   const list = (obj, field) => { const m = obj.match(new RegExp(`${field}:\\s*\\[([^\\]]*)\\]`)); return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((y) => y[1]) : null; };
   for (const m of text.matchAll(/\{\s*key:\s*"(\w+)"[^{}]*\}/g)) {
     sources[m[1]] = { corpus: list(m[0], "corpus") ?? [], expect: list(m[0], "expect") ?? [], langs: list(m[0], "langs") };
   }
+  for (const m of text.matchAll(/"([\w.-]+)":\s*\{\s*en:\s*\[([^\]]*)\],\s*pt:\s*\[([^\]]*)\]\s*\}/g)) {
+    const keys = (s) => [...s.matchAll(/"(\w+)"/g)].map((y) => y[1]);
+    byModel[m[1]] = { en: keys(m[2]), pt: keys(m[3]) };
+  }
   // A declaration block we cannot read must stop the gate, not silently fall back to the builtin corpus.
   if (/SUGGESTION_SOURCES/.test(text) && !Object.keys(sources).length) throw new Error(`SUGGESTION_SOURCES found in ${srcFile} but no entry could be parsed`);
 }
 
-// Only the (question, language) pairs the app offers: `langs` when declared, else both.
-const offered = (k, lang) => !sources[k]?.langs || sources[k].langs.includes(lang);
+// The app offers a (question, language) pair to a model when `langs` includes the language (or is undeclared) and the
+// model's byModel list for that language has the key (suggestionsFor). offeredTo = those models (null: no byModel).
+const langOk = (k, lang) => !sources[k]?.langs || sources[k].langs.includes(lang);
+const offeredTo = (k, lang) => (Object.keys(byModel).length ? Object.keys(byModel).filter((m) => langOk(k, lang) && byModel[m][lang].includes(k)) : null);
+const offered = (k, lang) => langOk(k, lang) && (offeredTo(k, lang)?.length ?? 1) > 0;
 // Every (question, language) pair is written; `offered` says whether the app shows it (CIT-1 measures all of them,
 // the gate blocks only on the offered ones).
 const rows = Object.keys(en).flatMap((k) => {
-  const suggestion = (lang) => ({ key: k, ...(sources[k] ?? { corpus: [], expect: [] }), offered: offered(k, lang) });
+  const suggestion = (lang) => ({ key: k, ...(sources[k] ?? { corpus: [], expect: [] }), offered: offered(k, lang), offeredTo: offeredTo(k, lang) });
   const base = { category: "suggestion", gold: [], license: "original" };
   return [
     { ...base, suggestion: suggestion("en"), id: suggestionId(en[k], "en"), query: en[k], lang: "en", source_url: "src/i18n/locales/en.json" },

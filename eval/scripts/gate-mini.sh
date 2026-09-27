@@ -38,7 +38,14 @@ S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/
 DEST="boar/gate/$LABEL"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-git -C "$TREE" archive "$REF" src assets/corpus | tar -x -C "$TMP"
+git -C "$TREE" archive "$REF" src assets | tar -x -C "$TMP"
+# Every asset the app code requires must be in the copy: ptLexiconAsset.ts swallows a missing
+# assets/lexicon/pt-en.json and runs PT with an empty lexicon (gates up to d7de156 copied only assets/corpus).
+MISSING_ASSETS=""
+for pair in $(grep -rhoE --include='*.ts' --include='*.tsx' "require\(\"(\.\./)+assets/[^\"]+\"\)" "$TMP/src" | sed -E 's/.*assets\/([^"]+)".*/\1/' | sort -u); do
+  [ -e "$TMP/assets/$pair" ] || MISSING_ASSETS+=" $pair"
+done
+if [ -n "$MISSING_ASSETS" ]; then echo "GATE INCOMPLETE: assets required by src are missing from the copy:$MISSING_ASSETS"; exit 2; fi
 HAS_PACK=0; [ -f "$TMP/src/rag/wikiPack.ts" ] && [ -f "$TMP/src/rag/testing/nodeSqlite.ts" ] && HAS_PACK=1
 # Packs = what this tree's catalog installs (sha256 + pinned URL from src/rag/preparedness.ts and cryptoPack.ts),
 # downloaded once per sha into ~/boar/shared-data/packs/pinned/<sha>/ and verified before and after the runs.
@@ -79,9 +86,9 @@ SUG_MODEL=qwen3-4b-instruct-2507-q4km
 if [ "$PIPELINE" = app ] && ! grep -q "export function createAnswerer" "$TMP/src/routing/answer.ts" 2>/dev/null; then echo "GATE INCOMPLETE: $REF has no src/routing/answer.ts createAnswerer (use GATE_PIPELINE=direct)"; exit 2; fi
 echo "gate $LABEL: tree $TREE @ $SHA, pipeline $PIPELINE, packs loadable: $HAS_PACK, seeds: $SEEDS"
 
-ssh "$HOST" "mkdir -p ~/$DEST/assets/corpus ~/boar/gate/.cache"
+ssh "$HOST" "mkdir -p ~/$DEST/assets ~/boar/gate/.cache"
 rsync -az --delete "$TMP/src/" "$HOST:$DEST/src/"
-rsync -az --delete "$TMP/assets/corpus/" "$HOST:$DEST/assets/corpus/"
+rsync -az --delete "$TMP/assets/" "$HOST:$DEST/assets/"
 rsync -az --delete --exclude node_modules --exclude .cache --exclude results "$ROOT/eval/" "$HOST:$DEST/eval/"
 scp -q "$TMP/questions.suggestions-gate.jsonl" "$HOST:$DEST/eval/dataset/questions.suggestions-gate.jsonl"
 

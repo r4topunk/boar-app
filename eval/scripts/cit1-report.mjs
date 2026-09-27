@@ -28,7 +28,8 @@ for (const f of existsSync(join(base, "runs")) ? readdirSync(join(base, "runs"))
   if (!f.startsWith("suggestions__")) continue;
   for (const r of readFileSync(join(base, "runs", f), "utf8").trim().split("\n").filter(Boolean).map((l) => normalizeRow(JSON.parse(l)))) {
     add(`${model(f)} · suggestions (all EN+PT)`, r);
-    if (r.suggestion?.offered !== false) add(`${model(f)} · suggestions (offered)`, r);
+    const to = r.suggestion?.offeredTo;
+    if (r.suggestion?.offered !== false && (!Array.isArray(to) || to.includes(r.modelId))) add(`${model(f)} · suggestions (offered)`, r);
   }
 }
 for (const f of existsSync(join(base, "s32")) ? readdirSync(join(base, "s32")) : []) {

@@ -60,7 +60,8 @@ export function checkSuggestion(row) {
   // Only the RF-1 answer checks failed: a TARGET miss (reported, not blocking) until RF1_BLOCKING.
   const onlyAnswer = failures.length > 0 && searchFailures === 0;
   // A pair the app does not offer (langs) is measured for CIT-1 but never blocks.
-  const notOffered = row.suggestion?.offered === false;
+  // Per model: the app offers the pair only to the models in SUGGESTION_VALIDATION.byModel (offeredTo).
+  const notOffered = row.suggestion?.offered === false || (Array.isArray(row.suggestion?.offeredTo) && !row.suggestion.offeredTo.includes(row.modelId));
   if (notOffered) warnings.push("not offered by the app in this language (measured only)");
   return { pass: failures.length === 0, failures, warnings, ...((onlyAnswer && !RF1_BLOCKING) || notOffered ? { target: true } : {}) };
 }

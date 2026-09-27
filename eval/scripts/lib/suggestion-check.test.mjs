@@ -61,4 +61,11 @@ describe("checkSuggestion", () => {
     expect(checkSuggestion(row).failures.join(" ")).not.toMatch(/off-topic source shown/);
     expect(checkSuggestion({ ...row, citedTitles: ["Wikibooks: First Aid/External Bleeding"] }).failures.join(" ")).toMatch(/off-topic source shown/);
   });
+  it("a pair offered to no model in byModel is measured only (d7de156 q9 PT)", () => {
+    const row = { queryId: "sug-what-is-plate-tectonics-pt", modelId: "qwen3-4b-instruct-2507-q4km", rawRetrievedTitles: ["Plate tectonics"], retrievedTitles: [], citedTitles: [],
+      answer: "Tectônica de placas é a teoria…", suggestion: { key: "q9", expect: ["Plate tectonics"], langs: ["en", "pt"], offered: false, offeredTo: [] } };
+    expect(checkSuggestion(row).target).toBe(true);
+    expect(checkSuggestion({ ...row, suggestion: { ...row.suggestion, offered: true, offeredTo: ["qwen2.5-1.5b-instruct-q4km"] } }).target).toBe(true);
+    expect(checkSuggestion({ ...row, suggestion: { ...row.suggestion, offered: true, offeredTo: ["qwen3-4b-instruct-2507-q4km"] } }).target).toBeUndefined();
+  });
 });
