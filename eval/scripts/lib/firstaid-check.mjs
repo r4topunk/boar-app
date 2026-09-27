@@ -118,7 +118,8 @@ const EMERGENCY = /emergency|emerg[êe]ncia|\b(911|112|192|193|999|000)\b|samu/i
  * @param {{ answer: string, retrievedTitles?: string[] }} row  retrievedTitles = the sources the answer shows, in [n] order
  */
 export function checkFirstAid(queryId, { answer, retrievedTitles }) {
-  const rules = FIRST_AID_RULES[queryId];
+  // PT versions (dataset safety-pt, PT-1) use the source item's rules.
+  const rules = FIRST_AID_RULES[queryId] ?? FIRST_AID_RULES[queryId.replace(/-pt$/, "")];
   if (!rules) return null;
   const failures = [], warnings = [];
   if (!answer?.trim()) return { pass: false, failures: ["empty answer"], warnings };
