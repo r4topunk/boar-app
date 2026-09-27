@@ -28,7 +28,13 @@ let regressions = 0;
 for (const model of ["qwen3-4b-instruct-2507-q4km", "qwen2.5-1.5b-instruct-q4km"]) {
   const c = load(model, control), k = load(model, candidate);
   const hit = Object.values(k.rows).filter((r) => CODES.some((x) => (r.reasonCodes ?? []).includes(x)));
-  L.push(`## ${model}`, "", `Answers with the net: ${hit.length}/${Object.keys(k.rows).length}.`, "");
+  const noCite = (rows) => Object.values(rows).filter((r) => !/\[\d+\]/.test(r.answer ?? "")).length;
+  // Cost: the net fired on an answer the control got right. Gain: it fired on an answer the control got wrong.
+  const cost = hit.filter((r) => c.judged[r.queryId]?.boar.correctness >= 4).length;
+  const gain = hit.filter((r) => c.judged[r.queryId] && c.judged[r.queryId].boar.correctness < 4).length;
+  L.push(`## ${model}`, "",
+    `Answers with the net: ${hit.length}/${Object.keys(k.rows).length} — cost (correct in the control): **${cost}**, gain (wrong in the control): **${gain}**.`,
+    `Answers without any [n]: control ${noCite(c.rows)}/${Object.keys(c.rows).length}, candidate ${noCite(k.rows)}/${Object.keys(k.rows).length} (post-processing strips unsupported citations, so "no [n]" is most answers).`, "");
   if (!hit.length) { L.push(""); continue; }
   L.push("| Question | Code | Control: correct (Jev) | Control: cited [n] | Candidate: correct (Jev) | UX regression |", "|---|---|---|---|---|---|");
   for (const r of hit) {
