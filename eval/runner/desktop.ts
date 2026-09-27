@@ -405,6 +405,26 @@ async function generate(llama: Llama, model: LlamaModel, query: string, chunks: 
  * corpus packs of --corpus and each --pack under its catalog filename in a documentDirectory of its own. The seeded
  * database is cached per (tree retrieval code, corpus, packs), so the 5,300 corpus embeddings are computed once.
  */
+/**
+ * The app's PT -> EN lexicon must load before anything PT is measured (Boar/Bramble 36499b2): the gate once copied
+ * only assets/corpus, ptLexicon() swallowed the missing asset and every PT answer ran without it. Trees with
+ * lexiconStatus() are checked through it; older trees by the lexicon's size. Exits 3 with LEXICON-NOT-LOADED.
+ */
+let lexiconChecked = false;
+async function assertPtLexicon() {
+  const mod = join(ROOT, "src/rag/ptLexiconAsset.ts");
+  if (lexiconChecked || !existsSync(mod)) return;
+  const m: any = await import(mod);
+  const names = Object.keys(m.ptLexicon() ?? {}).length;
+  const status = typeof m.lexiconStatus === "function" ? m.lexiconStatus() : { state: names ? "loaded" : "failed", error: "empty lexicon" };
+  if (status.state !== "loaded") {
+    console.error(`LEXICON-NOT-LOADED: the app's PT lexicon did not load (${status.error ?? status.state}); PT results would be wrong.`);
+    process.exit(3);
+  }
+  lexiconChecked = true;
+  console.error(`[eval] PT lexicon loaded: ${status.names ?? names} names`);
+}
+
 async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packPaths: string[], placePaths: string[] = []) {
   const { registerHooks } = await import("node:module");
   const shim = (f: string) => new URL(`./app-shims/${f}`, import.meta.url).href;
@@ -467,6 +487,7 @@ async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packP
   const { getDb } = await import(join(ROOT, "src/rag/db.ts"));
   const chunks = ((await (await getDb()).getFirstAsync("SELECT count(*) AS c FROM chunks")) as any)?.c ?? 0;
   const { retrieve } = await import(join(ROOT, "src/rag/retrieve.ts"));
+  await assertPtLexicon();
   // Offline places, wired as App.tsx does (geoProvidersFrom + src/rag/pois.ts); only the device location is simulated,
   // from the question's context, so "near me" is asked from a known point and a question without one has no fix.
   let geo: any = null;
@@ -540,6 +561,7 @@ async function main() {
   if (opt.pipeline === "app") {
     const answerModule = "../../src/routing/answer", personalityModule = "../../src/constants/personalities";
     const { createAnswerer } = await import(answerModule);
+    await assertPtLexicon();
     const pm = await import(personalityModule);
     const personality = pm.getPersonality(pm.DEFAULT_PERSONALITY_ID ?? PERSONALITY_ID);
     appCtx = { systemPrompt: personality.systemPrompt, styleReminder: personality.styleReminder, maxTokens: MAX_TOKENS };

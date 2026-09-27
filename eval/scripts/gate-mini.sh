@@ -123,8 +123,8 @@ if [ $HAS_PLACES = 1 ]; then
   echo "$BER_SHA  \$BER" | shasum -a 256 -c - || exit 3
 fi
 O=eval/results/gate-runs; mkdir -p \$O
-run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL --corpus $CORPUS "\$@" || echo "RUNFAIL \$*"; }
-runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL "\$@" || echo "RUNFAIL \$*"; }
+runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL "\$@"; rc=\$?; [ \$rc = 3 ] && { echo "LEXICON-NOT-LOADED \$*"; exit 3; }; [ \$rc = 0 ] || echo "RUNFAIL \$*"; }
+run() { runc --corpus $CORPUS "\$@"; }
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -170,7 +170,9 @@ if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run -
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
-ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP" || true
+ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP|LEXICON-NOT-LOADED" | tee "$TMP/remote.log" || true
+# 36499b2: the app's PT lexicon must have loaded (runner exits 3 otherwise), or nothing PT is measured.
+if grep -q "LEXICON-NOT-LOADED" "$TMP/remote.log"; then echo "GATE INCOMPLETE: the app's PT lexicon did not load (lexiconStatus)"; exit 2; fi
 
 OUT="$ROOT/eval/results/gates/$LABEL"
 mkdir -p "$OUT/runs"
