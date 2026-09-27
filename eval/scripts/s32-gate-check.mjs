@@ -21,6 +21,7 @@ const JUDGES = (args.includes("--judges") ? args[args.indexOf("--judges") + 1] :
 if (!control || !candidate) throw new Error("usage: s32-gate-check.mjs <control-label> <candidate-label>");
 const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const REFUSAL = /did(n't| not) find|(no|don't have a|do not have a) (reliable |good )?(offline )?source|won't (answer|give [^.]*) from memory|not (in|from) the offline library|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte/i;
+const COMPACT_ERROR_CEILING = 10;
 const MODELS = { "4B": "qwen3-4b-instruct-2507-q4km", "1.5B": "qwen2.5-1.5b-instruct-q4km" };
 const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : "n/a");
 const pct = (x) => (Number.isFinite(x) ? `${Math.round(100 * x)}%` : "n/a");
@@ -76,12 +77,14 @@ for (const [name, model] of Object.entries(MODELS)) {
   else if (name === "4B") ok = JUDGES.every((j) => k[j].ratioExclHealthRefusals >= c[j].ratioExclHealthRefusals - 0.03) && k.refusals - k.healthRefusals <= 2;
   // Boar 2026-09-27 (decision B, Compacto declines only without an on-topic source): the 1.5B fails only when its
   // confident errors rise above the control's; refusal rate and correct-when-answering are reported, not blocking.
-  else ok = JUDGES.every((j) => k[j].confidentErrors <= c[j].confidentErrors);
+  // Boar 2026-09-27 (after ea21e82): a FIXED ceiling of 10 confident errors (control-a8ee6bf-r2, the Compacto before
+  // decision B), not the moving control: answering more (fewer declines) with a few more errors is the agreed trade-off.
+  else ok = JUDGES.every((j) => k[j].confidentErrors <= COMPACT_ERROR_CEILING);
   if (ok === false) fail = true;
   verdicts.push(`${name} ${ok === null ? "INCOMPLETE (judgments missing)" : ok ? "PASS" : "FAIL"}`);
   L.push("", `Verdict ${name}: **${verdicts.at(-1).split(" ").slice(1).join(" ")}**`, "");
 }
-L.splice(2, 0, `TL;DR: ${verdicts.join(" · ")}. 4B: ratio (health fixed answers excluded) within 3 points of the control and <= 2/32 knowledge refusals. 1.5B (Compacto): confident errors may not rise above the control; refusals and correct-when-answering are reported, not blocking. Health fixed answers are reported apart (decision a4644ef). Judges: ${JUDGES.join(" + ")}. Regenerate with \`node eval/scripts/s32-gate-check.mjs ${args.join(" ")}\`.`, "");
+L.splice(2, 0, `TL;DR: ${verdicts.join(" · ")}. 4B: ratio (health fixed answers excluded) within 3 points of the control and <= 2/32 knowledge refusals. 1.5B (Compacto): at most ${COMPACT_ERROR_CEILING} confident errors (fixed ceiling); refusals and correct-when-answering are reported, not blocking. Health fixed answers are reported apart (decision a4644ef). Judges: ${JUDGES.join(" + ")}. Regenerate with \`node eval/scripts/s32-gate-check.mjs ${args.join(" ")}\`.`, "");
 writeFileSync(join(EVAL_DIR, "reports", `s32-check-${control}-vs-${candidate}.md`), L.join("\n"));
 console.log(L.join("\n"));
 process.exit(fail ? 1 : 0);

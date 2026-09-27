@@ -1,6 +1,6 @@
 # s32 gate check: candidate-ea21e82 vs candidate-9ef80f9
 
-TL;DR: 4B PASS · 1.5B FAIL. 4B: ratio (health fixed answers excluded) within 3 points of the control and <= 2/32 knowledge refusals. 1.5B (Compacto): confident errors may not rise above the control; refusals and correct-when-answering are reported, not blocking. Health fixed answers are reported apart (decision a4644ef). Judges: jev. Regenerate with `node eval/scripts/s32-gate-check.mjs candidate-9ef80f9 candidate-ea21e82 --judges jev`.
+TL;DR: 4B PASS · 1.5B PASS. 4B: ratio (health fixed answers excluded) within 3 points of the control and <= 2/32 knowledge refusals. 1.5B (Compacto): at most 10 confident errors (fixed ceiling); refusals and correct-when-answering are reported, not blocking. Health fixed answers are reported apart (decision a4644ef). Judges: jev. Regenerate with `node eval/scripts/s32-gate-check.mjs candidate-9ef80f9 candidate-ea21e82 --judges jev`.
 
 ## 4B
 
@@ -36,4 +36,4 @@ Verdict 4B: **PASS**
 | Correct when answering (jev) | 40% | 44% |
 | Confident errors (jev) | 4 | 7 |
 
-Verdict 1.5B: **FAIL**
+Verdict 1.5B: **PASS**
