@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Mandatory gate for any prompt/retrieval change (Boar, 2026-09-26): the first-aid set (dataset `safety`) and the
 # quantum-resistant signatures prompt (cryptopack crypto-named-001) on 1.5B and 4B, without packs and with the
-# Preparedness + crypto packs installed, over 5 seeds. Runs on the Mac mini through the heavy queue.
+# Preparedness + crypto packs of the tree's own catalog installed, over 5 seeds. Runs on the Mac mini through the heavy queue.
 # Nothing enters integration unless this exits 0.
 #
 # Usage (from the eval worktree root): bash eval/scripts/gate-mini.sh <source-tree-path> [git-ref=HEAD] [label]
@@ -25,13 +25,16 @@ S32="${GATE_S32:-0}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/eval/dataset/subset.s32.v1.json")"
 DEST="boar/gate/$LABEL"
-# Pinned packs (sha256 from the knowledge catalog: src/rag/preparedness.ts, src/rag/cryptoPack.ts).
-PREP_SHA=65dff5d9988a6fe2bffe17a4d3ab096a1a8f580d20b1ab18d0ada41bbbc0b4e8
-CRYPTO_SHA=fe75514ed407ea5f9c0310d3261407c9e779719b7787c2d8c4e7f584dae12c5e
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 git -C "$TREE" archive "$REF" src assets/corpus | tar -x -C "$TMP"
 HAS_PACK=0; [ -f "$TMP/src/rag/wikiPack.ts" ] && [ -f "$TMP/src/rag/testing/nodeSqlite.ts" ] && HAS_PACK=1
+# Packs = what this tree's catalog installs (sha256 + pinned URL from src/rag/preparedness.ts and cryptoPack.ts),
+# downloaded once per sha into ~/boar/shared-data/packs/pinned/<sha>/ and verified before and after the runs.
+cat_field() { grep -oE "$2: \"[^\"]*\"" "$TMP/src/rag/$1.ts" 2>/dev/null | head -1 | cut -d'"' -f2; }
+PREP_SHA="$(cat_field preparedness sha256)"; PREP_URL="$(cat_field preparedness sourceUrl)"
+CRYPTO_SHA="$(cat_field cryptoPack sha256)"; CRYPTO_URL="$(cat_field cryptoPack sourceUrl)"
+if [ "$HAS_PACK" = 1 ] && { [ -z "$PREP_SHA" ] || [ -z "$CRYPTO_SHA" ]; }; then echo "GATE INCOMPLETE: $REF has no preparedness/crypto pack in its catalog"; exit 2; fi
 if [ "$PIPELINE" = app ] && ! grep -q "export function createAnswerer" "$TMP/src/routing/answer.ts" 2>/dev/null; then echo "GATE INCOMPLETE: $REF has no src/routing/answer.ts createAnswerer (use GATE_PIPELINE=direct)"; exit 2; fi
 echo "gate $LABEL: tree $TREE @ $SHA, pipeline $PIPELINE, packs loadable: $HAS_PACK, seeds: $SEEDS"
 
@@ -48,22 +51,27 @@ cd ~/$DEST/eval
 ln -sfn ~/boar/gate/.cache .cache
 cd ..
 export BOAR_SHARED_MODELS=\$HOME/boar/shared-models
-PACKS=\$HOME/boar/shared-data/packs/pinned
-echo "$PREP_SHA  \$PACKS/boar-preparedness.sqlite" | shasum -a 256 -c - || exit 3
-echo "$CRYPTO_SHA  \$PACKS/boar-crypto.sqlite" | shasum -a 256 -c - || exit 3
+PIN=\$HOME/boar/shared-data/packs/pinned
+PREP=\$PIN/$PREP_SHA/boar-preparedness.sqlite; CRYPTO=\$PIN/$CRYPTO_SHA/boar-crypto.sqlite
+if [ $HAS_PACK = 1 ]; then
+  [ -f \$PREP ] || { mkdir -p \$(dirname \$PREP) && curl -sSfL -o \$PREP.part "$PREP_URL" && mv \$PREP.part \$PREP; }
+  [ -f \$CRYPTO ] || { mkdir -p \$(dirname \$CRYPTO) && curl -sSfL -o \$CRYPTO.part "$CRYPTO_URL" && mv \$CRYPTO.part \$CRYPTO; }
+  echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - || exit 3
+  echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c - || exit 3
+fi
 O=eval/results/gate-runs; mkdir -p \$O
 run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --corpus $CORPUS "\$@" || echo "RUNFAIL \$*"; }
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
     extra=(); name=\${m}__${CORPUS}__seed\$s
-    [ \$cfg = packs ] && extra=(--pack \$PACKS/boar-preparedness.sqlite,\$PACKS/boar-crypto.sqlite) && name=\${m}__${CORPUS}__packs__seed\$s
+    [ \$cfg = packs ] && extra=(--pack \$PREP,\$CRYPTO) && name=\${m}__${CORPUS}__packs__seed\$s
     run --model \$m --seed \$s --dataset safety \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
     run --model \$m --seed \$s --dataset cryptopack --ids crypto-named-001 \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
   done
 done; done
 if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
-echo "$PREP_SHA  \$PACKS/boar-preparedness.sqlite" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$PACKS/boar-crypto.sqlite" | shasum -a 256 -c -
+[ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
 ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror" || true
@@ -74,7 +82,7 @@ rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "corpus": "$CORPUS",
-  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
+  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
 EOF
 
 cd "$ROOT/eval"
