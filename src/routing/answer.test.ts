@@ -1073,6 +1073,65 @@ describe("answer(): Sextant cry-020 / cry-012", () => {
   });
 });
 
+describe("answer(): a known-false quantum claim (gate 394bf31)", () => {
+  const PQC = chunk("pqc", "Post-quantum cryptography", "Open Quantum Safe project: The Open Quantum Safe (OQS) project has the goal of developing and prototyping quantum-resistant cryptography.");
+  const seed5 = "Quantum-resistant signature algorithms include those based on elliptic curve cryptography (ECC) or lattice-based cryptography, such as those in the Open Quantum Safe (OQS) project.";
+  it("the compact model declines, whatever the seed", async () => {
+    f.retrieved = [PQC];
+    f.deps.engine.generate = async () => seed5;
+    const { events, result } = await collect("Which signature algorithms are quantum resistant?");
+    expect(events.find((e) => e.type === "warning")).toMatchObject({ code: "weak_sources", declined: true });
+    expect(result.text).toBe("");
+    expect(result.receipt.reasonCodes).toContain("grounding:false-claim-declined-compact");
+  });
+  it("the 4B loses the false sentence and keeps the rest", async () => {
+    f.installed = [lfm];
+    f.activeId = "lfm8";
+    f.retrieved = [PQC];
+    f.deps.engine.generate = async () => `${seed5} The Open Quantum Safe project develops quantum-resistant cryptography [1].`;
+    const { result } = await collect("Which signature algorithms are quantum resistant?");
+    expect(result.text).toBe("The Open Quantum Safe project develops quantum-resistant cryptography [1].");
+    expect(result.receipt.reasonCodes).toContain("grounding:false-claim-removed-1");
+  });
+});
+
+describe("answer(): Sextant q7 (chat screen): 'O que causa o efeito estufa?'", () => {
+  const GREENHOUSE = chunk(
+    "g",
+    "Greenhouse effect",
+    "The greenhouse effect occurs when heat-trapping gases in a planet's atmosphere prevent the planet from losing heat to space, raising its surface temperature. Surface heating can happen from an internal heat source or come from an external source, such as a host star. In the case of Earth, the Sun emits shortwave radiation (sunlight) that passes through greenhouse gases to heat the Earth's surface. In response, the Earth's surface emits longwave radiation that is mostly absorbed by greenhouse gases, reducing the rate at which the Earth can cool off."
+  );
+  const screen = (events: AnswerEvent[]) => ({
+    instant: (events.find((e) => e.type === "instant") as any)?.snippet.text as string | undefined,
+    declined: (events.find((e) => e.type === "warning") as any)?.declined === true,
+    done: events.find((e) => e.type === "done") as any,
+  });
+  for (const [label, setup] of [
+    ["1.5B", () => {}],
+    ["4B", () => { f.installed = [lfm]; f.activeId = "lfm8"; }],
+  ] as const) {
+    it(`${label}: no off-topic instant snippet, and never an empty answer while the source is on topic`, async () => {
+      for (const q of ["O que causa o efeito estufa?", "What causes the greenhouse effect?"]) {
+        f = makeFake();
+        setup();
+        f.retrieved = [GREENHOUSE];
+        f.deps.englishNames = () => ["Greenhouse effect"];
+        f.deps.engine.generate = async () =>
+          q.startsWith("O que") ? "O efeito estufa é causado por gases que retêm calor na atmosfera [1]." : "Heat-trapping gases in the atmosphere prevent the planet from losing heat to space [1].";
+        const { events, result } = await collect(q);
+        const s = screen(events);
+        if (s.instant) {
+          expect(s.instant, q).not.toMatch(/Surface heating|host star/);
+          expect(s.instant, q).toMatch(/greenhouse/i);
+        }
+        expect(s.declined, q).toBe(false);
+        expect(result.text.trim().length, q).toBeGreaterThan(0);
+        expect(result.text, q).not.toMatch(/host star/);
+      }
+    });
+  }
+});
+
 describe("answer(): today's date (Prism TD-1)", () => {
   it("a question about today gets the device's date next to it; others don't", async () => {
     f.installed = [lfm];

@@ -23,6 +23,9 @@ import {
   currentEventAnswer,
   temperatureConversion,
   mentionsNow,
+  sentenceNamesSubject,
+  passageLanguage,
+  falseQuantumClaims,
   isSubstantive,
   identifiersIn,
   titleHasIdentifier,
@@ -747,7 +750,9 @@ export function createAnswerer(deps: AnswerDeps) {
         const covers =
           !!snip &&
           onSubject(pool[snip.sourceIndex]) &&
-          termCoverage(matchQuery, `${pool[snip.sourceIndex].title} ${snip.text}`) >= MIN_TERM_COVERAGE;
+          termCoverage(matchQuery, `${pool[snip.sourceIndex].title} ${snip.text}`) >= MIN_TERM_COVERAGE &&
+          // The sentence itself names the subject, not only its page's title (Sextant q7, EN and PT).
+          sentenceNamesSubject(matchQuery, pool[snip.sourceIndex].title, snip.text);
         if (snip && sourceIndex >= 0 && !covers) reasonCodes.push("instant:off-topic");
         if (snip && sourceIndex >= 0 && covers) {
           markVisible();
@@ -974,7 +979,14 @@ export function createAnswerer(deps: AnswerDeps) {
           // Boar (A), s32 672bc41: the compact model cited, and no cited source supported it: 4 of 5 such
           // answers were confident errors ("Great Famine" from "Great Recession in Africa"). It declines,
           // as with no source, unless asked to answer anyway. The 4B keeps its (corrected) answer.
-          if (!/\[\d+\]/.test(text) && !health && isCompactModel(genLlm) && !req.answerAnyway && gen.mode !== "multipass") {
+          // Not when the answer and its sources are in different languages: CT-1 can't verify a PT sentence
+          // against an English source (it removes every such [n]), so that is no evidence against the answer
+          // (Sextant q7 PT: the 1.5B's answer became an empty decline with the Greenhouse effect source on topic).
+          const answerLang = passageLanguage(text);
+          const sourceLang = passageLanguage(sources.map((c) => c.body).join(" "));
+          const crossLanguage = !!answerLang && !!sourceLang && answerLang !== sourceLang;
+          if (crossLanguage) reasonCodes.push("grounding:all-citations-removed-kept-cross-language");
+          if (!crossLanguage && !/\[\d+\]/.test(text) && !health && isCompactModel(genLlm) && !req.answerAnyway && gen.mode !== "multipass") {
             reasonCodes.push("grounding:all-citations-removed-declined-compact");
             // Passages were found (and shown): "didn't find this" would be false (Quill 892c049).
             emit({ type: "warning", answerId, code: "weak_sources", declined: true, message: pt ? "Os trechos encontrados não sustentam esta resposta." : "The passages found don't support this answer." });
@@ -982,6 +994,29 @@ export function createAnswerer(deps: AnswerDeps) {
             return finish(genTier, "success", "", [], baseReceipt);
           }
         }
+      }
+      // A known-false claim (classical public-key crypto called quantum resistant, gate 394bf31): the compact
+      // model declines; the 4B loses the sentence. Deterministic, whatever the sampling seed.
+      const falseClaims = !health && gen.mode !== "multipass" ? falseQuantumClaims(text) : [];
+      if (falseClaims.length) {
+        if (isCompactModel(genLlm) && !req.answerAnyway) {
+          reasonCodes.push("grounding:false-claim-declined-compact");
+          emit({
+            type: "warning",
+            answerId,
+            code: "weak_sources",
+            declined: true,
+            message: sources.length
+              ? pt ? "Os trechos encontrados não sustentam esta resposta." : "The passages found don't support this answer."
+              : pt ? "Não encontrei isso no acervo deste celular." : "I didn't find this in this phone's library.",
+          });
+          finalText = "";
+          return finish(genTier, "success", "", [], baseReceipt);
+        }
+        reasonCodes.push(`grounding:false-claim-removed-${falseClaims.length}`);
+        for (const claim of falseClaims) text = text.replace(claim, "");
+        text = text.replace(/[ \t]{2,}/g, " ").trim();
+        finalText = text;
       }
       // Its inverse (Boar, gate 9ef80f9): a sentence without [n] that an on-topic source supports, by
       // the same measure, gets that source's [n]. Never without support.
