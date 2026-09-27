@@ -5,11 +5,14 @@
 
 export const slug = (t) => t.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
 
-/** slug(EN question) -> on-topic title pattern; retrieval "optional" = the app may skip search (math). */
+/**
+ * slug(EN question) -> onTopic: title pattern; retrieval "optional": math, where the search may find nothing on topic
+ * (then the answer must contain `answer`, and any source it shows must still be on topic).
+ */
 export const SUGGESTION_TOPICS = {
   [slug("Why do we have seasons on Earth?")]: { onTopic: /season|axial tilt|solstice|equinox|obliquity|earth's orbit|esta[çc][õo]es/i },
   [slug("What is the difference between a pandemic and an epidemic?")]: { onTopic: /pandemic|epidemic|epidemiolog|outbreak|endemic|pandemia|epidemia/i },
-  [slug("What is 30 °C in Fahrenheit?")]: { onTopic: /fahrenheit|celsius|temperature|conversion/i, retrieval: "optional" },
+  [slug("What is 30 °C in Fahrenheit?")]: { onTopic: /fahrenheit|celsius|temperature|conversion/i, retrieval: "optional", answer: /\b86\b/ },
   [slug("How do I stop a nosebleed?")]: { onTopic: /nosebleed|epistaxis|nasal|bleeding|sangramento|nariz/i },
 };
 
@@ -23,10 +26,22 @@ export const suggestionId = (en, lang) => `sug-${slug(en)}-${lang}`;
 export function checkSuggestion(row) {
   if (!row.queryId?.startsWith("sug-")) return null;
   const key = row.queryId.replace(/^sug-/, "").replace(/-(en|pt)$/, "");
-  const rule = SUGGESTION_TOPICS[key];
+  // The tree's own declaration (SUGGESTION_SOURCES, Quill RT-1) wins: expected title words of an on-topic source.
+  const declared = row.suggestion?.expect?.length
+    ? new RegExp(row.suggestion.expect.map((w) => `\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).join("|"), "i")
+    : null;
+  const hand = SUGGESTION_TOPICS[key];
+  const rule = declared ? { ...hand, onTopic: declared } : hand;
   if (!rule) return { pass: false, failures: [`no topic rule for this suggestion: add "${key}" to scripts/lib/suggestion-check.mjs`], warnings: [] };
+  const failures = [], warnings = [];
   const top3 = (row.rawRetrievedTitles ?? row.retrievedTitles ?? []).slice(0, 3);
-  if (!top3.length) return rule.retrieval === "optional" ? { pass: true, failures: [], warnings: ["no search (allowed for this question)"] } : { pass: false, failures: ["search returned nothing"], warnings: [] };
-  if (top3.some((t) => rule.onTopic.test(t))) return { pass: true, failures: [], warnings: [] };
-  return { pass: false, failures: [`no on-topic source in the search top-3: ${top3.map((t) => `"${t}"`).join(", ")}`], warnings: [] };
+  if (rule.retrieval !== "optional") {
+    if (!top3.length) failures.push("search returned nothing");
+    else if (!top3.some((t) => rule.onTopic.test(t))) failures.push(`no on-topic source in the search top-3: ${top3.map((t) => `"${t}"`).join(", ")}`);
+  }
+  // Same rule as health answers (accepted 2026-09-26): a source the answer shows must be on topic.
+  const off = (row.retrievedTitles ?? []).filter((t) => !rule.onTopic.test(t));
+  if (off.length) failures.push(`off-topic source shown: ${[...new Set(off)].map((t) => `"${t}"`).join(", ")}`);
+  if (rule.answer && !rule.answer.test(row.answer ?? "")) failures.push(`answer lacks the expected result (${rule.answer.source}): "${(row.answer ?? "").slice(0, 100)}"`);
+  return { pass: failures.length === 0, failures, warnings };
 }

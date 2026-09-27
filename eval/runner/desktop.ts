@@ -99,7 +99,7 @@ const DEFAULT_STEP_TIMEOUT_MS = 120_000;
 const PERSONALITY_ID = "succinct" as const;
 const PLAIN_STOPS = ["\nUser:", "\n\nUser:", "\nQuestion:", "\n\nQuestion:"];
 
-interface Question { id: string; category: string; query: string; lang: string; gold: Array<{ source: string; title: string }> }
+interface Question { id: string; category: string; query: string; lang: string; gold: Array<{ source: string; title: string }>; suggestion?: { key: string; corpus: string[]; expect: string[] } }
 
 function args() {
   const a = process.argv.slice(2);
@@ -146,7 +146,16 @@ function bundledCorpus(): Doc[] {
 
 /** A format-2 pack hit (src/rag/wikiPack.ts PackHit), typed loosely so this file compiles on trees without it. */
 type PackHit = { chunkId: number; articleId: number; title: string; source: string; section?: string; text: string; url?: string; license?: string; score: number; via?: string };
-type OpenPack = { id: string; sha256: string; searchDetailed(q: string, o: { k?: number; queryVec?: Float32Array }): Promise<{ hits: PackHit[] }> };
+type OpenPack = {
+  id: string;
+  sha256: string;
+  format: "1" | "2";
+  /** Format 2 (WikiPack). */
+  searchDetailed?(q: string, o: { k?: number; queryVec?: Float32Array }): Promise<{ hits: PackHit[] }>;
+  /** Format 1 (flat chunks + int8 vectors): mirrors src/rag/packs.ts searchPacks for one pack. */
+  searchFlat?(q: string, queryVec: Float32Array, limit: number): { lexical: RetrievedChunk[]; semantic: RetrievedChunk[] };
+};
+const PACK_CANDIDATES = 400; // src/rag/packs.ts
 
 // Mirrors src/rag/packs.ts packHitToChunk (feat/knowledge); packs.ts imports expo modules, so it cannot load in Node.
 const PACK_SOURCE_LABEL: Record<string, string> = {
@@ -170,6 +179,31 @@ function packHitToChunk(packId: string, h: PackHit): RetrievedChunk {
 
 /** Opens a format-2 pack with the source tree's WikiPack (Node's sqlite + fzstd, as in eval/retrieval/recall.test.ts). */
 async function openPack(path: string): Promise<OpenPack> {
+  const id = path.split("/").pop()!.replace(/\.sqlite$/, "");
+  const probe = new DatabaseSync(path, { readOnly: true });
+  const meta = Object.fromEntries((probe.prepare("SELECT key, value FROM meta").all() as Array<{ key: string; value: string }>).map((r) => [r.key, r.value]));
+  if (meta.formatVersion !== "2") {
+    // Format 1: FTS over chunks + int8 embeddings, searched like the built-in corpus and fused with it.
+    const pureModule = "../../src/rag/pure";
+    const { cosineSimilarityInt8 } = await import(pureModule);
+    const sha256 = await sha256File(path);
+    return {
+      id, sha256, format: "1",
+      searchFlat(q, queryVec, limit) {
+        const lq = buildLexicalQuery(q);
+        if (!lq) return { lexical: [], semantic: [] };
+        const rows = probe.prepare(
+          `SELECT c.id, c.title, c.body, c.vec, bm25(chunks_fts) AS rank FROM chunks_fts f JOIN chunks c ON c.id = f.rowid WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?`,
+        ).all(lq.match, PACK_CANDIDATES) as Array<{ id: number; title: string; body: string; vec: Uint8Array; rank: number }>;
+        const toChunk = (r: (typeof rows)[number], score: number, matchType: "lexical" | "semantic") =>
+          ({ chunkId: `pack:${id}:${r.id}`, docId: `pack:${id}:${r.title}`, title: r.title, body: r.body, score, matchType }) as RetrievedChunk;
+        const lexical = filterByTermCoverage(rows, lq.terms).slice(0, limit).map((r) => toChunk(r, -r.rank, "lexical"));
+        const semantic = filterByMinScore(rows.map((r) => toChunk(r, cosineSimilarityInt8(queryVec, r.vec), "semantic")).sort((a, b) => b.score - a.score), MIN_SEMANTIC_SIMILARITY).slice(0, limit);
+        return { lexical, semantic };
+      },
+    };
+  }
+  probe.close();
   const wikiPackModule = "../../src/rag/wikiPack", sqliteModule = "../../src/rag/testing/nodeSqlite";
   let WikiPack: any, nodeSqliteDatabase: any;
   try {
@@ -180,8 +214,7 @@ async function openPack(path: string): Promise<OpenPack> {
   }
   const { decompress } = await import("fzstd");
   const pack = await WikiPack.open(nodeSqliteDatabase(path), decompress);
-  const id = path.split("/").pop()!.replace(/\.sqlite$/, "");
-  return { id, sha256: await sha256File(path), searchDetailed: (q, o) => pack.searchDetailed(q, o) };
+  return { id, sha256: await sha256File(path), format: "2", searchDetailed: (q, o) => pack.searchDetailed(q, o) };
 }
 
 class DesktopKnowledgeBase {
@@ -230,10 +263,11 @@ class DesktopKnowledgeBase {
     if (!this.packs.length) return fuseRetrievalResults(lexical, semantic, topK);
     // Large-pack passages from articles the question names come first, in the pack's own order;
     // its keyword hits compete with everything else.
-    const wiki = await Promise.all(this.packs.map(async (p) => ({ id: p.id, hits: (await p.searchDetailed(query, { k: topK, queryVec: qvec })).hits })));
+    const flat = this.packs.filter((p) => p.format === "1").map((p) => p.searchFlat!(query, qvec, limit));
+    const wiki = await Promise.all(this.packs.filter((p) => p.format === "2").map(async (p) => ({ id: p.id, hits: (await p.searchDetailed!(query, { k: topK, queryVec: qvec })).hits })));
     const named = wiki.flatMap((w) => w.hits.filter((h) => h.via === "title").map((h) => packHitToChunk(w.id, h)));
     const wikiLexical = wiki.flatMap((w) => w.hits.filter((h) => h.via !== "title").map((h) => packHitToChunk(w.id, h)));
-    const fused = fuseRetrievalResults([...lexical, ...wikiLexical], semantic, topK);
+    const fused = fuseRetrievalResults([...lexical, ...flat.flatMap((f) => f.lexical), ...wikiLexical], [...semantic, ...flat.flatMap((f) => f.semantic)], topK);
     const seen = new Set(named.map((c) => c.chunkId));
     return [...named, ...fused.filter((c) => !seen.has(c.chunkId))].slice(0, Math.max(topK, named.length));
   }
@@ -496,6 +530,7 @@ async function main() {
       sourcesLayout: opt.sources,
       promptBuilder: app ? "src/routing/answer.ts createAnswerer" : opt.sources === "user" ? buildMessagesSource() : "src/rag/pure.ts assembleChatMessages",
       pipeline: opt.pipeline,
+      suggestion: q.suggestion,
       answerTier: app?.tier,
       modelCalled: app ? app.modelCalled : true,
       rawRetrievedTitles: app ? app.retrieved : undefined,

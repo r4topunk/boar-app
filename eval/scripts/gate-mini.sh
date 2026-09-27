@@ -11,8 +11,9 @@
 #      GATE_CORPUS (essential = corpus + corpus-standard + corpus-full, the default install),
 #      GATE_S32=1 also answers the v1 s32 questions (seed 42, no packs) into results/gates/<label>/s32/ for the judges,
 #      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
-# Also the "suggestions" item (RT-1): the tree's empty-chat suggestions (src/i18n chat.suggestions, EN+PT) must have
-# an on-topic source in the app's search top-3, without packs and with the packs (4B, seed 1: search is model-free).
+# Also the "suggestions" item (RT-1): each empty-chat suggestion (src/i18n chat.suggestions, EN+PT) is asked with
+# the builtin corpus plus the corpus it declares (src/ui/chat/suggestions.ts SUGGESTION_SOURCES), and the app's
+# search top-3 must hold a title with one of its declared words (4B, seed 1: search is model-free).
 # Exit: 0 = all pass, 1 = a case fails (blocker), 2 = incomplete (missing rows, or the tree cannot load packs).
 set -euo pipefail
 TREE="$(cd "$1" && pwd)"; REF="${2:-HEAD}"
@@ -37,7 +38,21 @@ cat_field() { grep -oE "$2: \"[^\"]*\"" "$TMP/src/rag/$1.ts" 2>/dev/null | head 
 PREP_SHA="$(cat_field preparedness sha256)"; PREP_URL="$(cat_field preparedness sourceUrl)"
 CRYPTO_SHA="$(cat_field cryptoPack sha256)"; CRYPTO_URL="$(cat_field cryptoPack sourceUrl)"
 if [ "$HAS_PACK" = 1 ] && { [ -z "$PREP_SHA" ] || [ -z "$CRYPTO_SHA" ]; }; then echo "GATE INCOMPLETE: $REF has no preparedness/crypto pack in its catalog"; exit 2; fi
-node "$ROOT/eval/scripts/extract-suggestions.mjs" "$TMP" "$TMP/questions.suggestions-gate.jsonl" >/dev/null
+node "$ROOT/eval/scripts/extract-suggestions.mjs" "$TMP" "$TMP/questions.suggestions-gate.jsonl" "$TMP/suggestions-plan.tsv"
+# wiki-vital5 (format-1 pack) from the tree's model manifest, when a suggestion declares it.
+VITAL_SHA="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const b=s.slice(s.indexOf("\"wiki-vital5\""));const m=b.match(/sha256: "([0-9a-f]{64})"/);console.log(m?m[1]:"")' "$TMP/src/models/manifest.ts" 2>/dev/null || true)"
+VITAL_URL="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const b=s.slice(s.indexOf("\"wiki-vital5\""));const m=b.match(/sourceUrl: "([^"]+)"/);console.log(m?m[1]:"")' "$TMP/src/models/manifest.ts" 2>/dev/null || true)"
+SUG_LINES=""; NEED_VITAL=0
+while IFS=$'\t' read -r packid ids; do
+  case "$packid" in
+    -) px="" ;;
+    boar-preparedness) px="--pack \$PREP" ;;
+    boar-crypto) px="--pack \$CRYPTO" ;;
+    wiki-vital5) px="--pack \$VITAL"; NEED_VITAL=1 ;;
+    *) echo "suggestions: corpus '$packid' is not available to the gate; its questions will be missing"; continue ;;
+  esac
+  SUG_LINES+="runc --model \$SUG_MODEL --seed 1 --corpus bundled --dataset suggestions-gate --ids $ids $px --out \$O/suggestions__declared.jsonl"$'\n'
+done < "$TMP/suggestions-plan.tsv"
 N_SUG=$(grep -c . "$TMP/questions.suggestions-gate.jsonl" || true)
 SUG_MODEL=qwen3-4b-instruct-2507-q4km
 if [ "$PIPELINE" = app ] && ! grep -q "export function createAnswerer" "$TMP/src/routing/answer.ts" 2>/dev/null; then echo "GATE INCOMPLETE: $REF has no src/routing/answer.ts createAnswerer (use GATE_PIPELINE=direct)"; exit 2; fi
@@ -65,8 +80,16 @@ if [ $HAS_PACK = 1 ]; then
   echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - || exit 3
   echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c - || exit 3
 fi
+VITAL=\$PIN/$VITAL_SHA/wiki-vital5.sqlite
+if [ $NEED_VITAL = 1 ]; then
+  [ -n "$VITAL_SHA" ] || { echo "wiki-vital5 declared but not in the manifest"; exit 3; }
+  [ -f \$VITAL ] || { mkdir -p \$(dirname \$VITAL) && curl -sSfL -o \$VITAL.part "$VITAL_URL" && mv \$VITAL.part \$VITAL; }
+  echo "$VITAL_SHA  \$VITAL" | shasum -a 256 -c - || exit 3
+fi
+SUG_MODEL=$SUG_MODEL
 O=eval/results/gate-runs; mkdir -p \$O
 run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --corpus $CORPUS "\$@" || echo "RUNFAIL \$*"; }
+runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE "\$@" || echo "RUNFAIL \$*"; }
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -76,12 +99,7 @@ for m in $MODELS; do for s in $SEEDS; do
     run --model \$m --seed \$s --dataset cryptopack --ids crypto-named-001 \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
   done
 done; done
-for cfg in none packs; do
-  [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
-  extra=(); name=suggestions__${CORPUS}
-  [ \$cfg = packs ] && extra=(--pack \$PREP,\$CRYPTO) && name=suggestions__${CORPUS}__packs
-  run --model $SUG_MODEL --seed 1 --dataset suggestions-gate \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
-done
+$SUG_LINES
 if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
@@ -94,7 +112,7 @@ rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "corpus": "$CORPUS",
-  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
+  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
 EOF
 
 cd "$ROOT/eval"
@@ -103,7 +121,7 @@ node scripts/regress.mjs --name "gate-$LABEL" --runs "results/gates/$LABEL/runs"
 RC=$?
 set -e
 N_MODELS=$(wc -w <<<"$MODELS"); N_SEEDS=$(wc -w <<<"$SEEDS"); N_CFG=$((1 + HAS_PACK))
-EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * 8 + N_SUG * N_CFG))
+EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * 8 + N_SUG))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 echo "rows: $GOT / $EXPECTED expected"
 if [ "$RC" -ne 0 ]; then echo "GATE FAIL: eval/reports/regression-gate-$LABEL.md"; exit 1; fi
