@@ -71,6 +71,34 @@ const health = items.filter((i) => i.startsWith("safety-"));
 L.push("## Model calls per health item (candidate, calls / answers)", "", "| Configuration | " + health.join(" | ") + " |", "|---|" + health.map(() => "---").join("|") + "|");
 for (const cfg of configs) if (B.cells[cfg]) L.push(`| ${cfg} | ` + health.map((i) => { const c = B.cells[cfg][i]; return c ? `${c.modelCalled}/${c.n}` : "–"; }).join(" | ") + " |");
 L.push("", noModel.length ? `Zero-model criterion on: ${noModel.join(", ")}.` : "", "");
+// Reason codes the engine reports on answers (Tusk dc41215): an uncited knowledge answer gets the "not from an offline
+// source" preface on the 4B and is declined on the Compacto. Counted over the gate runs and the s32 answers.
+const WATCH = ["grounding:uncited-preface", "grounding:uncited-declined-compact"];
+function codeCounts(label) {
+  const base = join(EVAL_DIR, "results", "gates", label);
+  const out = {};
+  for (const sub of ["runs", "s32"]) {
+    const dir = join(base, sub);
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).filter((f) => f.endsWith(".jsonl"))) {
+      // Suggestions always run on the 4B (gate-mini.sh SUG_MODEL).
+      const model = /1\.5b/.test(f) ? "1.5B" : /4b/.test(f) || f.startsWith("suggestions") ? "4B" : "other";
+      const key = `${model} · ${sub === "s32" ? "s32" : "gate items"}`;
+      for (const r of readFileSync(join(dir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
+        const c = (out[key] ??= { n: 0, ...Object.fromEntries(WATCH.map((w) => [w, 0])) });
+        c.n++;
+        for (const w of WATCH) if ((r.reasonCodes ?? []).includes(w)) c[w]++;
+      }
+    }
+  }
+  return out;
+}
+const cc = codeCounts(control), kc = codeCounts(candidate);
+L.push("## Uncited-answer safety net (reason codes, answers with the code / answers)", "", "| Model · set | " + WATCH.map((w) => `${w} (control → candidate)`).join(" | ") + " |", "|---|" + WATCH.map(() => "---").join("|") + "|");
+for (const key of [...new Set([...Object.keys(cc), ...Object.keys(kc)])].sort()) {
+  L.push(`| ${key} | ` + WATCH.map((w) => `${cc[key] ? `${cc[key][w]}/${cc[key].n}` : "–"} → ${kc[key] ? `${kc[key][w]}/${kc[key].n}` : "–"}`).join(" | ") + " |");
+}
+L.push("");
 L.push(`Full answers: \`reports/regression-gate-${control}.md\`, \`reports/regression-gate-${candidate}.md\`. Regenerate with \`node eval/scripts/gate-compare.mjs ${control} ${candidate}\`.`, "");
 writeFileSync(join(EVAL_DIR, "reports", `gate-compare-${control}-vs-${candidate}.md`), L.join("\n"));
 console.log(L.join("\n"));

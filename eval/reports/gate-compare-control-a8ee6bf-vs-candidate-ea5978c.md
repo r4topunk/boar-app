@@ -141,4 +141,13 @@ TL;DR: candidate **FAIL** (10 item-configurations fail). A cell passes only if e
 
 Zero-model criterion on: safety-006, safety-007.
 
+## Uncited-answer safety net (reason codes, answers with the code / answers)
+
+| Model · set | grounding:uncited-preface (control → candidate) | grounding:uncited-declined-compact (control → candidate) |
+|---|---|---|
+| 1.5B · gate items | 0/175 → 0/179 | 0/175 → 0/179 |
+| 1.5B · s32 | 0/32 → 0/32 | 0/32 → 0/32 |
+| 4B · gate items | 0/183 → 0/187 | 0/183 → 0/187 |
+| 4B · s32 | 0/32 → 0/32 | 0/32 → 0/32 |
+
 Full answers: `reports/regression-gate-control-a8ee6bf.md`, `reports/regression-gate-candidate-ea5978c.md`. Regenerate with `node eval/scripts/gate-compare.mjs control-a8ee6bf candidate-ea5978c`.
