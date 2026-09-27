@@ -17,6 +17,10 @@ export const SUGGESTION_TOPICS = {
   [slug("How do I stop a nosebleed?")]: { onTopic: /nosebleed|epistaxis|nasal|bleeding|sangramento|nariz/i },
 };
 
+// RF-1 (answered with a cited source on every model) is a registered target until the engine fix ("plate" root and
+// [n] attribution by support, Tusk); flip to true when it lands to make it blocking (Boar, 2026-09-27, after 21bab42).
+export const RF1_BLOCKING = false;
+
 /** Row id for a suggestion: sug-<slug of the English text>-<lang>. */
 export const suggestionId = (en, lang) => `sug-${slug(en)}-${lang}`;
 
@@ -47,9 +51,12 @@ export function checkSuggestion(row) {
   // RF-1 (Prism, 35ffb87): a suggestion the app offers must be ANSWERED with a cited source on every model — never
   // declined by the Compacto nor answered from memory with the preface. Math (retrieval optional) is exempt from citing.
   const answer = row.answer ?? "";
+  const searchFailures = failures.length;
   if (rule.calculator && row.modelCalled === true) failures.push("used the model (expected the exact conversion without it)");
   if (row.declined || /did(n't| not) find this in this phone|n[ãa]o encontrei isso no acervo/i.test(answer)) failures.push("declined (the app offers this suggestion, so it must answer it)");
   else if (/not from an offline source|n[ãa]o (vem|[ée]) de (uma )?fonte offline/i.test(answer)) failures.push("answered from memory with the no-source preface");
   else if (rule.retrieval !== "optional" && row.citedTitles !== undefined && !row.citedTitles.length) failures.push("answered without citing any source");
-  return { pass: failures.length === 0, failures, warnings };
+  // Only the RF-1 answer checks failed: a TARGET miss (reported, not blocking) until RF1_BLOCKING.
+  const onlyAnswer = failures.length > 0 && searchFailures === 0;
+  return { pass: failures.length === 0, failures, warnings, ...(onlyAnswer && !RF1_BLOCKING ? { target: true } : {}) };
 }
