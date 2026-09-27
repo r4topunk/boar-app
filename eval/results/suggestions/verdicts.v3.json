@@ -74,5 +74,24 @@
     "runs": "results/suggestions/runs-v3-d7de156-lex/<model>__bundled__seed{42,7,1234}.jsonl",
     "note": "gate/candidate d7de156 with the PT lexicon loaded (the gate ran PT without it until 9eb69c5).",
     "result": "q8 PT: search fixed (Monsoon #1, cited on 3/3 seeds, both models) but the answer is the English lead quoted verbatim (instant extractive) with no Portuguese notice: FAIL on language, 0/3 both models. q8 EN PASS 3/3 both. q9 EN 2/3 both (4B seed 7, 1.5B seed 42 uncited). q9 PT 0/3 both (source dropped by the on-topic guard). byModel unchanged."
+  },
+  "recheckQ8pt": {
+    "runs": "results/suggestions/runs-v3-q8pt-3c6dec4/<model>__bundled__seed{42,7,1234}.jsonl",
+    "build": "local merge 3c6dec4 (not pushed) = integration 8fdb71c (PT lexicon with 'monção') + 7fd3242 (Tusk 29d7e52, language lead on instant passages) + feat/ui-chat a933f50; app pipeline and retrieval, builtin corpus only, PT lexicon loaded (runner check).",
+    "criterion": "Quill: on-topic source in the PT top-3; answer cites it (done.cited); the answer says in Portuguese that the source is in English.",
+    "result": "q8 PT PASS 3/3 on both models: Monsoon #1, cited, answer opens with 'Da fonte offline (em inglês):' then the English lead (reason code instant:source-language-lead). q8 EN PASS 3/3 both (unchanged, no lead).",
+    "byModelProposal": {
+      "qwen3-4b-instruct-2507-q4km": {
+        "pt": [
+          "+q8"
+        ]
+      },
+      "qwen2.5-1.5b-instruct-q4km": {
+        "pt": [
+          "+q8"
+        ]
+      }
+    },
+    "caveat": "Holds only once 7fd3242 is integrated; the gate will then measure q8 PT as an offered suggestion (blocking)."
   }
 }
