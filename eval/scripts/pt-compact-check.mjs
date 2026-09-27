@@ -32,11 +32,14 @@ function measure(label) {
   // Only what the model wrote counts (decision a4644ef on s32): a health excerpt, the health fixed answer and an
   // extractive passage are the engine's, not the Compacto's, and are reported apart.
   const codes = (q) => rows[q]?.reasonCodes ?? [];
-  const engineOnly = (q) => codes(q).some((c) => /^grounding:health-(extractive|no-source)$|^instant:final$/.test(c));
+  // No model call (calculator 55d36c0, health excerpt/fixed answer, final extractive passage): the engine's answer.
+  const engineOnly = (q) => rows[q]?.modelCalled === false || codes(q).some((c) => /^grounding:health-(extractive|no-source)$|^instant:final$|^answer:calculator-|^answer:temperature-conversion$/.test(c));
   const answered = judged.filter((x) => !refused(x.q) && !engineOnly(x.q));
-  const engine = judged.filter((x) => !refused(x.q) && engineOnly(x.q)).length;
+  const engineRows = judged.filter((x) => !refused(x.q) && engineOnly(x.q));
+  const engine = engineRows.length;
+  const engineWrong = engineRows.filter((x) => x.c <= 2).map((x) => x.q);
   const uncited = Object.values(rows).filter((r) => !refused(r.queryId) && !(r.citedTitles?.length) && (r.reasonCodes ?? []).some((c) => c.startsWith("grounding:uncited"))).length;
-  return { n: judged.length, engine, refusals: judged.length - answered.length - engine, answered: answered.length, correct: answered.filter((x) => x.c >= 4).length, errors: answered.filter((x) => x.c <= 2).map((x) => x.q), uncited };
+  return { n: judged.length, engine, refusals: judged.length - answered.length - engine, answered: answered.length, correct: answered.filter((x) => x.c >= 4).length, errors: answered.filter((x) => x.c <= 2).map((x) => x.q), uncited, engineWrong };
 }
 
 const res = labels.map((l) => [l, measure(l)]);
@@ -47,9 +50,9 @@ const limit = control ? control.errors.length + MARGIN : CEILING;
 const pass = last && last.errors.length <= limit;
 const L = [`# Compacto (1.5B) in PT: ${labels.join(" vs ")}`, "",
   `TL;DR: **${!last ? "NOT RUN" : pass ? "PASS" : "FAIL"}**: ${labels.at(-1)} has ${last?.errors.length ?? "?"} confident errors in PT${control ? ` vs control ${control.errors.length} (blocks above ${limit})` : ""}; target <= ${CEILING}: ${last && last.errors.length <= CEILING ? "met" : "not met"}. Answered without a cited source: ${last?.uncited ?? "?"}${control ? ` (control ${control.uncited})` : ""}. Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with \`node eval/scripts/pt-compact-check.mjs ${labels.join(" ")}\`.`, "",
-  "| Gate | Judged | Refusals | Engine answers (excerpt / fixed, not counted) | Model answers | Correct when answering | Confident errors | Answered without a cited source |", "|---|---|---|---|---|---|---|---|"];
-for (const [l, m] of res) L.push(m ? `| ${l} | ${m.n} | ${m.refusals} | ${m.engine} | ${m.answered} | ${m.answered ? Math.round((100 * m.correct) / m.answered) : 0}% | **${m.errors.length}** | ${m.uncited} |` : `| ${l} | not run | | | | | | |`);
-L.push("", ...res.filter(([, m]) => m).map(([l, m]) => `- ${l} confident errors: ${m.errors.join(", ") || "none"}`), "");
+  "| Gate | Judged | Refusals | Engine answers (calculator / excerpt / fixed; not counted) | Engine answers judged wrong | Model answers | Correct when answering | Confident errors | Answered without a cited source |", "|---|---|---|---|---|---|---|---|---|"];
+for (const [l, m] of res) L.push(m ? `| ${l} | ${m.n} | ${m.refusals} | ${m.engine} | ${m.engineWrong.length} | ${m.answered} | ${m.answered ? Math.round((100 * m.correct) / m.answered) : 0}% | **${m.errors.length}** | ${m.uncited} |` : `| ${l} | not run | | | | | | | |`);
+L.push("", ...res.filter(([, m]) => m).map(([l, m]) => `- ${l} confident errors: ${m.errors.join(", ") || "none"}; engine answers judged wrong (read them: a health excerpt may be right but partial): ${m.engineWrong.join(", ") || "none"}`), "");
 writeFileSync(join(EVAL_DIR, "reports", `pt-compact-${labels.join("-vs-")}.md`), L.join("\n"));
 console.log(L.join("\n"));
 process.exit(!last ? 2 : pass ? 0 : 1);
