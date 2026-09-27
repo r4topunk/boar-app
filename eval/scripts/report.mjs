@@ -49,7 +49,7 @@ const rows = systems.map((system) => {
   const jevPairs = pairsFor(system, "judgments-jev");
   return {
     system,
-    label: runs[0]?.configLabel ?? system,
+    label: (runs[0]?.configLabel ?? system) + (runs[0]?.packs?.length ? ` + ${runs[0].packs.map((p) => p.id).join(", ")} pack` : ""),
     hardware: runs[0]?.hardware,
     n: inScope.length,
     successRate: ok.length / Math.max(1, inScope.length),
