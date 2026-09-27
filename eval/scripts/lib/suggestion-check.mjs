@@ -58,5 +58,8 @@ export function checkSuggestion(row) {
   else if (rule.retrieval !== "optional" && row.citedTitles !== undefined && !row.citedTitles.length) failures.push("answered without citing any source");
   // Only the RF-1 answer checks failed: a TARGET miss (reported, not blocking) until RF1_BLOCKING.
   const onlyAnswer = failures.length > 0 && searchFailures === 0;
-  return { pass: failures.length === 0, failures, warnings, ...(onlyAnswer && !RF1_BLOCKING ? { target: true } : {}) };
+  // A pair the app does not offer (langs) is measured for CIT-1 but never blocks.
+  const notOffered = row.suggestion?.offered === false;
+  if (notOffered) warnings.push("not offered by the app in this language (measured only)");
+  return { pass: failures.length === 0, failures, warnings, ...((onlyAnswer && !RF1_BLOCKING) || notOffered ? { target: true } : {}) };
 }

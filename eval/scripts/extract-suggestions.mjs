@@ -27,12 +27,14 @@ if (existsSync(srcFile)) {
 
 // Only the (question, language) pairs the app offers: `langs` when declared, else both.
 const offered = (k, lang) => !sources[k]?.langs || sources[k].langs.includes(lang);
+// Every (question, language) pair is written; `offered` says whether the app shows it (CIT-1 measures all of them,
+// the gate blocks only on the offered ones).
 const rows = Object.keys(en).flatMap((k) => {
-  const suggestion = { key: k, ...(sources[k] ?? { corpus: [], expect: [] }) };
-  const base = { category: "suggestion", gold: [], license: "original", suggestion };
+  const suggestion = (lang) => ({ key: k, ...(sources[k] ?? { corpus: [], expect: [] }), offered: offered(k, lang) });
+  const base = { category: "suggestion", gold: [], license: "original" };
   return [
-    ...(offered(k, "en") ? [{ ...base, id: suggestionId(en[k], "en"), query: en[k], lang: "en", source_url: "src/i18n/locales/en.json" }] : []),
-    ...(pt[k] && offered(k, "pt") ? [{ ...base, id: suggestionId(en[k], "pt"), query: pt[k], lang: "pt-BR", source_url: "src/i18n/locales/pt.json" }] : []),
+    { ...base, suggestion: suggestion("en"), id: suggestionId(en[k], "en"), query: en[k], lang: "en", source_url: "src/i18n/locales/en.json" },
+    ...(pt[k] ? [{ ...base, suggestion: suggestion("pt"), id: suggestionId(en[k], "pt"), query: pt[k], lang: "pt-BR", source_url: "src/i18n/locales/pt.json" }] : []),
   ];
 });
 writeFileSync(out, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
@@ -44,4 +46,4 @@ for (const r of rows) {
   (plan[c === "builtin" ? "-" : c] ??= []).push(r.id);
 }
 writeFileSync(planOut, Object.entries(plan).map(([p, ids]) => `${p}\t${ids.join(",")}`).join("\n") + "\n");
-console.log(`${rows.length} suggestions (${Object.keys(sources).length} with a declared source) -> ${out}; plan: ${Object.keys(plan).join(" ")}`);
+console.log(`${rows.length} suggestions (${rows.filter((r) => r.suggestion.offered).length} offered, ${Object.keys(sources).length} with a declared source) -> ${out}; plan: ${Object.keys(plan).join(" ")}`);

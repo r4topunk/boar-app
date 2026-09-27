@@ -179,6 +179,8 @@ cd "$ROOT/eval"
 set +e
 node scripts/regress.mjs --name "gate-$LABEL" --runs "results/gates/$LABEL/runs"
 RC=$?
+# CIT-1 (Tusk): citation rate, citations added/removed and mean context tokens per model (reported, not blocking).
+node scripts/cit1-report.mjs "$LABEL" >/dev/null || echo "cit1 report failed"
 set -e
 N_MODELS=$(wc -w <<<"$MODELS"); N_SEEDS=$(wc -w <<<"$SEEDS"); N_CFG=$((1 + HAS_PACK))
 N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + $(grep -c . "$ROOT/eval/dataset/questions.safety-pt.jsonl") + 1 ))  # safety EN + PT + the quantum prompt
