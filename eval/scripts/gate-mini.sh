@@ -7,7 +7,8 @@
 # Usage (from the eval worktree root): bash eval/scripts/gate-mini.sh <source-tree-path> [git-ref=HEAD] [label]
 #   The source tree's committed src/ and assets/corpus/corpus.json at <git-ref> are tested (uncommitted edits are not);
 #   eval/ (runner, datasets, checks) comes from this worktree.
-# Env: GATE_HOST (r4toMacMini), GATE_SEEDS ("1 2 3 4 5"), GATE_MODELS ("qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km").
+# Env: GATE_HOST (r4toMacMini), GATE_SEEDS ("1 2 3 4 5"), GATE_MODELS ("qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km"),
+#      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
 # Exit: 0 = all pass, 1 = a case fails (blocker), 2 = incomplete (missing rows, or the tree cannot load packs).
 set -euo pipefail
 TREE="$(cd "$1" && pwd)"; REF="${2:-HEAD}"
@@ -16,6 +17,7 @@ LABEL="${3:-$(basename "$TREE")-$SHA}"
 HOST="${GATE_HOST:-r4toMacMini}"
 SEEDS="${GATE_SEEDS:-1 2 3 4 5}"
 MODELS="${GATE_MODELS:-qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km}"
+PIPELINE="${GATE_PIPELINE:-app}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DEST="boar/gate/$LABEL"
 # Pinned packs (sha256 from the knowledge catalog: src/rag/preparedness.ts, src/rag/cryptoPack.ts).
@@ -25,7 +27,8 @@ CRYPTO_SHA=fe75514ed407ea5f9c0310d3261407c9e779719b7787c2d8c4e7f584dae12c5e
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 git -C "$TREE" archive "$REF" src assets/corpus/corpus.json | tar -x -C "$TMP"
 HAS_PACK=0; [ -f "$TMP/src/rag/wikiPack.ts" ] && [ -f "$TMP/src/rag/testing/nodeSqlite.ts" ] && HAS_PACK=1
-echo "gate $LABEL: tree $TREE @ $SHA, packs loadable: $HAS_PACK, seeds: $SEEDS"
+if [ "$PIPELINE" = app ] && ! grep -q "export function createAnswerer" "$TMP/src/routing/answer.ts" 2>/dev/null; then echo "GATE INCOMPLETE: $REF has no src/routing/answer.ts createAnswerer (use GATE_PIPELINE=direct)"; exit 2; fi
+echo "gate $LABEL: tree $TREE @ $SHA, pipeline $PIPELINE, packs loadable: $HAS_PACK, seeds: $SEEDS"
 
 ssh "$HOST" "mkdir -p ~/$DEST/assets/corpus ~/boar/gate/.cache"
 rsync -az --delete "$TMP/src/" "$HOST:$DEST/src/"
@@ -44,7 +47,7 @@ PACKS=\$HOME/boar/shared-data/packs/pinned
 echo "$PREP_SHA  \$PACKS/boar-preparedness.sqlite" | shasum -a 256 -c - || exit 3
 echo "$CRYPTO_SHA  \$PACKS/boar-crypto.sqlite" | shasum -a 256 -c - || exit 3
 O=eval/results/gate-runs; mkdir -p \$O
-run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu "\$@" || echo "RUNFAIL \$*"; }
+run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE "\$@" || echo "RUNFAIL \$*"; }
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -63,7 +66,7 @@ OUT="$ROOT/eval/results/gates/$LABEL"
 mkdir -p "$OUT/runs"
 rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 cat > "$OUT/meta.json" <<EOF
-{ "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS",
+{ "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE",
   "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
 EOF
 

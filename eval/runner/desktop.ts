@@ -25,6 +25,8 @@
  *   npx --prefix eval tsx eval/runner/desktop.ts --model qwen2.5-1.5b-instruct-q4km \
  *     [--dataset v1] [--ids exp-001,cmp-002] [--limit N] [--threads 4] [--gpu] [--corpus bundled|none] [--out path]
  *     [--pack /path/a.sqlite,/path/b.sqlite]   (format-2 knowledge packs; needs a source tree with src/rag/wikiPack.ts)
+ *     [--pipeline direct|app]   app = the tree's createAnswerer (src/routing/answer.ts): instant snippet, source
+ *       compression, grounding guard and PT->EN terms, with this runner's retrieval and model injected as deps
  *     [--seed 42] [--timeout-ms 120000] [--thought-budget 256] [--sources system|user]   (omit --gpu for CPU-only, e.g. models larger than the Metal working set)
  */
 import { mkdirSync, readFileSync, existsSync, writeFileSync, appendFileSync, createReadStream } from "node:fs";
@@ -111,6 +113,7 @@ function args() {
     gpu: a.includes("--gpu"),
     corpus: get("--corpus", "bundled") as "bundled" | "none",
     pack: get("--pack"),
+    pipeline: get("--pipeline", "direct") as "direct" | "app",
     sources: get("--sources", "system") as "system" | "user",
     out: get("--out"),
     seed: Number(get("--seed", "42")),
@@ -264,7 +267,7 @@ export function buildMessages(layout: "system" | "user", query: string, chunks: 
 
 interface GenResult { answer: string; reasoning: string; reasoningTokens: number; firstTokenMs: number; ttftMs: number; generationLatencyMs: number; tokensGenerated: number; timedOut: boolean; promptFormat: "chat-template" | "plain"; chatWrapper?: string }
 
-async function generate(llama: Llama, model: LlamaModel, query: string, chunks: RetrievedChunk[], systemPrompt: string, seed: number, threads: number, noThink = false, timeoutMs = DEFAULT_STEP_TIMEOUT_MS, thoughtBudget = DEFAULT_THOUGHT_BUDGET, sourcesLayout: "system" | "user" = "system"): Promise<GenResult> {
+async function generate(llama: Llama, model: LlamaModel, query: string, chunks: RetrievedChunk[], systemPrompt: string, seed: number, threads: number, noThink = false, timeoutMs = DEFAULT_STEP_TIMEOUT_MS, thoughtBudget = DEFAULT_THOUGHT_BUDGET, sourcesLayout: "system" | "user" = "system", given?: { messages?: ChatMsg[]; prompt?: string; maxTokens?: number }): Promise<GenResult> {
   const context = await model.createContext({ contextSize: N_CTX, threads });
   const sequence = context.getSequence();
   const useTemplate = model.fileInfo.metadata?.tokenizer?.chat_template != null;
@@ -280,7 +283,8 @@ async function generate(llama: Llama, model: LlamaModel, query: string, chunks: 
     if (firstTokenAt === null) firstTokenAt = performance.now();
     tokensGenerated += tokens.length;
   };
-  const sampling = { maxTokens: MAX_TOKENS, temperature: TEMPERATURE, topK: 40, topP: 0.95, minP: 0.05, seed, signal: abort.signal, stopOnAbortSignal: true, onToken };
+  const maxTokens = given?.maxTokens ?? MAX_TOKENS;
+  const sampling = { maxTokens, temperature: TEMPERATURE, topK: 40, topP: 0.95, minP: 0.05, seed, signal: abort.signal, stopOnAbortSignal: true, onToken };
   // Chat path: thoughts arrive as "thought" segments; answer text arrives as plain chunks.
   const onResponseChunk = (chunk: { type?: string; segmentType?: string; text: string; tokens: readonly unknown[] }) => {
     if (chunk.type === "segment" && chunk.segmentType === "thought") {
@@ -293,7 +297,10 @@ async function generate(llama: Llama, model: LlamaModel, query: string, chunks: 
   let chatWrapperName: string | undefined;
   try {
     if (useTemplate) {
-      const [system, user] = buildMessages(sourcesLayout, query, chunks, systemPrompt);
+      // --pipeline app hands over the exact messages the app would send (no history in the eval).
+      const [system, user] = given?.messages
+        ? [given.messages.find((m) => m.role === "system") ?? { role: "system" as const, content: "" }, given.messages.findLast((m) => m.role === "user")!]
+        : buildMessages(sourcesLayout, query, chunks, systemPrompt);
       const chatWrapper = resolveChatWrapper(model, noThink
         ? { customWrapperSettings: { qwen: { thoughts: "discourage" }, jinjaTemplate: { additionalRenderParameters: { enable_thinking: false } } } }
         : {});
@@ -301,14 +308,14 @@ async function generate(llama: Llama, model: LlamaModel, query: string, chunks: 
       const session = new LlamaChatSession({ contextSequence: sequence, systemPrompt: system.content, ...(chatWrapper ? { chatWrapper } : {}) });
       const res = await session.promptWithMeta(user.content, {
         ...sampling,
-        maxTokens: MAX_TOKENS + thoughtBudget,
+        maxTokens: maxTokens + thoughtBudget,
         budgets: { thoughtTokens: thoughtBudget },
         onResponseChunk,
       });
       answer = res.responseText;
     } else {
       const completion = new LlamaCompletion({ contextSequence: sequence });
-      answer = await completion.generateCompletion(assemblePrompt(query, chunks, systemPrompt), { ...sampling, customStopTriggers: PLAIN_STOPS });
+      answer = await completion.generateCompletion(given?.prompt ?? assemblePrompt(query, chunks, systemPrompt), { ...sampling, customStopTriggers: PLAIN_STOPS });
     }
   } catch (e) {
     // An abort before the first token throws instead of returning partial text; keep it as a timeout row.
@@ -356,11 +363,47 @@ async function main() {
   const modelLoadMs = performance.now() - loadStart;
 
   const runId = `desktop-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-  const out = opt.out ?? join(EVAL_DIR, "results", "runs", opt.dataset, `${opt.model}__${opt.corpus}${packTag}${opt.sources === "user" ? "__sources-user" : ""}.jsonl`);
+  const out = opt.out ?? join(EVAL_DIR, "results", "runs", opt.dataset, `${opt.model}__${opt.corpus}${packTag}${opt.sources === "user" ? "__sources-user" : ""}${opt.pipeline === "app" ? "__app" : ""}.jsonl`);
   mkdirSync(dirname(out), { recursive: true });
   const done = new Set(existsSync(out) ? readFileSync(out, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l).queryId) : []);
   const systemPrompt = getPersonality(PERSONALITY_ID).systemPrompt;
   const hardware = `${os.cpus()[0]?.model ?? "cpu"} ${opt.gpu ? "metal" : `cpu x${opt.threads}`}`;
+
+  // --pipeline app: the tree's answerer decides retrieval use, compression, instant snippets and whether the model runs.
+  let answerer: any = null, appCtx: any = null, lastGen: GenResult | undefined, lastChunks: RetrievedChunk[] = [];
+  if (opt.pipeline === "app") {
+    const answerModule = "../../src/routing/answer", personalityModule = "../../src/constants/personalities";
+    const { createAnswerer } = await import(answerModule);
+    const pm = await import(personalityModule);
+    const personality = pm.getPersonality(pm.DEFAULT_PERSONALITY_ID ?? PERSONALITY_ID);
+    appCtx = { systemPrompt: personality.systemPrompt, styleReminder: personality.styleReminder, maxTokens: MAX_TOKENS };
+    const llm = { id: opt.model, label: spec.label, filename: spec.file, sizeBytes: 0, roles: ["fast"], isDefault: true, answerTier: "default" };
+    const useTemplate = model.fileInfo.metadata?.tokenizer?.chat_template != null;
+    answerer = createAnswerer({
+      now: () => performance.now(),
+      engine: {
+        async load() { return { fit: null, warning: null }; },
+        async generate(o: any) {
+          lastGen = await generate(llama, model, "", [], "", opt.seed, opt.threads, spec.noThink, opt.timeoutMs, opt.thoughtBudget, "system", { messages: o.messages, prompt: o.prompt, maxTokens: o.nPredict });
+          if (lastGen.answer) o.onToken?.(lastGen.answer);
+          return lastGen.answer;
+        },
+        async stop() {},
+        getModelInfo: () => ({ filename: spec.file }),
+        hasEmbeddedChatTemplate: () => useTemplate,
+        async estimateFit() { return { verdict: "resident" }; },
+      },
+      retrieve: async (query: string, k: number) => (lastChunks = await kb.retrieve(query, k)),
+      getSettings: async () => ({ quickFirst: true, alwaysComplete: false, deepModelId: undefined }),
+      listInstalledLlms: async () => [llm],
+      getActiveModelId: async () => llm.id,
+      runMultipass: async () => { throw new Error("multipass is not part of the eval"); },
+      assemblePrompt,
+      assembleChatMessages,
+      contextSize: () => N_CTX,
+      deviceRamBytes: () => 8e9,
+    });
+  }
 
   let first = true;
   for (const q of questions) {
@@ -374,33 +417,46 @@ async function main() {
     let chunks: RetrievedChunk[] = [];
     let retrievalMs = 0;
     let gen: GenResult | undefined;
+    let app: { text: string; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number } | undefined;
     try {
-      const r0 = performance.now();
-      if (retrieveOn) chunks = await kb.retrieve(q.query, ANSWER_CONTEXT_CHUNKS);
-      retrievalMs = performance.now() - r0;
-      gen = await generate(llama, model, q.query, chunks, systemPrompt, opt.seed, opt.threads, spec.noThink, opt.timeoutMs, opt.thoughtBudget, opt.sources);
+      if (answerer) {
+        lastGen = undefined; lastChunks = [];
+        let appError: { code: string; message: string } | undefined;
+        const res = await answerer.answer({ query: q.query }, (e: any) => { if (e.type === "done" && e.error) appError = e.error; }, appCtx).done;
+        if (res.outcome === "error") throw new Error(`${appError?.code ?? "error"}: ${appError?.message ?? "answer failed"}`);
+        gen = lastGen;
+        chunks = lastChunks;
+        retrievalMs = res.receipt?.retrievalMs ?? 0;
+        app = { text: res.text, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title), reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs };
+      } else {
+        const r0 = performance.now();
+        if (retrieveOn) chunks = await kb.retrieve(q.query, ANSWER_CONTEXT_CHUNKS);
+        retrievalMs = performance.now() - r0;
+        gen = await generate(llama, model, q.query, chunks, systemPrompt, opt.seed, opt.threads, spec.noThink, opt.timeoutMs, opt.thoughtBudget, opt.sources);
+      }
     } catch (e: any) {
       errorMessage = e?.message ?? String(e);
     }
     clearInterval(rssTimer);
     const totalLatencyMs = performance.now() - start;
-    const answer = gen?.answer ?? "";
+    const answer = app ? app.text : gen?.answer ?? "";
     const outcome = errorMessage ? "failure" : answer.trim() ? "success" : "failure";
     if (gen?.timedOut && !answer.trim()) errorMessage = `timeout after ${opt.timeoutMs} ms with no answer`;
-    const retrievedTitles = chunks.map((c) => c.title);
+    // App pipeline: the sources the answer shows (after compression and the grounding guard), in [n] order.
+    const retrievedTitles = app ? app.sources : chunks.map((c) => c.title);
     const expectedKbTitles = q.gold.filter((g) => g.source === "enwiki").map((g) => g.title);
     const row = {
       // ExecutionTelemetryRecord fields
       modelId: opt.model,
       taskType,
       adaptiveRoutingUsed: false,
-      reasonCodes: ["eval:fixed-model", retrieveOn ? "retrieve:relevant-to-task" : "retrieve:skipped-task-not-knowledge-based", `generate:fixed-${opt.model}`],
+      reasonCodes: app ? ["eval:fixed-model", "eval:pipeline-app", ...app.reasonCodes] : ["eval:fixed-model", retrieveOn ? "retrieve:relevant-to-task" : "retrieve:skipped-task-not-knowledge-based", `generate:fixed-${opt.model}`],
       retrievalUsed: chunks.length > 0,
       modelSwitches: 0,
       crossMessageModelSwitch: false,
       modelResidency: first ? "cold" : "resident",
       modelLoadMs: first ? modelLoadMs : 0,
-      ttftMs: gen?.ttftMs,
+      ttftMs: app ? app.ttftMs : gen?.ttftMs,
       generationLatencyMs: gen?.generationLatencyMs,
       totalLatencyMs,
       tokensGenerated: gen?.tokensGenerated ?? 0,
@@ -428,7 +484,11 @@ async function main() {
       firstTokenMs: gen?.firstTokenMs,
       thinking: spec.noThink ? "off" : "model-default",
       sourcesLayout: opt.sources,
-      promptBuilder: opt.sources === "user" ? buildMessagesSource() : "src/rag/pure.ts assembleChatMessages",
+      promptBuilder: app ? "src/routing/answer.ts createAnswerer" : opt.sources === "user" ? buildMessagesSource() : "src/rag/pure.ts assembleChatMessages",
+      pipeline: opt.pipeline,
+      answerTier: app?.tier,
+      modelCalled: app ? app.modelCalled : true,
+      rawRetrievedTitles: app ? app.retrieved : undefined,
       retrievedTitles,
       expectedKbTitles,
       expectedKbHit: expectedKbTitles.length ? expectedKbTitles.every((t) => retrievedTitles.includes(t)) : null,
