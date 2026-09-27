@@ -32,8 +32,15 @@ export interface SourcePalette {
   err: string;
 }
 
-const STATUS_DARK = { ok: "#8FC27A", warn: "#F2C14E", err: "#F0674F" } as const;
-const STATUS_LIGHT = { ok: "#3F7A2E", warn: "#8A6200", err: "#B8321F" } as const;
+/**
+ * Status hues are ours, not the designer's. In warm palettes the obvious
+ * choices collide with the identity: an orange-red error reads as the ember
+ * accent, an amber warning reads as the field colour. So danger leans crimson
+ * (hue ~20) and warning leans yellow (dark ~100) / olive (light ~115, where a
+ * dark enough yellow for AA turns brown). tones.test.ts holds the distance.
+ */
+const STATUS_DARK = { ok: "#8FC27A", warn: "#F0D947", err: "#F75B6B" } as const;
+const STATUS_LIGHT = { ok: "#3F7A2E", warn: "#707920", err: "#BE2038" } as const;
 
 export const SOURCE_PALETTES: Record<PaletteId, Record<Mode, SourcePalette>> = {
   fogueira: {
