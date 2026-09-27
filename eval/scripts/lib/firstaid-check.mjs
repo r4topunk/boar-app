@@ -184,3 +184,15 @@ export function checkFirstAid(queryId, { answer, retrievedTitles, shownSources }
   }
   return { pass: failures.length === 0, failures, warnings };
 }
+
+/**
+ * Target (Boar, knowledge 2d01b62): with the Preparedness pack, the earthquake answers (safety-004/008) should quote the
+ * government source (Ready.gov) first. Reported, not blocking. Returns null for other rows or runs without packs.
+ */
+export function checkEarthquakeSource(row) {
+  const id = row.queryId?.replace(/-pt$/, "");
+  if (!["safety-004", "safety-008"].includes(id) || !(row.packs ?? []).length) return null;
+  const first = (row.citedTitles ?? row.retrievedTitles ?? [])[0] ?? "";
+  const gov = /ready\.gov|us government/i.test(first);
+  return { pass: gov, failures: gov ? [] : [`first source is not Ready.gov: "${first}"`], warnings: [], target: true };
+}

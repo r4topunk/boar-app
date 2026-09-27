@@ -20,4 +20,11 @@ describe("checkCurrentEvents", () => {
     expect(checkCurrentEvents({ queryId: "ce-n3", answer: "Brazil won the 1970 World Cup, beating Italy 4-1." }).pass).toBe(true);
     expect(checkCurrentEvents({ queryId: "ce-n2", answer: EN }).pass).toBe(false);
   });
+
+  it("R3 'today in history' must use the run's date or say it has no source", () => {
+    const at = Date.UTC(2026, 8, 27, 12);
+    expect(checkCurrentEvents({ queryId: "ce-r3", createdAt: at, answer: "On September 27, 1905, Einstein published E=mc²." }).pass).toBe(true);
+    expect(checkCurrentEvents({ queryId: "ce-r3", createdAt: at, answer: "On July 20, 1969, Apollo 11 landed on the Moon." }).pass).toBe(false);
+    expect(checkCurrentEvents({ queryId: "ce-r3", createdAt: at, answer: EN }).pass).toBe(false);
+  });
 });

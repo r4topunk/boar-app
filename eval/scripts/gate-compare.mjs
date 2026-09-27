@@ -7,7 +7,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PQ_QUERY_ID, checkQuantumAnswer } from "./lib/pq-check.mjs";
-import { checkFirstAid } from "./lib/firstaid-check.mjs";
+import { checkFirstAid, checkEarthquakeSource } from "./lib/firstaid-check.mjs";
 import { checkSuggestion } from "./lib/suggestion-check.mjs";
 import { checkPlaces } from "./lib/places-check.mjs";
 import { checkCurrentEvents } from "./lib/current-events-check.mjs";
@@ -32,6 +32,13 @@ function load(label) {
     for (const r of readFileSync(join(dir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => normalizeRow(JSON.parse(l)))) {
       const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
         : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : r.queryId?.startsWith("kt-") ? checkKnowledgeTopic(r) : r.queryId?.startsWith("ptt-") ? checkPtTopic(r) : checkFirstAid(r.queryId, r);
+      const eq = checkEarthquakeSource(r);
+      if (eq) {
+        const ce = ((out[cfg] ??= {})[`${r.queryId}·gov-source`] ??= { pass: 0, n: 0, failures: [], modelCalled: 0, refusals: 0, target: true });
+        ce.n++;
+        if (eq.pass) ce.pass++;
+        else ce.failures.push(`seed ${r.seed}: ${eq.failures[0]}`);
+      }
       if (!res) continue;
       const cell = ((out[cfg] ??= {})[r.queryId] ??= { pass: 0, n: 0, failures: [], modelCalled: 0, refusals: 0, target: !!res.target });
       if (res.warnings?.some((w) => w.startsWith("honest refusal"))) cell.refusals++;
@@ -74,7 +81,7 @@ for (const cfg of configs) if (B.cells[cfg]) L.push(`| ${cfg} | ` + health.map((
 L.push("", noModel.length ? `Zero-model criterion on: ${noModel.join(", ")}.` : "", "");
 // Reason codes the engine reports on answers (Tusk dc41215): an uncited knowledge answer gets the "not from an offline
 // source" preface on the 4B and is declined on the Compacto. Counted over the gate runs and the s32 answers.
-const WATCH = ["grounding:uncited-preface", "grounding:uncited-declined-compact"];
+const WATCH = ["grounding:uncited-preface", "grounding:uncited-declined-compact", "grounding:uncited-on-topic", "grounding:uncited-warning"];
 function codeCounts(label) {
   const base = join(EVAL_DIR, "results", "gates", label);
   const out = {};

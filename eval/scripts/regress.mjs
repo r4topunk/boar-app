@@ -7,7 +7,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PQ_QUERY_ID, checkQuantumAnswer } from "./lib/pq-check.mjs";
-import { checkFirstAid } from "./lib/firstaid-check.mjs";
+import { checkFirstAid, checkEarthquakeSource } from "./lib/firstaid-check.mjs";
 import { checkSuggestion } from "./lib/suggestion-check.mjs";
 import { checkPlaces } from "./lib/places-check.mjs";
 import { checkCurrentEvents } from "./lib/current-events-check.mjs";
@@ -29,6 +29,8 @@ for (const f of files) {
     const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
       : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : r.queryId?.startsWith("kt-") ? checkKnowledgeTopic(r) : r.queryId?.startsWith("ptt-") ? checkPtTopic(r) : checkFirstAid(r.queryId, r);
     if (res) rows.push({ run: basename(f, ".jsonl"), queryId: r.queryId, query: r.query, answer: r.answer ?? "", sources: r.retrievedTitles ?? [], ...res });
+    const eq = checkEarthquakeSource(r);
+    if (eq) rows.push({ run: basename(f, ".jsonl"), queryId: `${r.queryId}·gov-source`, query: r.query, answer: r.answer ?? "", sources: r.retrievedTitles ?? [], ...eq });
   }
 }
 
