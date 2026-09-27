@@ -594,14 +594,16 @@ async function main() {
     let chunks: RetrievedChunk[] = [];
     let retrievalMs = 0;
     let gen: GenResult | undefined;
-    let app: { text: string; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }>; cited?: number[]; citedTitles?: string[] } | undefined;
+    let app: { text: string; declined?: boolean; warnings?: Array<{ code?: string; message?: string; declined?: boolean }>; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }>; cited?: number[]; citedTitles?: string[] } | undefined;
     try {
       if (answerer) {
         lastGen = undefined; lastChunks = []; promptChunks = [];
         if (appPoint) appPoint.current = q.context ? { lat: q.context.lat, lon: q.context.lon, accuracyM: 20 } : null;
         let appError: { code: string; message: string } | undefined;
         let cited: number[] | undefined;
+        const warnings: Array<{ code?: string; message?: string; declined?: boolean }> = [];
         const res = await answerer.answer({ query: q.query }, (e: any) => {
+          if (e.type === "warning") warnings.push({ code: e.code, message: e.message, declined: e.declined });
           if (e.type === "done") {
             if (e.error) appError = e.error;
             if (Array.isArray(e.cited)) cited = e.cited; // engine-routing c884d7a: 1-based indexes into result.sources
@@ -612,8 +614,13 @@ async function main() {
         chunks = lastChunks;
         retrievalMs = res.receipt?.retrievalMs ?? 0;
         const clip = (c: RetrievedChunk) => ({ title: c.title, body: c.body.slice(0, 8000) });
+        // The Compacto's decline is a success with empty text plus a warning the UI shows ("I didn't find this in this
+        // phone's library."): that message is what the user reads, so it is the answer here.
+        const declined = warnings.find((w) => w.declined);
         app = {
-          text: res.text, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title),
+          text: res.text || (declined?.message ?? ""),
+          declined: !!declined && !res.text,
+          warnings, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title),
           reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs,
           // Citation audit: the model's own text before any post-processing, the sources in its prompt, and the shown ones.
           modelText: (lastGen as GenResult | undefined)?.answer, promptSources: promptChunks.map(clip), shownSources: (res.sources ?? []).map(clip),
@@ -689,6 +696,8 @@ async function main() {
       promptSources: app?.promptSources,
       shownSources: app?.shownSources,
       cited: app?.cited,
+      declined: app?.declined,
+      warnings: app?.warnings,
       citedTitles: app?.citedTitles,
       retrievedTitles,
       expectedKbTitles,

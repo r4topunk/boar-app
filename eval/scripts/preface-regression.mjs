@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeRow } from "./lib/row-normalize.mjs";
 import { combineOrders } from "./lib/judge-core.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,7 +17,7 @@ const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("
 const CODES = ["grounding:uncited-preface", "grounding:uncited-declined-compact"];
 
 function load(model, label) {
-  const rows = Object.fromEntries(readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map((r) => [r.queryId, r]));
+  const rows = Object.fromEntries(readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map(normalizeRow).map((r) => [r.queryId, r]));
   const byQ = {};
   for (const j of readJsonl(join(EVAL_DIR, "results/judgments-jev/v1", `${model}__essential__app__${label}__vs__claude-code__opus.jsonl`)).filter((j) => j.mapped)) (byQ[j.queryId] ??= {})[j.order] = j;
   const judged = Object.fromEntries(Object.entries(byQ).filter(([, o]) => o.boarA && o.boarB).map(([q, o]) => [q, combineOrders(o.boarA.mapped, o.boarB.mapped)]));

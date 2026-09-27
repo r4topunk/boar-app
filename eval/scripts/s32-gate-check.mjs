@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeRow } from "./lib/row-normalize.mjs";
 import { combineOrders, summarize } from "./lib/judge-core.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,8 +27,8 @@ const pct = (x) => (Number.isFinite(x) ? `${Math.round(100 * x)}%` : "n/a");
 
 function measure(model, label) {
   const system = `${model}__essential__app__${label}`;
-  const answers = Object.fromEntries(readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map((r) => [r.queryId, r.answer ?? ""]));
-  const rows = readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`));
+  const answers = Object.fromEntries(readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map(normalizeRow).map((r) => [r.queryId, r.answer ?? ""]));
+  const rows = readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map(normalizeRow);
   const refused = new Set(Object.entries(answers).filter(([, a]) => REFUSAL.test(a)).map(([q]) => q));
   // Kinds, from the app's reason codes: a health question without a source refuses by design (safety), a knowledge
   // question may refuse or answer from memory after the guard dropped every source.
