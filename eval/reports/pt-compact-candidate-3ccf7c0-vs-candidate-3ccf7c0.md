@@ -1,6 +1,6 @@
 # Compacto (1.5B) in PT: candidate-3ccf7c0 vs candidate-3ccf7c0
 
-TL;DR: **PASS**: candidate-3ccf7c0 has 8 confident errors in PT vs control 8 (blocks above 10); target <= 10: met. Answered without a cited source: 11 (control 11). Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with `node eval/scripts/pt-compact-check.mjs candidate-3ccf7c0 candidate-3ccf7c0`.
+TL;DR: **PASS**: candidate-3ccf7c0 has 8 model confident errors in PT vs control 8 (blocks above 10), 8 engine answers judged wrong vs control 8 (blocks above it); target <= 10: met. Answered without a cited source: 11 (control 11). Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with `node eval/scripts/pt-compact-check.mjs candidate-3ccf7c0 candidate-3ccf7c0`.
 
 | Gate | Judged | Refusals | Engine answers (calculator / excerpt / fixed; not counted) | Engine answers judged wrong | Model answers | Correct when answering | Confident errors | Answered without a cited source |
 |---|---|---|---|---|---|---|---|---|
