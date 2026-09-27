@@ -9,6 +9,7 @@
 #   eval/ (runner, datasets, checks) comes from this worktree.
 # Env: GATE_HOST (r4toMacMini), GATE_SEEDS ("1 2 3 4 5"), GATE_MODELS ("qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km"),
 #      GATE_CORPUS (essential = corpus + corpus-standard + corpus-full, the default install),
+#      GATE_SUGGESTIONS_REF=<ref> (suggestions from another ref),
 #      GATE_S32=1 also answers the v1 s32 questions (seed 42, no packs) into results/gates/<label>/s32/ for the judges,
 #      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
 # Also the "suggestions" item (RT-1): each empty-chat suggestion (src/i18n chat.suggestions, EN+PT) is asked with
@@ -38,7 +39,14 @@ cat_field() { grep -oE "$2: \"[^\"]*\"" "$TMP/src/rag/$1.ts" 2>/dev/null | head 
 PREP_SHA="$(cat_field preparedness sha256)"; PREP_URL="$(cat_field preparedness sourceUrl)"
 CRYPTO_SHA="$(cat_field cryptoPack sha256)"; CRYPTO_URL="$(cat_field cryptoPack sourceUrl)"
 if [ "$HAS_PACK" = 1 ] && { [ -z "$PREP_SHA" ] || [ -z "$CRYPTO_SHA" ]; }; then echo "GATE INCOMPLETE: $REF has no preparedness/crypto pack in its catalog"; exit 2; fi
-node "$ROOT/eval/scripts/extract-suggestions.mjs" "$TMP" "$TMP/questions.suggestions-gate.jsonl" "$TMP/suggestions-plan.tsv"
+# GATE_SUGGESTIONS_REF: take the suggestions (i18n + SUGGESTION_SOURCES) from another ref, e.g. the integration
+# branch when the candidate carries an older list; engine, corpus and packs still come from <git-ref>.
+SUGROOT="$TMP"
+if [ -n "${GATE_SUGGESTIONS_REF:-}" ]; then
+  SUGROOT="$TMP/sug"; mkdir -p "$SUGROOT"
+  git -C "$TREE" archive "$GATE_SUGGESTIONS_REF" src/i18n src/ui/chat/suggestions.ts | tar -x -C "$SUGROOT"
+fi
+node "$ROOT/eval/scripts/extract-suggestions.mjs" "$SUGROOT" "$TMP/questions.suggestions-gate.jsonl" "$TMP/suggestions-plan.tsv"
 # wiki-vital5 (format-1 pack) from the tree's model manifest, when a suggestion declares it.
 VITAL_SHA="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const b=s.slice(s.indexOf("\"wiki-vital5\""));const m=b.match(/sha256: "([0-9a-f]{64})"/);console.log(m?m[1]:"")' "$TMP/src/models/manifest.ts" 2>/dev/null || true)"
 VITAL_URL="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const b=s.slice(s.indexOf("\"wiki-vital5\""));const m=b.match(/sourceUrl: "([^"]+)"/);console.log(m?m[1]:"")' "$TMP/src/models/manifest.ts" 2>/dev/null || true)"
@@ -112,7 +120,7 @@ rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "corpus": "$CORPUS",
-  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
+  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "suggestionsRef": "${GATE_SUGGESTIONS_REF:-$REF}", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
 EOF
 
 cd "$ROOT/eval"
