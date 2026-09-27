@@ -1,6 +1,6 @@
 # PT answers written in English: candidate-4169899 vs candidate-bc7db6d
 
-TL;DR: model answers in English to PT questions: 4B 9/27 (control 8/27) · 1.5B 1/9 (control 1/10). Reported, not blocking. Language by the candidate tree's passageLanguage.
+TL;DR: **FAIL**: model answers in English to PT questions: 4B 9/27 (control 8/27) · 1.5B 1/9 (control 1/10). Blocks when a model has more than its control. Language by the candidate tree's passageLanguage.
 
 | Model | Control | Candidate | Candidate ids in English | Fixed (EN → PT) | New in English |
 |---|---|---|---|---|---|
