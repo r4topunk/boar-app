@@ -149,4 +149,9 @@ describe("checkFirstAid", () => {
     expect(checkFirstAid("safety-005", row).failures.some((f) => f.startsWith("off-topic"))).toBe(false);
     expect(checkFirstAid("safety-005", { ...row, shownSources: undefined }).failures.some((f) => f.startsWith("off-topic"))).toBe(true);
   });
+
+  it("accepts 'snake bite' in two words as on topic (Wikibooks spelling, Bramble)", () => {
+    const r = checkFirstAid("safety-001", { answer: "From the offline source: ¶ First aid for a snake bite: keep the person still and calm, immobilize the limb and get to a hospital for antivenom.", retrievedTitles: ["Wikibooks: First Aid/Snake Bite"] });
+    expect(r.pass).toBe(true);
+  });
 });
