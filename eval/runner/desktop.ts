@@ -115,6 +115,9 @@ function args() {
     corpus: get("--corpus", "bundled") as "bundled" | "essential" | "none",
     pack: get("--pack"),
     pipeline: get("--pipeline", "direct") as "direct" | "app",
+    // app = import the tree's own retrieval (seedCorpus + retrieve + packs) through Node shims (eval/runner/app-shims);
+    // mirror = this runner's copy of it (kept for trees too old to import).
+    retrieval: get("--retrieval", "mirror") as "mirror" | "app",
     sources: get("--sources", "system") as "system" | "user",
     out: get("--out"),
     seed: Number(get("--seed", "42")),
@@ -392,6 +395,78 @@ async function generate(llama: Llama, model: LlamaModel, query: string, chunks: 
   return { answer: answer.replace(/^\s+/, ""), reasoning, reasoningTokens, firstTokenMs, ttftMs, generationLatencyMs: genEnd - genStart - firstTokenMs, tokensGenerated, timedOut, promptFormat: useTemplate ? "chat-template" : "plain", chatWrapper: chatWrapperName };
 }
 
+// ---------------------------------------------------------------- app retrieval (the tree's own code)
+
+/**
+ * Imports the tree's retrieval (src/rag/seedCorpus.ts, retrieve.ts, packs.ts, db.ts, embed.ts) with native modules
+ * replaced by Node shims (eval/runner/app-shims), and installs what the app would have: the embedding model, the
+ * corpus packs of --corpus and each --pack under its catalog filename in a documentDirectory of its own. The seeded
+ * database is cached per (tree retrieval code, corpus, packs), so the 5,300 corpus embeddings are computed once.
+ */
+async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packPaths: string[]) {
+  const { registerHooks } = await import("node:module");
+  const shim = (f: string) => new URL(`./app-shims/${f}`, import.meta.url).href;
+  const SHIMS: Record<string, string> = {
+    "expo-sqlite": shim("expo-sqlite.mjs"), "expo-file-system": shim("expo-file-system.mjs"),
+    "expo-file-system/legacy": shim("expo-file-system.mjs"), "llama.rn": shim("llama-rn.mjs"), "react-native": shim("react-native.mjs"),
+  };
+  // Bare packages the tree needs (fzstd…) resolve from eval/node_modules when the tree has no node_modules of its own.
+  (registerHooks as any)({
+    resolve: (spec: string, ctx: any, next: any) => {
+      if (SHIMS[spec]) return { url: SHIMS[spec], shortCircuit: true };
+      try {
+        return next(spec, ctx);
+      } catch (e) {
+        if (/^[./]/.test(spec)) throw e;
+        return next(spec, { ...ctx, parentURL: import.meta.url });
+      }
+    },
+  });
+  const { symlinkSync, rmSync } = await import("node:fs");
+  // tsx resolves CommonJS requires before any hook: a gate copy of the tree (no node_modules) borrows eval's.
+  if (!existsSync(join(ROOT, "node_modules"))) symlinkSync(join(EVAL_DIR, "node_modules"), join(ROOT, "node_modules"));
+  const code = ["src/rag/seedCorpus.ts", "src/rag/db.ts", "src/rag/retrieve.ts", "src/rag/packs.ts", "src/models/manifest.ts"]
+    .map((f) => (existsSync(join(ROOT, f)) ? readFileSync(join(ROOT, f), "utf8") : "")).join("\n");
+  if (corpus === "none") throw new Error("--retrieval app needs --corpus bundled or essential (the app always has the builtin corpus)");
+  const key = createHash("sha256").update(code).update(corpus).update(packPaths.join(",")).digest("hex").slice(0, 16);
+  const appDir = join(EVAL_DIR, ".cache", "appdir", key);
+  process.env.BOAR_APP_DIR = appDir;
+  process.env.BOAR_APP_GPU = process.env.BOAR_APP_GPU ?? "1";
+  mkdirSync(join(appDir, "corpus"), { recursive: true });
+  const manifest: any = await import(join(ROOT, "src/models/manifest.ts"));
+  const catalog: any[] = [...(manifest.MODEL_CATALOG ?? []), ...(manifest.CORPUS_CATALOG ?? [])];
+  const link = (src: string, rel: string) => {
+    const dst = join(appDir, rel);
+    mkdirSync(dirname(dst), { recursive: true });
+    rmSync(dst, { force: true });
+    symlinkSync(src, dst);
+  };
+  const emb = catalog.find((m) => m.kind === "embedding" && m.required);
+  link(join(SHARED_MODELS, EMBED_FILE), emb.filename);
+  if (corpus === "essential") for (const id of ["corpus-standard", "corpus-full"]) {
+    const entry = catalog.find((m) => m.id === id);
+    if (!entry) throw new Error(`catalog has no ${id}`);
+    link(join(ROOT, "assets/corpus", `${id}.json`), entry.filename);
+  }
+  // Packs registered by other modules (cryptoPack.ts, preparedness.ts…) join the catalog when imported.
+  for (const m of ["src/rag/cryptoPack.ts", "src/rag/preparedness.ts"]) if (existsSync(join(ROOT, m))) await import(join(ROOT, m));
+  const packs = [];
+  for (const p of packPaths) {
+    const id = p.split("/").pop()!.replace(/\.sqlite$/, "");
+    const filename = catalog.find((m) => m.id === id)?.filename ?? `corpus/${id}.sqlite`; // crypto, preparedness, wiki-vital5
+    link(p, filename);
+    packs.push({ id, sha256: await sha256File(p), format: "2" as const });
+  }
+  const { embeddingEngine } = await import(join(ROOT, "src/rag/embed.ts"));
+  await embeddingEngine.load(emb.filename);
+  const { seedKnowledgeBaseIfEmpty } = await import(join(ROOT, "src/rag/seedCorpus.ts"));
+  await seedKnowledgeBaseIfEmpty();
+  const { getDb } = await import(join(ROOT, "src/rag/db.ts"));
+  const chunks = ((await (await getDb()).getFirstAsync("SELECT count(*) AS c FROM chunks")) as any)?.c ?? 0;
+  const { retrieve } = await import(join(ROOT, "src/rag/retrieve.ts"));
+  return { retrieve: (q: string, k: number) => retrieve(q, k) as Promise<RetrievedChunk[]>, packs: packs as OpenPack[], chunks };
+}
+
 // ---------------------------------------------------------------- main
 
 async function main() {
@@ -413,10 +488,18 @@ async function main() {
   const embed = async (t: string) => Float32Array.from((await embedCtx.getEmbeddingFor(t)).vector);
 
   const kb = new DesktopKnowledgeBase(embed);
+  let retrievalImpl = "runner mirror of src/rag/retrieve.ts";
+  if (opt.retrieval === "app") {
+    const appRetrieve = await setupAppRetrieval(opt.corpus, opt.pack?.split(",") ?? []);
+    kb.retrieve = appRetrieve.retrieve;
+    kb.packs = appRetrieve.packs;
+    retrievalImpl = `tree src/rag/retrieve.ts (app shims, ${appRetrieve.chunks} corpus chunks)`;
+  } else {
   if (opt.corpus === "bundled") await kb.index(bundledCorpus(), join(EVAL_DIR, ".cache", "embeddings-bundled.json"));
   if (opt.corpus === "essential") await kb.index(essentialCorpus(), join(EVAL_DIR, ".cache", "embeddings-essential.json"));
   if (opt.pack) assertPackMirror();
   for (const p of opt.pack?.split(",") ?? []) kb.packs.push(await openPack(p));
+  }
   const packTag = kb.packs.map((p) => `__pack-${p.id}`).join("");
 
   const loadStart = performance.now();
@@ -554,6 +637,7 @@ async function main() {
       sourcesLayout: opt.sources,
       promptBuilder: app ? "src/routing/answer.ts createAnswerer" : opt.sources === "user" ? buildMessagesSource() : "src/rag/pure.ts assembleChatMessages",
       pipeline: opt.pipeline,
+      retrieval: retrievalImpl,
       suggestion: q.suggestion,
       answerTier: app?.tier,
       modelCalled: app ? app.modelCalled : true,

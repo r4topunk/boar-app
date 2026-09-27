@@ -12,6 +12,8 @@
 #      GATE_SUGGESTIONS_REF=<ref> (suggestions from another ref),
 #      GATE_PT=1 (PT item: v2 non-food items in EN and PT, 4B seed 42 with the catalog packs, for the PT vs EN gap),
 #      GATE_S32=1 also answers the v1 s32 questions (seed 42, no packs) into results/gates/<label>/s32/ for the judges,
+#      GATE_RETRIEVAL (app = import the tree's own src/rag retrieval through eval/runner/app-shims; mirror = the
+#      runner's copy, which drifted from the app until 2026-09-27),
 #      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
 # Also the "suggestions" item (RT-1): each empty-chat suggestion (src/i18n chat.suggestions, EN+PT) is asked with
 # the builtin corpus plus the corpus it declares (src/ui/chat/suggestions.ts SUGGESTION_SOURCES), and the app's
@@ -26,6 +28,7 @@ SEEDS="${GATE_SEEDS:-1 2 3 4 5}"
 MODELS="${GATE_MODELS:-qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km}"
 PIPELINE="${GATE_PIPELINE:-app}"
 CORPUS="${GATE_CORPUS:-essential}"
+RETRIEVAL="${GATE_RETRIEVAL:-app}"
 S32="${GATE_S32:-0}"
 PTSET="${GATE_PT:-0}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -98,8 +101,8 @@ if [ $NEED_VITAL = 1 ]; then
 fi
 SUG_MODEL=$SUG_MODEL
 O=eval/results/gate-runs; mkdir -p \$O
-run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --corpus $CORPUS "\$@" || echo "RUNFAIL \$*"; }
-runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE "\$@" || echo "RUNFAIL \$*"; }
+run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL --corpus $CORPUS "\$@" || echo "RUNFAIL \$*"; }
+runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL "\$@" || echo "RUNFAIL \$*"; }
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -135,7 +138,7 @@ rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
 [ "$PTSET" = 1 ] && mkdir -p "$OUT/pt" && rsync -az "$HOST:$DEST/eval/results/gate-pt/" "$OUT/pt/"
 cat > "$OUT/meta.json" <<EOF
-{ "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "corpus": "$CORPUS",
+{ "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "retrieval": "$RETRIEVAL", "corpus": "$CORPUS",
   "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "suggestionsRef": "${GATE_SUGGESTIONS_REF:-$REF}", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
 EOF
 
