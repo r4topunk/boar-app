@@ -535,6 +535,7 @@ async function main() {
   const hardware = `${os.cpus()[0]?.model ?? "cpu"} ${opt.gpu ? "metal" : `cpu x${opt.threads}`}`;
 
   // --pipeline app: the tree's answerer decides retrieval use, compression, instant snippets and whether the model runs.
+  let appAnswerTier: string | undefined;
   let answerer: any = null, appCtx: any = null, lastGen: GenResult | undefined, lastChunks: RetrievedChunk[] = [], promptChunks: RetrievedChunk[] = [];
   if (opt.pipeline === "app") {
     const answerModule = "../../src/routing/answer", personalityModule = "../../src/constants/personalities";
@@ -542,8 +543,15 @@ async function main() {
     const pm = await import(personalityModule);
     const personality = pm.getPersonality(pm.DEFAULT_PERSONALITY_ID ?? PERSONALITY_ID);
     appCtx = { systemPrompt: personality.systemPrompt, styleReminder: personality.styleReminder, maxTokens: MAX_TOKENS };
-    const llm = { id: opt.model, label: spec.label, filename: spec.file, sizeBytes: 0, roles: ["fast"], isDefault: true, answerTier: "default" };
+    // Tier and size from the tree's own catalog: the engine treats the 1.5B as the Compacto (declines instead of answering
+    // from memory, CR-1…) only when answerTier is "compact". The runner used to declare every model "default".
+    const entry = (((await import(join(ROOT, "src/models/manifest.ts"))) as any).MODEL_CATALOG ?? []).find((m: any) => m.id === opt.model);
+    const llm = {
+      id: opt.model, label: spec.label, filename: spec.file, sizeBytes: entry?.sizeBytes ?? 0, roles: ["fast"], isDefault: true,
+      answerTier: entry?.answerTier ?? "default",
+    };
     const useTemplate = model.fileInfo.metadata?.tokenizer?.chat_template != null;
+    appAnswerTier = llm.answerTier;
     answerer = createAnswerer({
       now: () => performance.now(),
       engine: {
@@ -669,6 +677,7 @@ async function main() {
       sourcesLayout: opt.sources,
       promptBuilder: app ? "src/routing/answer.ts createAnswerer" : opt.sources === "user" ? buildMessagesSource() : "src/rag/pure.ts assembleChatMessages",
       pipeline: opt.pipeline,
+      answerTierDeclared: appAnswerTier,
       retrieval: retrievalImpl,
       suggestion: q.suggestion,
       context: q.context,
