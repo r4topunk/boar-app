@@ -549,6 +549,8 @@ export function createAnswerer(deps: AnswerDeps) {
         r: AnswerReceipt,
         error?: { code: AnswerErrorCode; message: string }
       ): AnswerResult => {
+        // PERF-1 measurement: the receipt's timing fields in the log (not all are on the card).
+        console.info(`[answer] tier=${tier} model=${r.modelId} ttftMs=${Math.round(r.ttftMs)} retrievalMs=${Math.round(r.retrievalMs ?? -1)} loadMs=${Math.round(r.loadMs ?? -1)} prefillMs=${Math.round(r.prefillMs ?? -1)} ctxTokens=${r.ctxTokens ?? -1} cachedTokens=${r.cachedTokens ?? -1} tokPerSec=${r.tokPerSec.toFixed(1)} totalMs=${Math.round(r.totalMs)}`);
         emit({ type: "done", answerId, tier, outcome, receipt: r, error, ...(finalText !== undefined ? { finalText } : {}) });
         return { answerId, tier, outcome, text, sources, receipt: r };
       };
