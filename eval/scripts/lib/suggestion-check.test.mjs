@@ -48,4 +48,10 @@ describe("checkSuggestion", () => {
     expect(checkSuggestion({ ...base, answer: "This answer is not from an offline source. Monsoons…", citedTitles: [] }).failures[0]).toMatch(/preface/);
     expect(checkSuggestion({ ...base, answer: "Monsoons are seasonal winds.", citedTitles: [] }).failures[0]).toMatch(/without citing/);
   });
+
+  it("q3 °C→°F is exact and made without the model", () => {
+    const qid = suggestionId("What is 30 °C in Fahrenheit?", "en");
+    expect(checkSuggestion({ queryId: qid, rawRetrievedTitles: [], retrievedTitles: [], answer: "30 °C = 86 °F.", modelCalled: false }).pass).toBe(true);
+    expect(checkSuggestion({ queryId: qid, rawRetrievedTitles: [], retrievedTitles: [], answer: "30 °C is 86 °F.", modelCalled: true }).failures[0]).toMatch(/model/);
+  });
 });

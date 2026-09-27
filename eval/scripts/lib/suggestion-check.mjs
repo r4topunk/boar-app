@@ -12,7 +12,8 @@ export const slug = (t) => t.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+
 export const SUGGESTION_TOPICS = {
   [slug("Why do we have seasons on Earth?")]: { onTopic: /season|axial tilt|solstice|equinox|obliquity|earth's orbit|esta[çc][õo]es/i },
   [slug("What is the difference between a pandemic and an epidemic?")]: { onTopic: /pandemic|epidemic|epidemiolog|outbreak|endemic|pandemia|epidemia/i },
-  [slug("What is 30 °C in Fahrenheit?")]: { onTopic: /fahrenheit|celsius|temperature|conversion/i, retrieval: "optional", answer: /\b86\b/ },
+  // RF-1 (engine-routing 176dd71): exact °C/°F by the calculator, without the model.
+  [slug("What is 30 °C in Fahrenheit?")]: { onTopic: /fahrenheit|celsius|temperature|conversion/i, retrieval: "optional", answer: /\b86\b/, calculator: true },
   [slug("How do I stop a nosebleed?")]: { onTopic: /nosebleed|epistaxis|nasal|bleeding|sangramento|nariz/i },
 };
 
@@ -46,6 +47,7 @@ export function checkSuggestion(row) {
   // RF-1 (Prism, 35ffb87): a suggestion the app offers must be ANSWERED with a cited source on every model — never
   // declined by the Compacto nor answered from memory with the preface. Math (retrieval optional) is exempt from citing.
   const answer = row.answer ?? "";
+  if (rule.calculator && row.modelCalled === true) failures.push("used the model (expected the exact conversion without it)");
   if (row.declined || /did(n't| not) find this in this phone|n[ãa]o encontrei isso no acervo/i.test(answer)) failures.push("declined (the app offers this suggestion, so it must answer it)");
   else if (/not from an offline source|n[ãa]o (vem|[ée]) de (uma )?fonte offline/i.test(answer)) failures.push("answered from memory with the no-source preface");
   else if (rule.retrieval !== "optional" && row.citedTitles !== undefined && !row.citedTitles.length) failures.push("answered without citing any source");
