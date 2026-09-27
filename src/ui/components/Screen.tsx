@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, StyleProp, View, ViewStyle } from "react-native";
+import { Platform, ScrollView, StyleProp, View, ViewStyle } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { Edge, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTokens } from "../theme";
@@ -52,15 +52,15 @@ export function Screen({ children, scroll = true, edges = ["bottom", "left", "ri
   // show and collapse the title (wrapped in SafeAreaView, the title area stayed empty until scrolling,
   // Loom 99eba00). A plain scrolling screen is therefore the scroll view itself, with the safe-area
   // insets it needs applied to its content.
+  // LT-1 test 5: a plain RN ScrollView (a direct UIScrollView) for header-tracked screens.
   if (scroll && !footer && !ambient) {
     // iOS: "automatic" already adds the header and safe-area insets to the content; add them by hand only on Android.
     const edge = (e: Edge, v: number) => (Platform.OS === "android" && edges.includes(e) ? v : 0);
     return (
-      <KeyboardAwareScrollView
+      <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         contentInsetAdjustmentBehavior="automatic"
-        bottomOffset={t.space.base}
         style={{ flex: 1, backgroundColor: t.color.bg.canvas }}
         contentContainerStyle={[
           inner,
@@ -74,7 +74,7 @@ export function Screen({ children, scroll = true, edges = ["bottom", "left", "ri
         ]}
       >
         {children}
-      </KeyboardAwareScrollView>
+      </ScrollView>
     );
   }
   return (
