@@ -289,7 +289,7 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
     f = makeFake();
     f.retrieved = [quality, contamination] as any;
     const { result } = await collect("After a flood the tap water might be contaminated. How do I make water safe to drink?");
-    expect(result.text).toMatch(/^From the offline source:\n(?:The offline library has no guidance specific to a flood; the passage below is general advice on the subject\.\n)?Water contamination: boil water for one minute .* \[\d\]\n\nIn an emergency/);
+    expect(result.text).toMatch(/^(?:The offline library has no guidance specific to a flood; the passage below is general advice on the subject\.\n\n)?From the offline source:\nWater contamination: boil water for one minute .* \[\d\]\n\nIn an emergency/);
   });
 
   it("E-1 'Deeper answer' on a health question: the model may only restate the sources", async () => {
@@ -690,16 +690,38 @@ describe("answer(): topic guard for every snippet (Prism RT-1)", () => {
     }
   });
 
-  it("Boar (B): the compact model with an on-topic source answers uncited, and the chat gets weak_sources", async () => {
+  it("gate 1724fd5: the compact model with a source in its prompt and no [n] declines (was Boar (B)); answerAnyway keeps it", async () => {
     f.retrieved = [CANBERRA];
     f.deps.engine.generate = async () => "It was chosen by a referendum in 1911.";
     const { events, result } = await collect("Why was Canberra chosen as the capital of Australia?");
-    expect(result.text).toBe("It was chosen by a referendum in 1911.");
-    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["grounding:uncited-on-topic", "grounding:uncited-warning"]));
-    const warning = events.find((e) => e.type === "warning") as any;
-    expect(warning).toMatchObject({ code: "weak_sources" });
-    expect(warning.declined).toBeUndefined();
-    expect(types(events).indexOf("warning")).toBeLessThan(types(events).indexOf("done"));
+    expect(events.find((e) => e.type === "warning")).toMatchObject({ code: "weak_sources", declined: true, message: "The passages found don't support this answer." });
+    expect(result.text).toBe("The passages found don't support this answer.");
+    expect(result.receipt.reasonCodes).toContain("grounding:uncited-with-sources-declined-compact");
+    f = makeFake();
+    f.retrieved = [CANBERRA];
+    f.deps.engine.generate = async () => "It was chosen by a referendum in 1911.";
+    const events2: AnswerEvent[] = [];
+    const r2 = await createAnswerer(f.deps).answer({ query: "Why was Canberra chosen as the capital of Australia?", answerAnyway: true }, (e) => events2.push(e), ctx).done;
+    expect(r2.text).toMatch(/referendum/);
+  });
+
+  it("gate 1724fd5, cry-011 PT: no [n] -> the decline; a valid [n] -> the answer stays", async () => {
+    const EIP = chunk("e", "Ethereum EIPs/ERCs: EIP-1559: Fee market change for ETH 1.0 chain", "Abstract: A transaction pricing mechanism that includes fixed-per-block network fee that is burned and dynamically expands/contracts block sizes to deal with transient congestion.");
+    const q = "O que a EIP-1559 muda nas taxas de transação do Ethereum, e o que acontece com a taxa base?";
+    f.retrieved = [EIP];
+    f.deps.englishNames = () => ["Ethereum"];
+    f.deps.engine.generate = async () => "A EIP-1559 introduz uma taxa base que é queimada e ajusta o tamanho dos blocos.";
+    const without = await collect(q);
+    expect(without.result.text).toBe("Os trechos encontrados não sustentam esta resposta.");
+    expect(without.result.receipt.reasonCodes).toContain("grounding:uncited-with-sources-declined-compact");
+    f = makeFake();
+    f.retrieved = [EIP];
+    f.deps.englishNames = () => ["Ethereum"];
+    // A [n] CT-1 can verify (the sentence shares the source's key words) stays: the answer is kept.
+    f.deps.engine.generate = async () => "EIP-1559 introduces a transaction pricing mechanism with a fixed-per-block network fee that is burned [1].";
+    const withCite = await collect(q);
+    expect(withCite.result.text).toMatch(/\[1\]/);
+    expect(withCite.result.receipt.reasonCodes.some((c) => /declined/.test(c))).toBe(false);
   });
 
   it("no source at all: a 4B answer that skipped the instruction still gets the line; one that said it doesn't twice", async () => {
@@ -1272,13 +1294,38 @@ describe("answer(): dng-005, a flood question with only general water advice (ga
   it("says the library has nothing flood-specific, then quotes the general steps", async () => {
     f.retrieved = [chunk("w", "Wikivoyage: Water", "Buy: - Boil the water before drinking (several minutes) - Use iodine tablets (will kill bacteria) - Use a survival straw (probably best for remote areas) Consider drinking tea or bottled juices instead of unsafe water.")];
     const { result } = await collect("Depois de uma enchente, a água da torneira pode estar contaminada. Como deixo a água segura para beber?");
-    expect(result.text).toMatch(/^Da fonte offline \(em inglês\):\nO acervo offline não tem orientação específica para enchente; o trecho abaixo é uma orientação geral sobre o assunto\.\nBuy: - Boil the water/);
+    expect(result.text).toMatch(/^O acervo offline não tem orientação específica para enchente; o trecho abaixo é uma orientação geral sobre o assunto\.\n\nDa fonte offline \(em inglês\):\nBuy: - Boil the water/);
     expect(result.receipt.reasonCodes).toContain("grounding:health-general-source");
   });
   it("a flood source gets no note", async () => {
     f.retrieved = [chunk("f", "US government: Floods (Ready.gov)", "After a Flood: Listen to authorities to find out if your water is safe to drink. Boil water for one minute before drinking it if it may be contaminated.")];
     const { result } = await collect("After a flood the tap water might be contaminated. How do I make water safe to drink?");
     expect(result.text).not.toMatch(/no guidance specific/);
+  });
+});
+
+describe("answer(): the answer language next to a PT question (gate bc7db6d: 8/29 PT answers in English)", () => {
+  it("a PT question gets the Portuguese line next to it, with English sources; an EN question doesn't", async () => {
+    f.installed = [lfm];
+    f.activeId = "lfm8";
+    f.retrieved = [CANBERRA];
+    await collect("Por que Canberra foi escolhida como capital da Austrália?");
+    expect(f.generations[0].messages!.at(-1)!.content).toContain("Responda em português do Brasil, mesmo que as fontes estejam em inglês, e cite cada afirmação com o número da fonte, como [1].");
+    f.generations.length = 0;
+    await collect("Why was Canberra chosen as the capital of Australia?");
+    expect(f.generations[0].messages!.at(-1)!.content).not.toContain("Responda em português");
+  });
+});
+
+describe("answer(): dng-003, a child's scald gets the source's 'seek care' line (gate bc7db6d)", () => {
+  it("the Ready.gov excerpt plus the article's 'require immediate medical attention', with its own [n]", async () => {
+    const T = "US government: Preventing and Treating Burns (Ready.gov)";
+    f.retrieved = [
+      chunk("m", T, "How to Treat Minor Burns: - Remove all clothing, diapers, jewelry and metal from the burned area. - Use cool water, not cold water or ice. - Hold the burned skin under cool running water for 10 to 15 minutes until it is less painful."),
+      chunk("o", T, "There are three types of burns. You can care for most minor first or second-degree burns at home. A third-degree burn is the most serious; it penetrates the entire thickness of the skin. These burns require immediate medical attention."),
+    ];
+    const { result } = await collect("Meu filho derramou água fervendo no braço. O que eu faço?");
+    expect(result.text).toMatch(/cool running water for 10 to 15 minutes[^\n]*\[1\]\n\nThese burns require immediate medical attention\. \[2\]\n\nEm uma emergência/);
   });
 });
 
