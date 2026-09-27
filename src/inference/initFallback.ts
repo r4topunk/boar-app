@@ -46,7 +46,12 @@ export async function initWithCpuFallback<P extends object, C>(
   opts: { platform: string; cpuDevices: () => Promise<string[]>; log?: (message: string) => void }
 ): Promise<{ context: C; backend: BackendInfo }> {
   // iOS: the library that fails to compile is the flash-attention one; don't ask for it.
-  const first: P & BackendInitParams = opts.platform === "ios" ? { ...params, flash_attn_type: "off" } : params;
+  // PERF-1 experiment: with no layers on the GPU, skip the Metal backend entirely (its runtime
+  // library compile held the first init for ~22 s on the simulator). Literal "CPU": asking
+  // getBackendDevicesInfo() could itself start Metal.
+  const cpuOnly = opts.platform === "ios" && (params.n_gpu_layers ?? 0) === 0;
+  const first: P & BackendInitParams =
+    opts.platform === "ios" ? { ...params, flash_attn_type: "off", ...(cpuOnly ? { n_gpu_layers: 0, devices: ["CPU"] } : {}) } : params;
   try {
     return { context: await init(first), backend: { kind: "default" } };
   } catch (e: any) {

@@ -19,8 +19,8 @@ describe("initWithCpuFallback", () => {
     const f = fakeInit(["failed to initialize MTL0 backend"]);
     const logs: string[] = [];
     const r = await initWithCpuFallback(f.init, { model: "m.gguf", n_gpu_layers: 0 }, { platform: "ios", cpuDevices: cpu, log: (m) => logs.push(m) });
-    expect(f.calls[0]).toMatchObject({ model: "m.gguf", flash_attn_type: "off" });
-    expect(f.calls[0].devices).toBeUndefined();
+    // PERF-1: with no GPU layers, iOS starts on CPU only (no Metal backend init).
+    expect(f.calls[0]).toMatchObject({ model: "m.gguf", flash_attn_type: "off", devices: ["CPU"] });
     expect(f.calls[1]).toEqual({ model: "m.gguf", n_gpu_layers: 0, devices: ["CPU"], flash_attn_type: "off" });
     expect(r.backend).toEqual({ kind: "cpu-fallback", reason: "failed to initialize MTL0 backend" });
     expect(r.context).toEqual({ id: 2 });
@@ -37,7 +37,7 @@ describe("initWithCpuFallback", () => {
   it("asks iOS for no flash attention up front; leaves Android's params alone", async () => {
     const ios = fakeInit([]);
     expect((await initWithCpuFallback(ios.init, { model: "m" }, { platform: "ios", cpuDevices: cpu })).backend).toEqual({ kind: "default" });
-    expect(ios.calls).toEqual([{ model: "m", flash_attn_type: "off" }]);
+    expect(ios.calls).toEqual([{ model: "m", flash_attn_type: "off", n_gpu_layers: 0, devices: ["CPU"] }]);
     const android = fakeInit([]);
     await initWithCpuFallback(android.init, { model: "m" }, { platform: "android", cpuDevices: cpu });
     expect(android.calls).toEqual([{ model: "m" }]);
