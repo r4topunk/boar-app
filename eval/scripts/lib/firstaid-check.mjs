@@ -150,7 +150,9 @@ export function checkFirstAid(queryId, { answer, retrievedTitles }) {
   const q = answer.match(QUOTE);
   if (q) {
     const excerpt = answer.slice(q.index + q[0].length).replace(/^[\s¶]+/, "");
-    const heading = excerpt.split(/[:\n]/)[0];
+    // A heading is a short label before ":" ("Treatment:", "Steps to Prevent Burns:"); prose has none.
+    const lead = excerpt.split(/[:\n]/)[0];
+    const heading = excerpt.includes(":") && lead.split(/\s+/).length <= 8 ? lead : "";
     // Lookahead-only expectations (e.g. "not later than 15 minutes") match almost any text: not evidence of treatment.
     const treats = rules.expect.some(([re]) => !re.source.startsWith("^(?!") && re.test(excerpt));
     // A heading or caption alone ("During:", "Earthquake safety") gives no instruction.
