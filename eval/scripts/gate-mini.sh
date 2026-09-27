@@ -11,6 +11,8 @@
 #      GATE_CORPUS (essential = corpus + corpus-standard + corpus-full, the default install),
 #      GATE_S32=1 also answers the v1 s32 questions (seed 42, no packs) into results/gates/<label>/s32/ for the judges,
 #      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
+# Also the "suggestions" item (RT-1): the tree's empty-chat suggestions (src/i18n chat.suggestions, EN+PT) must have
+# an on-topic source in the app's search top-3, without packs and with the packs (4B, seed 1: search is model-free).
 # Exit: 0 = all pass, 1 = a case fails (blocker), 2 = incomplete (missing rows, or the tree cannot load packs).
 set -euo pipefail
 TREE="$(cd "$1" && pwd)"; REF="${2:-HEAD}"
@@ -35,6 +37,9 @@ cat_field() { grep -oE "$2: \"[^\"]*\"" "$TMP/src/rag/$1.ts" 2>/dev/null | head 
 PREP_SHA="$(cat_field preparedness sha256)"; PREP_URL="$(cat_field preparedness sourceUrl)"
 CRYPTO_SHA="$(cat_field cryptoPack sha256)"; CRYPTO_URL="$(cat_field cryptoPack sourceUrl)"
 if [ "$HAS_PACK" = 1 ] && { [ -z "$PREP_SHA" ] || [ -z "$CRYPTO_SHA" ]; }; then echo "GATE INCOMPLETE: $REF has no preparedness/crypto pack in its catalog"; exit 2; fi
+node "$ROOT/eval/scripts/extract-suggestions.mjs" "$TMP" "$TMP/questions.suggestions-gate.jsonl" >/dev/null
+N_SUG=$(grep -c . "$TMP/questions.suggestions-gate.jsonl" || true)
+SUG_MODEL=qwen3-4b-instruct-2507-q4km
 if [ "$PIPELINE" = app ] && ! grep -q "export function createAnswerer" "$TMP/src/routing/answer.ts" 2>/dev/null; then echo "GATE INCOMPLETE: $REF has no src/routing/answer.ts createAnswerer (use GATE_PIPELINE=direct)"; exit 2; fi
 echo "gate $LABEL: tree $TREE @ $SHA, pipeline $PIPELINE, packs loadable: $HAS_PACK, seeds: $SEEDS"
 
@@ -42,6 +47,7 @@ ssh "$HOST" "mkdir -p ~/$DEST/assets/corpus ~/boar/gate/.cache"
 rsync -az --delete "$TMP/src/" "$HOST:$DEST/src/"
 rsync -az --delete "$TMP/assets/corpus/" "$HOST:$DEST/assets/corpus/"
 rsync -az --delete --exclude node_modules --exclude .cache --exclude results "$ROOT/eval/" "$HOST:$DEST/eval/"
+scp -q "$TMP/questions.suggestions-gate.jsonl" "$HOST:$DEST/eval/dataset/questions.suggestions-gate.jsonl"
 
 cat > "$TMP/run.sh" <<EOF
 #!/bin/bash
@@ -70,6 +76,12 @@ for m in $MODELS; do for s in $SEEDS; do
     run --model \$m --seed \$s --dataset cryptopack --ids crypto-named-001 \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
   done
 done; done
+for cfg in none packs; do
+  [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
+  extra=(); name=suggestions__${CORPUS}
+  [ \$cfg = packs ] && extra=(--pack \$PREP,\$CRYPTO) && name=suggestions__${CORPUS}__packs
+  run --model $SUG_MODEL --seed 1 --dataset suggestions-gate \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
+done
 if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
@@ -91,7 +103,7 @@ node scripts/regress.mjs --name "gate-$LABEL" --runs "results/gates/$LABEL/runs"
 RC=$?
 set -e
 N_MODELS=$(wc -w <<<"$MODELS"); N_SEEDS=$(wc -w <<<"$SEEDS"); N_CFG=$((1 + HAS_PACK))
-EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * 8))
+EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * 8 + N_SUG * N_CFG))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 echo "rows: $GOT / $EXPECTED expected"
 if [ "$RC" -ne 0 ]; then echo "GATE FAIL: eval/reports/regression-gate-$LABEL.md"; exit 1; fi
