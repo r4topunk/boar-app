@@ -68,6 +68,9 @@ const rows = systems.map((system) => {
   };
 });
 
+// Same model in several runs (e.g. gate control vs candidate): tell them apart by the run's last name part.
+const dupLabels = new Set(rows.map((r) => r.label).filter((l, i, all) => all.indexOf(l) !== i));
+for (const r of rows) if (dupLabels.has(r.label)) r.label += ` [${r.system.split("__").pop()}]`;
 const allPairs = rows.flatMap((r) => r.pairs);
 const refCorrect = allPairs.length ? allPairs.filter((p) => p.ref.correctness >= 4).length / allPairs.length : NaN;
 const refInScope = refs.filter((r) => !subsetIds || subsetIds.has(r.id));
