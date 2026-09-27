@@ -22,7 +22,12 @@ const food = questions.filter((q) => q.category.startsWith("local-food"));
 const gold = Object.fromEntries(food.map((q) => [q.id, JSON.parse(readFileSync(join(EVAL_DIR, "dataset", q.gold[0].file), "utf8"))]));
 const refs = Object.fromEntries(readJsonl(join(EVAL_DIR, "references", dataset, `${refName}.jsonl`)).filter((r) => r.ok).map((r) => [r.id, r]));
 const runsDir = join(EVAL_DIR, "results", "runs", dataset);
-const systems = existsSync(runsDir) ? readdirSync(runsDir).filter((f) => f.endsWith(".jsonl") && !/\.(pre-|invalid)/.test(f)).map((f) => f.replace(/\.jsonl$/, "")) : [];
+// --systems a,b: only these runs (runs/v2 also holds gate and A/B runs). --name: report file name.
+const argv = process.argv.slice(2);
+const only = argv.includes("--systems") ? argv[argv.indexOf("--systems") + 1].split(",") : null;
+const reportName = argv.includes("--name") ? argv[argv.indexOf("--name") + 1] : "baseline-v2";
+const systems = (existsSync(runsDir) ? readdirSync(runsDir).filter((f) => f.endsWith(".jsonl") && !/\.(pre-|invalid)/.test(f)).map((f) => f.replace(/\.jsonl$/, "")) : [])
+  .filter((s) => !only || only.includes(s));
 
 function foodScores(answers) {
   const rows = food.filter((q) => answers[q.id] != null).map((q) => ({ id: q.id, located: q.category === "local-food-located", ...scoreFoodAnswer(answers[q.id], gold[q.id], q.grading) }));
@@ -98,5 +103,5 @@ L.push("- A venue missing from OSM is unverified, not necessarily wrong; OSM cov
 L.push("- The reference gets the device coordinates for the 3 located items; BOAR's runner does not (the app does not use them yet).");
 L.push("- Judge and reference are both Claude (same-family limitation as in v1).");
 mkdirSync(join(EVAL_DIR, "reports"), { recursive: true });
-writeFileSync(join(EVAL_DIR, "reports", "baseline-v2.md"), L.join("\n") + "\n");
-console.log("wrote reports/baseline-v2.md");
+writeFileSync(join(EVAL_DIR, "reports", `${reportName}.md`), L.join("\n") + "\n");
+console.log(`wrote reports/${reportName}.md`);
