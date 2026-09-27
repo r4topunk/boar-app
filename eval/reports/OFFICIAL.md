@@ -32,7 +32,7 @@ Where both judged (Qwen3-4B, v1, 96 questions) they agree on the winner in 99% o
 - **Vitalik-style (v2, Jev)** ([`official-v2-6c3d6c6.md`](./official-v2-6c3d6c6.md)): quality ratio 4B 0.49 (0.43–0.54), 1.5B 0.41 (0.37–0.44); crypto correct 30% / 10%, travel 20% / 10%. **Local food: 0% for both** (reference 90%), by construction: the evaluation does not install the offline places packs, so the app has no venue to cite.
 - **Crypto, 20 questions, with the crypto pack (Jev)** ([`official-cryptopack-6c3d6c6.md`](./official-cryptopack-6c3d6c6.md)): 4B ratio 0.68 (0.59–0.77), 55% correct. Earlier A/B on the same questions: the pack takes named-concept questions from 10% to 60% correct ([`cryptopack-v1.md`](./cryptopack-v1.md)).
 - **Answers from memory, without a source** ([`nosource.md`](./nosource.md)): the 1.5B is correct 3–7% of the time and wrong 64–83% (crypto and travel only); the product keeps refusing sourceless knowledge questions on the Compacto.
-- **PT vs EN** (4B with packs, 41 v2 items, Jev): EN 0.55 vs PT 0.51 on the last measured candidate; retrieval (Bramble, 42 questions): PT with the EN lexicon R@3 0.62, EN 0.21 (EN is the weak side).
+- **PT vs EN** (4B with packs, 41 v2 items, Jev): EN 0.55 vs PT 0.51 on the last measured candidate. **Measured without the PT lexicon; to be redone.** The gate copied only `assets/corpus` from the app tree, and the app's lexicon loader (`src/rag/ptLexiconAsset.ts`) silently falls back to an empty lexicon when `assets/lexicon/pt-en.json` is missing. So every PT answer in the gates up to d7de156 (safety-pt, pt-topic, PT suggestions, PT vs EN) ran without it. Fixed in the gate on 2026-09-27 (`9eb69c5`: it copies `assets/` and stops when a required asset is missing); the numbers will be redone on the control e0d842d. Retrieval (Bramble, 42 questions, with the lexicon, measured outside the gate): PT R@3 0.62, EN 0.21 (EN is the weak side).
 
 ## Safety gate (every prompt or retrieval change)
 
@@ -45,4 +45,5 @@ The integrated build passed the gate on candidate `a2bafb1` ([`regression-gate-c
 - One seed (42) for the quality numbers; the safety gate uses 5.
 - Unsupported citations: 3 of the 5 citations shown in gate answers were not supported by the cited source (Jev); post-processing removes most unsupported ones from the model's text (19 of 24, 1 false positive) — open item for the engine.
 - The reference is generated once (Opus + web search, 2026-09-26) and its answers are the key: a wrong reference would count against BOAR.
+- PT answers in the safety gate and the PT vs EN numbers above were measured without the PT lexicon (see "By set"); the PT safety items passed even so, which the redone run will confirm.
 - History: the first official numbers (runner without the app pipeline, 2026-09-26) are in [`official-v1.md`](./official-v1.md) (4B 59% Claude / 70% Jev, 5.7 s).
