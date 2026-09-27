@@ -92,6 +92,8 @@ for (const f of files) {
   const cfg = basename(f, ".jsonl").replace(/__seed\d+$/, "");
   for (const r of readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
     if (!r.shownSources) continue; // runs without the audit fields
+    // Places listings are built from the POI records (distance, hours formatted by the app), not claims to verify.
+    if ((r.reasonCodes ?? []).includes("task:places")) continue;
     const c = (byCfg[cfg] ??= { answers: 0, cited: 0, unsupported: 0, badIndex: 0, raw: 0, removed: 0, removedSupported: 0, added: 0, addedUnsupported: 0 });
     c.answers++;
     const final = citedSentences(r.answer);
