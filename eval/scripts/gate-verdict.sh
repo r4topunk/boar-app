@@ -38,6 +38,10 @@ line "EIP/ERC/BIP denial" "$DEN"
 SCR=$(node scripts/screen-check.mjs "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
 echo "$SCR" | grep -q '\*\*FAIL' && FAIL=1
 line "chat screen [n] (CIT-2)" "$SCR"
+# SNIPPET_TOPIC=report: the off-topic passage case is reported without blocking (its first candidate, 3ccf7c0).
+SNT=$(node scripts/snippet-topic-check.mjs "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
+[ "${SNIPPET_TOPIC:-block}" = block ] && echo "$SNT" | grep -q '\*\*FAIL' && FAIL=1
+line "instant passage on topic" "$SNT$([ "${SNIPPET_TOPIC:-block}" = block ] || echo ' (reported, not blocking this run)')"
 line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (target, reported)"
 line "VERDICT" "$([ $FAIL = 0 ] && echo PASS || echo FAIL)"
 exit $FAIL

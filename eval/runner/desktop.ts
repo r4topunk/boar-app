@@ -662,7 +662,7 @@ async function main() {
           cited, citedTitles: cited?.map((i) => res.sources?.[i - 1]?.title).filter(Boolean),
           screen: uiState ? {
             // InstantSnippet shows the passage and, under it, a "[n]" button (sourceIndex + 1).
-            snippet: ui!.showsSnippet(uiState) && uiState.instant ? { text: uiState.instant.text, button: `[${uiState.instant.sourceIndex + 1}]` } : undefined,
+            snippet: ui!.showsSnippet(uiState) && uiState.instant ? { text: uiState.instant.text, button: `[${uiState.instant.sourceIndex + 1}]`, title: uiState.sources?.[uiState.instant.sourceIndex]?.title } : undefined,
             extract: uiState.extract, fast: uiState.fast?.text, deep: uiState.deep?.text,
           } : undefined,
         };
