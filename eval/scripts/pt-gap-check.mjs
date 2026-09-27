@@ -25,22 +25,34 @@ function ratio(label, lang) {
     const j = JSON.parse(l);
     if (j.mapped && j.ok !== false) (by[j.queryId] ??= {})[j.order] = j;
   }
-  const pairs = Object.values(by).filter((o) => o.boarA && o.boarB).map((o) => combineOrders(o.boarA.mapped, o.boarB.mapped));
+  const pairs = Object.entries(by).filter(([, o]) => o.boarA && o.boarB).map(([q, o]) => ({ q, ...combineOrders(o.boarA.mapped, o.boarB.mapped) }));
   const s = summarize(pairs, { seed: 21 });
-  return { n: pairs.length, r: s.qualityRatio, ci: s.qualityRatioCI };
+  // Per item (Boar, after bc7db6d): BOAR's mean rubric score and correctness, to show which items moved the gap.
+  const answers = Object.fromEntries(readFileSync(src, "utf8").trim().split("\n").map((l) => JSON.parse(l)).map((r) => [r.queryId, r.answer ?? ""]));
+  const items = Object.fromEntries(pairs.map((p) => [p.q, { mean: Object.values(p.boar).reduce((a, x) => a + x, 0) / Object.values(p.boar).length, correct: p.boar.correctness, answer: answers[p.q] }]));
+  return { n: pairs.length, r: s.qualityRatio, ci: s.qualityRatioCI, items };
 }
 
 const f = (x) => x.toFixed(3);
-const rows = [], gaps = {};
+const rows = [], gaps = {}, per = {};
 for (const label of [control, candidate]) {
   const en = ratio(label, "en"), pt = ratio(label, "pt");
   gaps[label] = en.r - pt.r;
+  per[label] = { en: en.items, pt: pt.items };
   rows.push(`| ${label} | ${f(en.r)} (${f(en.ci[0])}–${f(en.ci[1])}, n=${en.n}) | ${f(pt.r)} (${f(pt.ci[0])}–${f(pt.ci[1])}, n=${pt.n}) | ${(100 * gaps[label]).toFixed(1)} pts |`);
 }
 const pass = gaps[candidate] <= gaps[control] + MARGIN;
 const L = [`# PT vs EN: ${candidate} vs ${control}`, "",
   `TL;DR: **${pass ? "PASS" : "FAIL"}**: candidate gap ${(100 * gaps[candidate]).toFixed(1)} pts vs control ${(100 * gaps[control]).toFixed(1)} pts (blocks above control + ${100 * MARGIN} pt). Target gap <= ${100 * TARGET} pts: ${gaps[candidate] <= TARGET ? "met" : "not met (recorded goal, not blocking)"}. Jev, 4B with packs, v2 non-food items. Regenerate with \`node eval/scripts/pt-gap-check.mjs ${control} ${candidate}\`.`, "",
   "| Gate | EN quality ratio (95% CI) | PT quality ratio (95% CI) | Gap EN − PT |", "|---|---|---|---|", ...rows, ""];
+// Items whose score moved (mean rubric score, 1-5, both A/B orders), PT drops first.
+for (const lang of ["pt", "en"]) {
+  const moved = Object.keys(per[candidate][lang]).map((q) => ({ q, c: per[control][lang][q], k: per[candidate][lang][q] }))
+    .filter((x) => x.c && Math.abs(x.k.mean - x.c.mean) >= 0.5).sort((a, b) => (a.k.mean - a.c.mean) - (b.k.mean - b.c.mean));
+  L.push(`## ${lang.toUpperCase()} items that moved (|Δ mean score| ≥ 0.5)`, "", moved.length ? "| Item | Mean score control → candidate | Correctness control → candidate | Candidate answer |" : "None.", ...(moved.length ? ["|---|---|---|---|"] : []));
+  for (const x of moved) L.push(`| ${x.q} | ${x.c.mean.toFixed(1)} → **${x.k.mean.toFixed(1)}** | ${x.c.correct.toFixed(1)} → ${x.k.correct.toFixed(1)} | ${x.k.answer.slice(0, 140).replace(/\n/g, " ").replace(/\|/g, "/")} |`);
+  L.push("");
+}
 writeFileSync(join(EVAL_DIR, "reports", `pt-gap-${control}-vs-${candidate}.md`), L.join("\n"));
 console.log(L.join("\n"));
 process.exit(pass ? 0 : 1);
