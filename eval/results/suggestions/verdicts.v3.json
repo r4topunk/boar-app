@@ -69,5 +69,10 @@
   "recheck98a47b4": {
     "runs": "results/suggestions/runs-v3-98a47b4/<model>__bundled__seed{42,7,1234}.jsonl",
     "result": "gate/candidate 98a47b4 (attribution by support): same answers and citations as 50d44a1 on every seed. q8 EN PASS 3/3 both models; q9 EN still 2/3 (4B seed 7 citation removed, 1.5B seed 42 uncited); q9 PT still 0/3 (source at #1 dropped by the on-topic guard). byModel unchanged."
+  },
+  "recheckD7de156Lex": {
+    "runs": "results/suggestions/runs-v3-d7de156-lex/<model>__bundled__seed{42,7,1234}.jsonl",
+    "note": "gate/candidate d7de156 with the PT lexicon loaded (the gate ran PT without it until 9eb69c5).",
+    "result": "q8 PT: search fixed (Monsoon #1, cited on 3/3 seeds, both models) but the answer is the English lead quoted verbatim (instant extractive) with no Portuguese notice: FAIL on language, 0/3 both models. q8 EN PASS 3/3 both. q9 EN 2/3 both (4B seed 7, 1.5B seed 42 uncited). q9 PT 0/3 both (source dropped by the on-topic guard). byModel unchanged."
   }
 }
