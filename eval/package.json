@@ -10,7 +10,8 @@
     "judge": "node scripts/judge.mjs",
     "report": "node scripts/report.mjs",
     "report:official": "node scripts/report.mjs --subset all --name official-v1 --systems qwen3-4b-instruct-2507-q4km__bundled,qwen2.5-1.5b-instruct-q4km__bundled && node scripts/judge-agreement.mjs --subset all && node scripts/report-v2.mjs && node scripts/report.mjs --dataset cryptopack --subset all --name cryptopack-v1 && node scripts/judge-agreement.mjs --dataset cryptopack --subset all",
-    "test": "cd .. && npx vitest run eval/scripts"
+    "test": "cd .. && npx vitest run eval/scripts",
+    "regress": "node scripts/regress.mjs"
   },
   "dependencies": {
     "fzstd": "^0.1.1",
