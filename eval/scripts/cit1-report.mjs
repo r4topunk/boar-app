@@ -13,8 +13,11 @@ const label = process.argv[2];
 const base = join(EVAL_DIR, "results", "gates", label);
 const groups = {};
 const add = (key, r) => {
-  const g = (groups[key] ??= { n: 0, cited: 0, added: 0, removed: 0, ctxN: 0, before: 0, after: 0 });
+  const g = (groups[key] ??= { n: 0, cited: 0, added: 0, removed: 0, ctxN: 0, before: 0, after: 0, repeated: 0 });
   g.n++;
+  // CIT-2: the same [n] twice in a row ("[1][1]") or closing two consecutive sentences ("... [1]. ... [1].").
+  const ends = String(r.answer ?? "").split(/(?<=[.!?])\s+/).map((x) => x.match(/\[(\d+)\]\W*$/)?.[1] ?? null);
+  if (/\[(\d+)\]\s*\[\1\]/.test(r.answer ?? "") || ends.some((e, i) => e && e === ends[i + 1])) g.repeated++;
   if ((r.citedTitles?.length ?? 0) > 0 || /\[\d+\]/.test(r.answer ?? "")) g.cited++;
   for (const c of r.reasonCodes ?? []) {
     if (c.startsWith("citations:added-")) g.added += c.replace("citations:added-", "").split("-").length;
@@ -35,10 +38,13 @@ for (const f of existsSync(join(base, "runs")) ? readdirSync(join(base, "runs"))
 for (const f of existsSync(join(base, "s32")) ? readdirSync(join(base, "s32")) : []) {
   for (const r of readFileSync(join(base, "s32", f), "utf8").trim().split("\n").filter(Boolean).map((l) => normalizeRow(JSON.parse(l)))) add(`${model(f)} · s32`, r);
 }
+for (const f of existsSync(join(base, "pt")) ? readdirSync(join(base, "pt")) : []) {
+  for (const r of readFileSync(join(base, "pt", f), "utf8").trim().split("\n").filter(Boolean).map((l) => normalizeRow(JSON.parse(l)))) add(`4B · ${f.replace(".jsonl", "")} (packs)`, r);
+}
 const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}% (${a}/${b})` : "–");
 const L = [`# CIT-1: citations and context size, ${label}`, "", "Answers with a citation ([n] in the text or done.cited), citations the engine added/removed after generation, and the mean retrieved context before → after compression (tokens, from the context:<before>-><after> reason code; answers without it, e.g. fixed or extractive ones, are not in the mean).", ""];
-L.push("| Model · set | Answers | With a citation | [n] added | [n] removed | Mean context tokens before → after (answers) |", "|---|---|---|---|---|---|");
-for (const [k, g] of Object.entries(groups).sort()) L.push(`| ${k} | ${g.n} | ${pct(g.cited, g.n)} | ${g.added} | ${g.removed} | ${g.ctxN ? `${Math.round(g.before / g.ctxN)} → ${Math.round(g.after / g.ctxN)} (${g.ctxN})` : "–"} |`);
+L.push("| Model · set | Answers | With a citation | [n] added | [n] removed | Same [n] repeated (CIT-2) | Mean context tokens before → after (answers) |", "|---|---|---|---|---|---|---|");
+for (const [k, g] of Object.entries(groups).sort()) L.push(`| ${k} | ${g.n} | ${pct(g.cited, g.n)} | ${g.added} | ${g.removed} | ${g.repeated} | ${g.ctxN ? `${Math.round(g.before / g.ctxN)} → ${Math.round(g.after / g.ctxN)} (${g.ctxN})` : "–"} |`);
 L.push("", `Regenerate with \`node eval/scripts/cit1-report.mjs ${label}\`.`, "");
 writeFileSync(join(EVAL_DIR, "reports", `cit1-${label}.md`), L.join("\n"));
 console.log(L.join("\n"));
