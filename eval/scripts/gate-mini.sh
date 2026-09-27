@@ -128,6 +128,14 @@ for m in $MODELS; do for s in $SEEDS; do
 done; done
 $SUG_LINES
 if [ $HAS_PLACES = 1 ]; then for m in $MODELS; do run --model \$m --seed 1 --dataset places --places \$WP,\$BER --out \$O/places__\${m}.jsonl; done; fi
+# Tile path ("I'm going to X"): the Berlin 1x1 tile + world-places, no city pack, when the gazetteer hosts it.
+TILE_INFO=\$(node eval/scripts/tile-info.mjs \$WP t-N52E013)
+if [ $HAS_PLACES = 1 ] && [ -n "\$TILE_INFO" ]; then
+  TSHA=\${TILE_INFO%% *}; TURL=\${TILE_INFO#* }; TILE=\$PIN/\$TSHA/t-N52E013.sqlite
+  [ -f \$TILE ] || { mkdir -p \$(dirname \$TILE) && curl -sSfL -o \$TILE.part "\$TURL" && mv \$TILE.part \$TILE; }
+  echo "\$TSHA  \$TILE" | shasum -a 256 -c - || exit 3
+  for m in $MODELS; do run --model \$m --seed 1 --dataset places --places \$WP,\$TILE --out \$O/places-tile__\${m}.jsonl; done
+elif [ $HAS_PLACES = 1 ]; then echo "tile path: SKIP (gazetteer without a hosted t-N52E013 in its tile index)"; fi
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -145,7 +153,7 @@ if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run -
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
-ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror" || true
+ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RUNFAIL|OK$|FAILED|rror|SKIP" || true
 
 OUT="$ROOT/eval/results/gates/$LABEL"
 mkdir -p "$OUT/runs"
@@ -167,6 +175,9 @@ N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + $(grep -c
 N_PLACES=$(( HAS_PLACES * N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.places.jsonl") ))
 EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG + N_PLACES))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
+N_TILE=$(cat "$OUT"/runs/places-tile__*.jsonl 2>/dev/null | grep -c . || true)
+GOT=$((GOT - N_TILE))  # tile rows exist only when the gazetteer hosts the tile; they are graded, not counted
+[ "$N_TILE" -gt 0 ] && echo "tile path: $N_TILE rows" || echo "tile path: not run (no hosted tile in the gazetteer)"
 echo "rows: $GOT / $EXPECTED expected"
 if [ "$RC" -ne 0 ]; then echo "GATE FAIL: eval/reports/regression-gate-$LABEL.md"; exit 1; fi
 if [ "$GOT" -lt "$EXPECTED" ] || [ "$HAS_PACK" = 0 ]; then echo "GATE INCOMPLETE (missing rows or tree without src/rag/wikiPack.ts: merge feat/knowledge first)"; exit 2; fi
