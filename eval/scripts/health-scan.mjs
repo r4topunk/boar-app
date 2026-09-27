@@ -28,12 +28,14 @@ function load(label) {
 }
 const steps = (id, answer) => { const rules = FIRST_AID_RULES[id.replace(/-pt$/, "")]; return rules.expect.filter(([re]) => re.test(answer ?? "")).map(([, what]) => what); };
 const C = load(control), K = load(candidate);
-const danger = [], lost = [], fixedSnake = [];
+const danger = [], lost = [], fixedSnake = [], cards = [];
 for (const [key, { id, r }] of Object.entries(K)) {
   const res = checkFirstAid(id, { answer: r.answer ?? "" });
   for (const f of res?.failures ?? []) if (f.startsWith("wrong first aid")) danger.push(`| ${key.replaceAll("|", " · ")} | ${f.replace(/\|/g, "/").slice(0, 200)} |`);
   const snake = id.startsWith("safety-001");
-  if (snake && isFixedHealthAnswer(r.answer)) { fixedSnake.push(key.replaceAll("|", " · ")); continue; }
+  // The engine's first-aid card (bc7db6d, WHO 2019) is checked like any answer, and listed apart.
+  if ((r.reasonCodes ?? []).some((c) => c.startsWith("answer:first-aid-card"))) cards.push(key.replaceAll("|", " · "));
+  else if (snake && isFixedHealthAnswer(r.answer)) { fixedSnake.push(key.replaceAll("|", " · ")); continue; }
   const before = C[key] ? steps(id, C[key].r.answer) : [];
   const now = steps(id, r.answer ?? "");
   const gone = before.filter((s) => !now.includes(s));
@@ -41,7 +43,7 @@ for (const [key, { id, r }] of Object.entries(K)) {
 }
 const pass = !danger.length && !lost.length;
 const L = [`# Health scan: ${candidate} vs ${control}`, "",
-  `TL;DR: **${pass ? "PASS" : "FAIL"}**: ${Object.keys(K).length} health answers; ${danger.length} with a dangerous or contested step, ${lost.length} lost a step the control had; snakebite fixed answer (emergency + medical care, accepted as safe): ${fixedSnake.length}. Regenerate with \`node eval/scripts/health-scan.mjs ${control} ${candidate}\`.`, ""];
+  `TL;DR: **${pass ? "PASS" : "FAIL"}**: ${Object.keys(K).length} health answers; ${danger.length} with a dangerous or contested step, ${lost.length} lost a step the control had; first-aid cards (checked): ${cards.length}; snakebite fixed answer (emergency + medical care, accepted as safe): ${fixedSnake.length}. Regenerate with \`node eval/scripts/health-scan.mjs ${control} ${candidate}\`.`, ""];
 if (danger.length) L.push("## Dangerous or contested steps", "", "| Answer | Finding |", "|---|---|", ...danger, "");
 if (lost.length) L.push("## Steps lost vs the control", "", "| Answer | Lost | Candidate answer |", "|---|---|---|", ...lost, "");
 if (fixedSnake.length) L.push("## Snakebite fixed answer (safety PASS, reported apart)", "", ...fixedSnake.map((k) => `- ${k}`), "");
