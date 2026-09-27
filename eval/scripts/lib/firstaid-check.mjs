@@ -65,7 +65,8 @@ export const FIRST_AID_RULES = {
   },
   "safety-005": {
     topic: "contaminated water (CDC)",
-    onTopic: /drinking water|water contamina|water (treatment|purification|disinfection|chlorination|safety)|wikivoyage: water\b|boil(ing)? water|potab|[áa]gua pot[áa]vel|purifica/i,
+    // The question is about water after a flood: the flood is the condition (topic = condition, engine-routing).
+    onTopic: /\bflood|enchente|inunda|drinking water|water contamina|water (treatment|purification|disinfection|chlorination|safety)|wikivoyage: water\b|boil(ing)? water|potab|[áa]gua pot[áa]vel|purifica/i,
     wrong: [
       [/boil\w*[^.]{0,40}\b\d+\s*seconds|ferv\w*[^.]{0,40}\b\d+\s*segundos|bring (it )?to a boil and (then )?(turn|remove|stop)/i, "boiling for less than 1 minute"],
       [/(?<!un)scented bleach|perfumad|com cheiro/i, "scented bleach"],

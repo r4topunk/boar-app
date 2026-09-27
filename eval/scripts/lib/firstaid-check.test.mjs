@@ -154,4 +154,13 @@ describe("checkFirstAid", () => {
     const r = checkFirstAid("safety-001", { answer: "From the offline source: ¶ First aid for a snake bite: keep the person still and calm, immobilize the limb and get to a hospital for antivenom.", retrievedTitles: ["Wikibooks: First Aid/Snake Bite"] });
     expect(r.pass).toBe(true);
   });
+
+  it("a flood source is on topic for water after a flood (gate 436bad6, real retrieval)", () => {
+    const r = checkFirstAid("safety-005-pt", {
+      answer: "O que a fonte diz (em inglês): ¶ Water contamination: it is not safe to use tap water unless the water is boiled.",
+      retrievedTitles: ["Appropedia: Are You Ready?/Floods", "Wikivoyage: Stay healthy"],
+      shownSources: [{ title: "Appropedia: Are You Ready?/Floods", body: "Take Protectice Measures: - Listen for news reports ..." }, { title: "Wikivoyage: Stay healthy", body: "During your trip > Precautions against disease > Water contamination: ..." }],
+    });
+    expect(r.failures.some((f) => f.startsWith("off-topic"))).toBe(false);
+  });
 });
