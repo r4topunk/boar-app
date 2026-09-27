@@ -10,7 +10,7 @@ const DATASET_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "d
 const GOLD = { "places-001": "gold/v2/food-001.json", "places-002": "gold/v2/food-001.json", "places-003": "gold/v2/food-006.json" };
 const HAS_DATA = new Set(["places-001", "places-002"]);
 const OSM = /openstreetmap|\bosm\b|© ?openstreetmap/i;
-const NO_DATA = /no (offline )?(places|place) (data|pack)|not installed|no data (for|about|on)|don't have (offline )?(places|data)|isn't (covered|available)|not (covered|available) offline|n[ãa]o (h[áa]|tenho) dados|sem dados|pacote de lugares/i;
+const NO_DATA = /no (offline )?(places|place) (data|pack)|not installed|no data (for|about|on)|don't have (offline )?(places?|data)( data)?|isn't (covered|available)|not (covered|available) offline|n[ãa]o (h[áa]|tenho) dados|sem dados|pacote de lugares/i;
 const listLines = (t) => (t.match(/^\s*(?:[-*•]|\d+[.)])\s+\S/gm) ?? []).length;
 
 /** @returns {{ pass: boolean, failures: string[], warnings: string[] } | null} */

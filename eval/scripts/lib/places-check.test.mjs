@@ -17,4 +17,8 @@ describe("checkPlaces", () => {
   it("ignores other items", () => {
     expect(checkPlaces({ queryId: "safety-001", answer: "x" })).toBeNull();
   });
+
+  it("accepts the app's wording for a city without data (gate e39ce96)", () => {
+    expect(checkPlaces({ queryId: "places-003", answer: "I don't have offline place data for Tokyo, so I won't list any restaurants rather than guess." }).pass).toBe(true);
+  });
 });
