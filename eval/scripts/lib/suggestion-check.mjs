@@ -19,7 +19,7 @@ export const SUGGESTION_TOPICS = {
 
 // RF-1 (answered with a cited source on every model) is a registered target until the engine fix ("plate" root and
 // [n] attribution by support, Tusk); flip to true when it lands to make it blocking (Boar, 2026-09-27, after 21bab42).
-export const RF1_BLOCKING = false;
+export const RF1_BLOCKING = true; // engine fix delivered in fix/pt1-lexicon-names deedc8d (gate ea21e82)
 
 /** Row id for a suggestion: sug-<slug of the English text>-<lang>. */
 export const suggestionId = (en, lang) => `sug-${slug(en)}-${lang}`;

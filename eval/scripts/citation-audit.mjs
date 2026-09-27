@@ -87,12 +87,12 @@ async function supported(claim, source) {
 }
 
 const byCfg = {};
-const examples = { unsupported: [], removedSupported: [] };
+const examples = { unsupported: [], removedSupported: [], addedUnsupported: [] };
 for (const f of files) {
   const cfg = basename(f, ".jsonl").replace(/__seed\d+$/, "");
   for (const r of readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
     if (!r.shownSources) continue; // runs without the audit fields
-    const c = (byCfg[cfg] ??= { answers: 0, cited: 0, unsupported: 0, badIndex: 0, raw: 0, removed: 0, removedSupported: 0 });
+    const c = (byCfg[cfg] ??= { answers: 0, cited: 0, unsupported: 0, badIndex: 0, raw: 0, removed: 0, removedSupported: 0, added: 0, addedUnsupported: 0 });
     c.answers++;
     const final = citedSentences(r.answer);
     for (const { claim, refs } of final) for (const k of refs) {
@@ -101,6 +101,19 @@ for (const f of files) {
       if (!src) { c.badIndex++; c.unsupported++; continue; }
       const p = await supported(claim, `${src.title}\n${src.body}`);
       if (p < 0.5) { c.unsupported++; if (examples.unsupported.length < 8) examples.unsupported.push({ cfg, q: r.queryId, claim, src: src.title, p }); }
+    }
+    // Citations the engine attributed after generation (engine-routing 40ef8a2: reason code citations:added-<k>-<k>…):
+    // each sentence citing an added index must be supported by that source, or the attribution sourced a false claim.
+    const addedCode = (r.reasonCodes ?? []).find((x) => x.startsWith("citations:added-"));
+    if (addedCode) {
+      const addedIdx = new Set(addedCode.replace("citations:added-", "").split("-").map(Number));
+      for (const { claim, refs } of final) for (const k of refs) {
+        if (!addedIdx.has(k)) continue;
+        c.added++;
+        const src = r.shownSources[k - 1];
+        const p = src ? await supported(claim, `${src.title}\n${src.body}`) : 0;
+        if (p < 0.5) { c.addedUnsupported++; if (examples.addedUnsupported.length < 8) examples.addedUnsupported.push({ cfg, q: r.queryId, claim, src: src?.title ?? "(missing)", p }); }
+      }
     }
     if (!r.modelText || !r.promptSources) continue;
     const finalPairs = final.flatMap(({ claim, refs }) => refs.map((k) => ({ claim, title: r.shownSources[k - 1]?.title })));
@@ -120,14 +133,14 @@ for (const f of files) {
 const pct = (x, n) => (n ? `${Math.round((100 * x) / n)}% (${x}/${n})` : "–");
 const L = [`# Citation audit: ${name}`, ""];
 L.push("TL;DR: support of every [n] in the shown answers, and what post-processing removed. Judge: Jev (another model family), p(supported) < 0.5 = unsupported. Regenerate with `node eval/scripts/citation-audit.mjs " + a.join(" ") + "` (cached, no new cost).", "");
-L.push("| Configuration | Answers | Citations shown | Unsupported | Index out of range | Citations in model text | Removed by post-processing | Removed but supported (false positive) |", "|---|---|---|---|---|---|---|---|");
-const T = { answers: 0, cited: 0, unsupported: 0, badIndex: 0, raw: 0, removed: 0, removedSupported: 0 };
+L.push("| Configuration | Answers | Citations shown | Unsupported | Index out of range | Citations in model text | Removed by post-processing | Removed but supported (false positive) | Added by attribution | Added but unsupported |", "|---|---|---|---|---|---|---|---|---|---|");
+const T = { answers: 0, cited: 0, unsupported: 0, badIndex: 0, raw: 0, removed: 0, removedSupported: 0, added: 0, addedUnsupported: 0 };
 for (const [cfg, c] of Object.entries(byCfg)) {
   for (const k of Object.keys(T)) T[k] += c[k];
-  L.push(`| ${cfg} | ${c.answers} | ${c.cited} | ${pct(c.unsupported, c.cited)} | ${c.badIndex} | ${c.raw} | ${pct(c.removed, c.raw)} | ${pct(c.removedSupported, c.removed)} |`);
+  L.push(`| ${cfg} | ${c.answers} | ${c.cited} | ${pct(c.unsupported, c.cited)} | ${c.badIndex} | ${c.raw} | ${pct(c.removed, c.raw)} | ${pct(c.removedSupported, c.removed)} | ${c.added} | ${pct(c.addedUnsupported, c.added)} |`);
 }
-L.push(`| **All** | ${T.answers} | ${T.cited} | ${pct(T.unsupported, T.cited)} | ${T.badIndex} | ${T.raw} | ${pct(T.removed, T.raw)} | ${pct(T.removedSupported, T.removed)} |`, "");
-for (const [title, xs] of [["Unsupported citations (sample)", examples.unsupported], ["Removed although supported (sample)", examples.removedSupported]]) {
+L.push(`| **All** | ${T.answers} | ${T.cited} | ${pct(T.unsupported, T.cited)} | ${T.badIndex} | ${T.raw} | ${pct(T.removed, T.raw)} | ${pct(T.removedSupported, T.removed)} | ${T.added} | ${pct(T.addedUnsupported, T.added)} |`, "");
+for (const [title, xs] of [["Unsupported citations (sample)", examples.unsupported], ["Removed although supported (sample)", examples.removedSupported], ["Added by attribution but unsupported (sample)", examples.addedUnsupported]]) {
   L.push(`## ${title}`, "");
   for (const x of xs) L.push(`- ${x.cfg} · ${x.q} · p=${x.p.toFixed(2)} · source "${x.src}": ${x.claim.slice(0, 200)}`);
   L.push("");
