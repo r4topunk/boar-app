@@ -654,7 +654,8 @@ async function main() {
         const declined = warnings.find((w) => w.declined);
         app = {
           text: res.text || (declined?.message ?? ""),
-          declined: !!declined && !res.text,
+          // a11d730: the decline also arrives as the answer text (finalText no longer ''); it is still a decline.
+          declined: !!declined && (!res.text || res.text.trim() === (declined.message ?? "").trim()),
           warnings, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title),
           reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs,
           // Citation audit: the model's own text before any post-processing, the sources in its prompt, and the shown ones.
