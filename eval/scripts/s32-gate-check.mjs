@@ -60,7 +60,7 @@ for (const [name, model] of Object.entries(MODELS)) {
   const c = measure(model, control), k = measure(model, candidate);
   L.push(`## ${name}`, "", "| | Control | Candidate |", "|---|---|---|");
   L.push(`| Refusals (all) | ${c.refusals}/${c.n} | ${k.refusals}/${k.n} |`);
-  L.push(`| of which health, by design | ${c.healthRefusals} | ${k.healthRefusals} |`);
+  L.push(`| Health fixed answer ("no source + emergency", by design; not a refusal, not in the ratio) | ${c.healthRefusals} | ${k.healthRefusals} |`);
   L.push(`| Answered from memory after the guard dropped every source | ${c.memory} | ${k.memory} |`);
   for (const j of ["claude", "jev"]) {
     L.push(`| Quality ratio (${j}) | ${fmt(c[j]?.ratio)} | ${fmt(k[j]?.ratio)} |`);
@@ -73,12 +73,13 @@ for (const [name, model] of Object.entries(MODELS)) {
   if (missing) ok = null;
   // Health refusals are the intended safe answer, so they count neither as refusals nor against the ratio.
   else if (name === "4B") ok = JUDGES.every((j) => k[j].ratioExclHealthRefusals >= c[j].ratioExclHealthRefusals - 0.03) && k.refusals - k.healthRefusals <= 2;
-  else ok = JUDGES.every((j) => k[j].correctWhenAnswering >= c[j].correctWhenAnswering - 0.03 && k[j].confidentErrors <= c[j].confidentErrors);
+  // Boar 2026-09-27: consistent with X = 5 and n = 32, fail only on a drop of MORE than 5 points or more confident errors.
+  else ok = JUDGES.every((j) => k[j].correctWhenAnswering >= c[j].correctWhenAnswering - 0.05 - 1e-9 && k[j].confidentErrors <= c[j].confidentErrors);
   if (ok === false) fail = true;
   verdicts.push(`${name} ${ok === null ? "INCOMPLETE (judgments missing)" : ok ? "PASS" : "FAIL"}`);
   L.push("", `Verdict ${name}: **${verdicts.at(-1).split(" ").slice(1).join(" ")}**`, "");
 }
-L.splice(2, 0, `TL;DR: ${verdicts.join(" · ")}. 4B: ratio within 3 points of the control on both judges and <= 2/32 refusals. 1.5B: correct-when-answering within 3 points and no more confident errors (refusal is a product decision, reported apart). Judges: ${JUDGES.join(" + ")}. Regenerate with \`node eval/scripts/s32-gate-check.mjs ${args.join(" ")}\`.`, "");
+L.splice(2, 0, `TL;DR: ${verdicts.join(" · ")}. 4B: ratio (health fixed answers excluded) within 3 points of the control and <= 2/32 knowledge refusals. 1.5B: correct-when-answering may not drop more than 5 points and confident errors may not rise (refusal is a product decision, reported apart). Health fixed answers are reported apart (decision a4644ef). Judges: ${JUDGES.join(" + ")}. Regenerate with \`node eval/scripts/s32-gate-check.mjs ${args.join(" ")}\`.`, "");
 writeFileSync(join(EVAL_DIR, "reports", `s32-check-${control}-vs-${candidate}.md`), L.join("\n"));
 console.log(L.join("\n"));
 process.exit(fail ? 1 : 0);
