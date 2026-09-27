@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The Compacto (1.5B) in PT (Boar, 20e8c65): its answers to the 41 PT v2 items (gate results/gates/<label>/pt-compact),
-// judged by Jev against the reference. Confident error = an answer (not a refusal/decline) with correctness <= 2.
+// judged by Jev against the reference. Confident error = a model answer (not a refusal, not a health excerpt or fixed answer) with correctness <= 2.
 // Blocks above the fixed ceiling of 10 (the s32 ceiling); reports the uncited answers ("sem fonte citada") too.
 // Usage (from eval/): node scripts/pt-compact-check.mjs <label> [<label> ...]   (the last one is judged for the verdict)
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,9 +29,14 @@ function measure(label) {
   }
   const judged = Object.entries(by).filter(([, o]) => o.boarA && o.boarB).map(([q, o]) => ({ q, c: combineOrders(o.boarA.mapped, o.boarB.mapped).boar.correctness }));
   const refused = (q) => rows[q]?.declined || REFUSAL.test(rows[q]?.answer ?? "");
-  const answered = judged.filter((x) => !refused(x.q));
+  // Only what the model wrote counts (decision a4644ef on s32): a health excerpt, the health fixed answer and an
+  // extractive passage are the engine's, not the Compacto's, and are reported apart.
+  const codes = (q) => rows[q]?.reasonCodes ?? [];
+  const engineOnly = (q) => codes(q).some((c) => /^grounding:health-(extractive|no-source)$|^instant:final$/.test(c));
+  const answered = judged.filter((x) => !refused(x.q) && !engineOnly(x.q));
+  const engine = judged.filter((x) => !refused(x.q) && engineOnly(x.q)).length;
   const uncited = Object.values(rows).filter((r) => !refused(r.queryId) && !(r.citedTitles?.length) && (r.reasonCodes ?? []).some((c) => c.startsWith("grounding:uncited"))).length;
-  return { n: judged.length, refusals: judged.length - answered.length, answered: answered.length, correct: answered.filter((x) => x.c >= 4).length, errors: answered.filter((x) => x.c <= 2).map((x) => x.q), uncited };
+  return { n: judged.length, engine, refusals: judged.length - answered.length - engine, answered: answered.length, correct: answered.filter((x) => x.c >= 4).length, errors: answered.filter((x) => x.c <= 2).map((x) => x.q), uncited };
 }
 
 const res = labels.map((l) => [l, measure(l)]);
@@ -39,8 +44,8 @@ const last = res.at(-1)[1];
 const pass = last && last.errors.length <= CEILING;
 const L = [`# Compacto (1.5B) in PT: ${labels.join(" vs ")}`, "",
   `TL;DR: **${!last ? "NOT RUN" : pass ? "PASS" : "FAIL"}**: ${labels.at(-1)} has ${last?.errors.length ?? "?"} confident errors in PT (fixed ceiling ${CEILING}). Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with \`node eval/scripts/pt-compact-check.mjs ${labels.join(" ")}\`.`, "",
-  "| Gate | Judged | Refusals | Answered | Correct when answering | Confident errors | Answered without a cited source |", "|---|---|---|---|---|---|---|"];
-for (const [l, m] of res) L.push(m ? `| ${l} | ${m.n} | ${m.refusals} | ${m.answered} | ${m.answered ? Math.round((100 * m.correct) / m.answered) : 0}% | **${m.errors.length}** | ${m.uncited} |` : `| ${l} | not run | | | | | |`);
+  "| Gate | Judged | Refusals | Engine answers (excerpt / fixed, not counted) | Model answers | Correct when answering | Confident errors | Answered without a cited source |", "|---|---|---|---|---|---|---|---|"];
+for (const [l, m] of res) L.push(m ? `| ${l} | ${m.n} | ${m.refusals} | ${m.engine} | ${m.answered} | ${m.answered ? Math.round((100 * m.correct) / m.answered) : 0}% | **${m.errors.length}** | ${m.uncited} |` : `| ${l} | not run | | | | | | |`);
 L.push("", ...res.filter(([, m]) => m).map(([l, m]) => `- ${l} confident errors: ${m.errors.join(", ") || "none"}`), "");
 writeFileSync(join(EVAL_DIR, "reports", `pt-compact-${labels.join("-vs-")}.md`), L.join("\n"));
 console.log(L.join("\n"));
