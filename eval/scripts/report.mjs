@@ -155,16 +155,20 @@ lines.push("|---|" + RUBRIC.map(() => "---").join("|") + "|");
 for (const r of rows.filter((r) => r.judged)) lines.push(`| ${r.label} | ` + RUBRIC.map(([k]) => `${fmt(r.judged.rubricBoar[k])} / ${fmt(r.judged.rubricRef[k])}`).join(" | ") + " |");
 lines.push("");
 
-lines.push("## Per category (win score)", "");
+lines.push("## Per category (correct answers · quality ratio)", "");
 const cats = [...new Set(rows.flatMap((r) => r.pairs.map((p) => p.category)))].sort();
 lines.push("| System | " + cats.join(" | ") + " |", "|---|" + cats.map(() => "---").join("|") + "|");
+const rubricMean = (s) => RUBRIC.reduce((a, [k]) => a + s[k], 0) / RUBRIC.length;
 for (const r of rows.filter((r) => r.judged)) {
   lines.push(`| ${r.label} | ` + cats.map((c) => {
     const ps = r.pairs.filter((p) => p.category === c);
-    return ps.length ? fmt(ps.reduce((a, p) => a + (p.winner === "boar" ? 1 : p.winner === "tie" ? 0.5 : 0), 0) / ps.length) : "–";
+    if (!ps.length) return "–";
+    const correct = ps.filter((p) => p.boar.correctness >= 4).length / ps.length;
+    const ratio = ps.reduce((a, p) => a + rubricMean(p.boar), 0) / ps.reduce((a, p) => a + rubricMean(p.ref), 0);
+    return `${pct(correct)} · ${fmt(ratio)}`;
   }).join(" | ") + " |");
 }
-lines.push("");
+lines.push("", "Win scores per category are omitted: the reference wins almost every pair, so they are all near 0.", "");
 
 lines.push("## Judge calibration", "", calibText, "");
 
@@ -180,6 +184,7 @@ lines.push(rows.some((r) => r.jev)
   : "- **Judge and reference are the same family (Claude).** Self-preference bias would favor the reference, so BOAR's ratio is, if anything, understated.");
 lines.push("- Author notes in the dataset guide the judge; they can be incomplete or outdated for time-sensitive facts.");
 lines.push("- Desktop latency (Apple M4, Metal) is not phone latency; device numbers come from `scripts/eval-device.mjs`.");
+if (dataset === "v1") lines.push("- KB hit is 0% by design in v1: no question may target the corpus bundled with the app (dataset README, Exclusions), so v1 measures answers from the model plus whatever the bundled corpus happens to cover.");
 const busy = rows.filter((r) => r.maxLoad > 8);
 if (busy.length) lines.push(`- The host was busy during some runs (1-min load average up to ${fmt(Math.max(...busy.map((r) => r.maxLoad)), 1)}): ${busy.map((r) => r.label).join(", ")}. Latency may be inflated.`);
 lines.push("");
