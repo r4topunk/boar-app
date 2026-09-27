@@ -75,6 +75,7 @@ import type { GenerateOptions, GenerationTimings, LoadResult } from "../inferenc
 import type { MemoryFit } from "../inference/memoryFit";
 import type { AnswerSettings } from "../models/settings";
 import type { ResearchOptions, ResearchProgress, ResearchResult } from "../services/orchestrator";
+import { bootMark } from "../services/bootMarks";
 
 export interface InstalledLlm {
   id: string;
@@ -478,7 +479,9 @@ export function createAnswerer(deps: AnswerDeps) {
           : detectGeoIntent(req.query);
       if (geoIntent) return runGeo(geoIntent as GeoIntent, t0, markVisible, () => firstVisibleAt);
 
+      bootMark("answer:start");
       const { settings, installed, speeds, fastLlm, lowRamNote, lowRamBlocked } = await selectAnswerModel(deps);
+      bootMark("answer:model-selected");
       const byId = new Map(installed.map((m) => [m.id, m]));
       const toDepth = (m: InstalledLlm, fit?: MemoryFit | null): DepthModel => ({
         id: m.id,
@@ -549,6 +552,7 @@ export function createAnswerer(deps: AnswerDeps) {
         r: AnswerReceipt,
         error?: { code: AnswerErrorCode; message: string }
       ): AnswerResult => {
+        bootMark(`answer:done ttftMs=${Math.round(r.ttftMs)} retrievalMs=${Math.round(r.retrievalMs ?? -1)} loadMs=${Math.round(r.loadMs ?? -1)} prefillMs=${Math.round(r.prefillMs ?? -1)} ctxTokens=${r.ctxTokens ?? -1}`);
         emit({ type: "done", answerId, tier, outcome, receipt: r, error, ...(finalText !== undefined ? { finalText } : {}) });
         return { answerId, tier, outcome, text, sources, receipt: r };
       };
@@ -567,11 +571,13 @@ export function createAnswerer(deps: AnswerDeps) {
       if (plan.retrieve && gen?.mode !== "multipass") {
         stage("retrieving", plan.instant !== "off" ? "instant" : genTier);
         const rs = deps.now();
+        bootMark("answer:retrieve:start");
         raw = await deps.retrieve(searchQuery, gen?.retrieveK ?? 6).catch((e) => {
           console.warn("[answer] retrieval failed, answering without sources:", e?.message ?? e);
           return [] as RetrievedChunk[];
         });
         retrievalMs = deps.now() - rs;
+        bootMark(`answer:retrieve:end n=${raw.length}`);
       }
       if (stopRequested) return finish(genTier, "stopped", "", [], receipt({ retrievalMs }));
 
@@ -717,7 +723,9 @@ export function createAnswerer(deps: AnswerDeps) {
         stage("loading_model", tier, m.id);
         const ls = deps.now();
         try {
+          bootMark("answer:load:start");
           const r = await deps.engine.load(m.filename, { meta: { modelId: m.id, label: m.label } });
+          bootMark("answer:load:end");
           loadMs += deps.now() - ls;
           if (r.warning) emit({ type: "warning", answerId, code: "model_streams_from_storage", message: r.warning });
           if (r.backend?.kind === "cpu-fallback") reasonCodes.push("backend:cpu-fallback");

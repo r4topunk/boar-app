@@ -16,6 +16,7 @@ import { BackendInfo, cpuDeviceNames, initWithCpuFallback } from "./initFallback
 import type { LoadGuard, LoadMeta } from "./loadMarker";
 import { classifyLoadFailure, ModelLoadError } from "./loadError";
 import { loadGuard as appLoadGuard } from "./loadGuard";
+import { bootMark } from "../services/bootMarks";
 
 export { contextSizeForRam };
 
@@ -234,6 +235,7 @@ export class LlamaEngine {
     let loadedOk = false;
     try {
       const onProgress = opts?.onProgress;
+      bootMark("llm.initLlama:start");
       const loaded = await initWithCpuFallback(
         onProgress ? (p) => initLlama(p, (pct: number) => onProgress(Math.min(1, Math.max(0, pct / 100)))) : initLlama,
         {
@@ -247,6 +249,7 @@ export class LlamaEngine {
         { platform: Platform.OS, cpuDevices: () => cpuDeviceNames(getBackendDevicesInfo), log: (m) => console.warn(m) }
       );
       this.context = loaded.context;
+      bootMark("llm.initLlama:end");
       backend = loaded.backend;
       this.modelInfo = { filename: modelFilename, nCtx, nThreads, backend };
       this.loadedMeta = meta;

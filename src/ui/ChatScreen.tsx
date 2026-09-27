@@ -68,6 +68,7 @@ import { placesForCopy, sourceName } from "./chat/placesFormat";
 import { locate } from "./chat/locationApi";
 import { suggestionsFor } from "./chat/suggestions";
 import { installedKnowledgeIds } from "./chat/knowledgeApi";
+import { bootMark } from "../services/bootMarks";
 
 const VERBATIM_MESSAGE_COUNT = 6;
 
@@ -249,6 +250,7 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
       // Both loads start here, before any question: the search's query vector waits in the embedder's queue
       // behind its own load, and answer() waits for the model's (Tusk). No model can run (null): no preload;
       // answer() says no_model.
+      bootMark("chat.loads:dispatch");
       const loads = Promise.all([
         llm
           ? llamaEngine.load(llm.filename, {
@@ -261,6 +263,7 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
         embeddingEngine.load(emb.filename),
       ]);
       setModelsRequested(true);
+      bootMark("chat.canAsk (send enabled)");
       await loads;
       startAppMemoryTracking();
       const stopProgress = onSeedProgress((p) =>
@@ -270,11 +273,13 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
         })
       );
       setIndexing(true);
+      bootMark("chat.loads:end");
       await seedKnowledgeBaseIfEmpty().finally(() => {
         stopProgress();
         setIndexing(false);
       });
       setReady(true);
+      bootMark("chat.ready");
     } catch (e: any) {
       // The native message is the one worth showing (the RAM estimate is only in the log now).
       setLoadErrorKind(e instanceof ModelLoadError ? e.kind : undefined);
@@ -388,7 +393,9 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
   const ask = useCallback(
     async (rawQuery: string) => {
       const query = rawQuery.trim();
+      bootMark(`chat.send:tap query=${!!query} active=${!!activeRef.current} canAsk=${canAsk}`);
       if (!query || activeRef.current || !canAsk) return;
+      bootMark("chat.send:accepted");
       // Claim the answer slot before the first await.
       const assistantId = `${Date.now()}-a`;
       activeRef.current = { messageId: assistantId, handle: null };
