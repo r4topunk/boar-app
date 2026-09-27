@@ -30,7 +30,11 @@ Source lines: shots/fidelity/1717835/boot-lines-long*.txt, boot-lines-ask.txt.
 | P1 | Chat usable at mount; LLM/bge load in the background. answer() already loads on demand (loads are queued, a loaded model is skipped); instant snippet and places need no model. Status "preparing the model..." without blocking the input. | Quill (ChatScreen) + Tusk | asked |
 | P2 | Seed: do not re-read and parse the JSON corpus packs when the COUNT already matches. | Bramble | proposed |
 | P3 | bge on first need (lazy); keyword search works without it. | Bramble | proposed |
-| E1 | Experiment perf/boot-cpu-devices 793c181: on iOS, an init with no GPU layers starts with devices ["CPU"] (no Metal init). Moves bge from Metal to CPU. | Tusk | Harbor measuring (sim: 2 cold boots + 1 answer) |
-| E2 | iPhone 13 (Harbor, next day): CPU x GPU for the 1.5B and the 4B: ttft, tok/s, 1st-init time, and bge embed time. If the GPU is much faster, the fix is Metal with a precompiled library (build without GGML_METAL_EMBED_LIBRARY) instead of CPU. | Harbor + Tusk | planned |
+| E1 | Experiment perf/boot-cpu-devices 793c181: on iOS, an init with no GPU layers starts with devices ["CPU"]. | Tusk | **Discarded**: 1st init still 23.1 / 21.8 s. llama.rn starts the Metal backend on the first load whatever device is asked. Only a precompiled Metal library removes it (native build, Harbor, after the UI sprint). |
+| E2 | iPhone 13 (Harbor, next day): CPU arm perf/boot-marks 983d895 (n_gpu_layers 0, as integration) x GPU arm perf/boot-gpu 78fac89 (n_gpu_layers 99). Per arm: 1 cold + 1 warm boot, 2 answers (1.5B); 4B on GPU if time. One "[answer] ttftMs retrievalMs loadMs prefillMs ctxTokens cachedTokens tokPerSec totalMs" line per answer. | Harbor + Tusk | planned |
 
 Decision rule for E1/E2: adopt CPU-only if ttft and tok/s don't get worse than on Metal; otherwise precompiled Metal (E2).
+
+## TTFT (simulator, 793c181, warm, 1.5B)
+
+The card: Search 0 s, Context 346 tokens, First token 10 s, 26.1 tok/s: the time to the first word is nearly all prefill (~35 tokens/s on the simulator's CPU, 4 threads), and it repeats on every question (not a first-use cost). E2 decides between the GPU (if it speeds up prefill) and a smaller fast-tier context budget (only after an s32 run).
