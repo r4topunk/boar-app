@@ -15,9 +15,9 @@ const groups = {};
 const add = (key, r) => {
   const g = (groups[key] ??= { n: 0, cited: 0, added: 0, removed: 0, ctxN: 0, before: 0, after: 0, repeated: 0 });
   g.n++;
-  // CIT-2: the same [n] twice in a row ("[1][1]") or closing two consecutive sentences ("... [1]. ... [1].").
-  const ends = String(r.answer ?? "").split(/(?<=[.!?])\s+/).map((x) => x.match(/\[(\d+)\]\W*$/)?.[1] ?? null);
-  if (/\[(\d+)\]\s*\[\1\]/.test(r.answer ?? "") || ends.some((e, i) => e && e === ends[i + 1])) g.repeated++;
+  // CIT-2 (Prism, engine 4073be1): the same [n] twice around one sentence end ("… Zone [1]. [1]", "… [1] [1].").
+  // The same source closing consecutive sentences is legitimate and not counted.
+  if (/\[(\d+)\][ \t]*[.!?]?[ \t]*\[\1\]/.test(r.answer ?? "")) g.repeated++;
   if ((r.citedTitles?.length ?? 0) > 0 || /\[\d+\]/.test(r.answer ?? "")) g.cited++;
   for (const c of r.reasonCodes ?? []) {
     if (c.startsWith("citations:added-")) g.added += c.replace("citations:added-", "").split("-").length;
@@ -43,7 +43,7 @@ for (const f of existsSync(join(base, "pt")) ? readdirSync(join(base, "pt")) : [
 }
 const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}% (${a}/${b})` : "–");
 const L = [`# CIT-1: citations and context size, ${label}`, "", "Answers with a citation ([n] in the text or done.cited), citations the engine added/removed after generation, and the mean retrieved context before → after compression (tokens, from the context:<before>-><after> reason code; answers without it, e.g. fixed or extractive ones, are not in the mean).", ""];
-L.push("| Model · set | Answers | With a citation | [n] added | [n] removed | Same [n] repeated (CIT-2) | Mean context tokens before → after (answers) |", "|---|---|---|---|---|---|---|");
+L.push("| Model · set | Answers | With a citation | [n] added | [n] removed | Duplicate [n] at a sentence end (CIT-2) | Mean context tokens before → after (answers) |", "|---|---|---|---|---|---|---|");
 for (const [k, g] of Object.entries(groups).sort()) L.push(`| ${k} | ${g.n} | ${pct(g.cited, g.n)} | ${g.added} | ${g.removed} | ${g.repeated} | ${g.ctxN ? `${Math.round(g.before / g.ctxN)} → ${Math.round(g.after / g.ctxN)} (${g.ctxN})` : "–"} |`);
 L.push("", `Regenerate with \`node eval/scripts/cit1-report.mjs ${label}\`.`, "");
 writeFileSync(join(EVAL_DIR, "reports", `cit1-${label}.md`), L.join("\n"));

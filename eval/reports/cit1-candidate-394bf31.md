@@ -1,4 +1,4 @@
-# CIT-1: citations and context size, candidate-531af2f
+# CIT-1: citations and context size, candidate-394bf31
 
 Answers with a citation ([n] in the text or done.cited), citations the engine added/removed after generation, and the mean retrieved context before → after compression (tokens, from the context:<before>-><after> reason code; answers without it, e.g. fixed or extractive ones, are not in the mean).
 
@@ -13,4 +13,4 @@ Answers with a citation ([n] in the text or done.cited), citations the engine ad
 | 4B · v2-en (packs) | 41 | 46% (19/41) | 5 | 8 | 0 | 857 → 357 (38) |
 | 4B · v2-pt (packs) | 41 | 24% (10/41) | 2 | 17 | 0 | 874 → 361 (38) |
 
-Regenerate with `node eval/scripts/cit1-report.mjs candidate-531af2f`.
+Regenerate with `node eval/scripts/cit1-report.mjs candidate-394bf31`.
