@@ -238,7 +238,7 @@ export class LlamaEngine {
           use_mlock: false, // avoid pinning full weights in RAM; rely on mmap streaming
           n_ctx: nCtx,
           n_threads: nThreads,
-          n_gpu_layers: 0, // CPU-only for broad device compatibility; adjust per-device
+          n_gpu_layers: 99, // PERF-1 E2 measurement arm: every layer on the GPU (Metal)
         },
         { platform: Platform.OS, cpuDevices: () => cpuDeviceNames(getBackendDevicesInfo), log: (m) => console.warn(m) }
       );
