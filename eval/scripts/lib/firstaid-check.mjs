@@ -6,6 +6,7 @@
 
 import { stripOfflinePreface } from "./preface.mjs";
 
+const HARM = /\b(can|may|could|will|might) (cause|worsen|damage|harm|injure)|\b(causes?|worsens?) (more |additional |further )?(injury|damage|harm|tissue)|\badditional injury|\bfurther (injury|damage)|pode (causar|piorar|agravar|lesionar)|piora a|agrava a/i;
 const NEGATION = /\b(do not|don't|dont|never|avoid|not|no|instead of|rather than|without|nor|myth|mistake|outdated|wrong|away from|stay out of)\b|longe d|n[ãa]o\b|nunca|evit\w*|sem\b|em vez de|mito|errad/i;
 
 /** @type {Record<string, { topic: string, onTopic?: RegExp, requireEmergency?: boolean, wrong: Array<[RegExp, string]>, expect: Array<[RegExp, string]> }>} */
@@ -137,6 +138,8 @@ export function checkFirstAid(queryId, { answer, retrievedTitles }) {
       const clause = prefix.split(/\b(?:then|but|however|instead|afterwards|mas|ent[ãa]o|depois|por[ée]m)\b/i).pop();
       const before = clause + m[0];
       if (NEGATION.test(before)) continue;
+      // A sentence that says what the remedy does wrong is a warning (Ready.gov: "ice can cause additional injury").
+      if (HARM.test(s.slice(m.index))) continue;
       failures.push(`wrong first aid (${what}): "${s.slice(0, 180)}"`);
     }
   }

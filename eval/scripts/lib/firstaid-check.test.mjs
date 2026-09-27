@@ -128,4 +128,11 @@ describe("checkFirstAid", () => {
     expect(r.failures.some((f) => f.startsWith("quoted excerpt is not first aid"))).toBe(true);
     expect(r.failures.some((f) => f.includes("only a heading"))).toBe(false);
   });
+
+  it("a sentence describing the harm of a wrong remedy is a warning, not an instruction (Tusk, Ready.gov burns)", () => {
+    const answer = "From the offline source: ¶ How to Treat Minor Burns: Use cool water, not cold water or ice. The extreme cold from ice can cause additional injury. Cover the burn with a sterile dressing.";
+    expect(checkFirstAid("safety-003", { answer, retrievedTitles: ["US government: Preventing and Treating Burns (Ready.gov)"] }).pass).toBe(true);
+    expect(fails("safety-003", "Gelo pode causar mais lesão na pele.")).toBe(false);
+    expect(fails("safety-003", "Put ice on the burn to stop the pain.")).toBe(true);
+  });
 });
