@@ -1095,6 +1095,59 @@ describe("answer(): a known-false quantum claim (gate 394bf31)", () => {
   });
 });
 
+describe("answer(): Sextant q7 (chat screen): 'O que causa o efeito estufa?'", () => {
+  const GREENHOUSE = chunk(
+    "g",
+    "Greenhouse effect",
+    "The greenhouse effect occurs when heat-trapping gases in a planet's atmosphere prevent the planet from losing heat to space, raising its surface temperature. Surface heating can happen from an internal heat source or come from an external source, such as a host star. In the case of Earth, the Sun emits shortwave radiation (sunlight) that passes through greenhouse gases to heat the Earth's surface. In response, the Earth's surface emits longwave radiation that is mostly absorbed by greenhouse gases, reducing the rate at which the Earth can cool off."
+  );
+  const screen = (events: AnswerEvent[]) => ({
+    instant: (events.find((e) => e.type === "instant") as any)?.snippet.text as string | undefined,
+    declined: (events.find((e) => e.type === "warning") as any)?.declined === true,
+    done: events.find((e) => e.type === "done") as any,
+  });
+  for (const [label, setup] of [
+    ["1.5B", () => {}],
+    ["4B", () => { f.installed = [lfm]; f.activeId = "lfm8"; }],
+  ] as const) {
+    it(`${label}: no off-topic instant snippet, and never an empty answer while the source is on topic`, async () => {
+      for (const q of ["O que causa o efeito estufa?", "What causes the greenhouse effect?"]) {
+        f = makeFake();
+        setup();
+        f.retrieved = [GREENHOUSE];
+        f.deps.englishNames = () => ["Greenhouse effect"];
+        f.deps.engine.generate = async () =>
+          q.startsWith("O que") ? "O efeito estufa é causado por gases que retêm calor na atmosfera [1]." : "Heat-trapping gases in the atmosphere prevent the planet from losing heat to space [1].";
+        const { events, result } = await collect(q);
+        const s = screen(events);
+        if (s.instant) {
+          expect(s.instant, q).not.toMatch(/Surface heating|host star/);
+          expect(s.instant, q).toMatch(/greenhouse/i);
+        }
+        expect(s.declined, q).toBe(false);
+        expect(result.text.trim().length, q).toBeGreaterThan(0);
+        expect(result.text, q).not.toMatch(/host star/);
+      }
+    });
+  }
+});
+
+describe("answer(): arithmetic before places (Sextant 3ccf7c0, v2-pt math)", () => {
+  it("mth-003-pt: the dinner bill in baht is a sum, not a restaurant search; no model, receipt 'calculator'", async () => {
+    const { events, result } = await collect("Minha conta do jantar deu 2.450 baht tailandeses e 1 dólar americano vale 36,5 baht. Quanto dá em dólares, e qual o total com 10% de gorjeta?");
+    expect(events.some((e) => e.type === "places")).toBe(false);
+    expect(f.generations).toHaveLength(0);
+    expect(result.text).toMatch(/67,12 dólares.*73,84 dólares/);
+    expect(result.receipt.modelId).toBe("calculator");
+    expect(result.receipt.reasonCodes).toContain("answer:calculator-currency");
+    expect((events.find((e) => e.type === "done") as any).cited).toEqual([]);
+  });
+  it("a restaurant question is still a places question", async () => {
+    const { result } = await collect("Quais são os melhores restaurantes veganos em Lisboa?");
+    expect(result.receipt.modelId).not.toBe("calculator");
+  });
+});
+
 describe("answer(): today's date (Prism TD-1)", () => {
   it("a question about today gets the device's date next to it; others don't", async () => {
     f.installed = [lfm];
