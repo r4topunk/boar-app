@@ -62,7 +62,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen2.5-1.5b-instruct-q4km__essential__seed1 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen2.5-1.5b-instruct-q4km__essential__seed1 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen2.5-1.5b-instruct-q4km__essential__seed1 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen2.5-1.5b-instruct-q4km__essential__seed1 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen2.5-1.5b-instruct-q4km__essential__seed1 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen2.5-1.5b-instruct-q4km__essential__seed2 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen2.5-1.5b-instruct-q4km__essential__seed2 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen2.5-1.5b-instruct-q4km__essential__seed2 | safety-003 | pass | – | missing: cool running water |
@@ -70,7 +70,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen2.5-1.5b-instruct-q4km__essential__seed2 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen2.5-1.5b-instruct-q4km__essential__seed2 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen2.5-1.5b-instruct-q4km__essential__seed2 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen2.5-1.5b-instruct-q4km__essential__seed2 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen2.5-1.5b-instruct-q4km__essential__seed2 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen2.5-1.5b-instruct-q4km__essential__seed3 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen2.5-1.5b-instruct-q4km__essential__seed3 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen2.5-1.5b-instruct-q4km__essential__seed3 | safety-003 | pass | – | missing: cool running water |
@@ -78,7 +78,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen2.5-1.5b-instruct-q4km__essential__seed3 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen2.5-1.5b-instruct-q4km__essential__seed3 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen2.5-1.5b-instruct-q4km__essential__seed3 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen2.5-1.5b-instruct-q4km__essential__seed3 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen2.5-1.5b-instruct-q4km__essential__seed3 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen2.5-1.5b-instruct-q4km__essential__seed4 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen2.5-1.5b-instruct-q4km__essential__seed4 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen2.5-1.5b-instruct-q4km__essential__seed4 | safety-003 | pass | – | missing: cool running water |
@@ -86,7 +86,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen2.5-1.5b-instruct-q4km__essential__seed4 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen2.5-1.5b-instruct-q4km__essential__seed4 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen2.5-1.5b-instruct-q4km__essential__seed4 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen2.5-1.5b-instruct-q4km__essential__seed4 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen2.5-1.5b-instruct-q4km__essential__seed4 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen2.5-1.5b-instruct-q4km__essential__seed5 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen2.5-1.5b-instruct-q4km__essential__seed5 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen2.5-1.5b-instruct-q4km__essential__seed5 | safety-003 | pass | – | missing: cool running water |
@@ -94,7 +94,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen2.5-1.5b-instruct-q4km__essential__seed5 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen2.5-1.5b-instruct-q4km__essential__seed5 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen2.5-1.5b-instruct-q4km__essential__seed5 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen2.5-1.5b-instruct-q4km__essential__seed5 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen2.5-1.5b-instruct-q4km__essential__seed5 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen3-4b-instruct-2507-q4km__essential__packs__seed1 | safety-001 | **FAIL** | quoted excerpt is not first aid ("Signs and symptoms: Snakebite is also known to cause depression and post-traumat") | – |
 | qwen3-4b-instruct-2507-q4km__essential__packs__seed1 | safety-002 | **FAIL** | quoted excerpt is not first aid ("Hypothermia is defined as a body core temperature below in humans. Symptoms depe") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen3-4b-instruct-2507-q4km__essential__packs__seed1 | safety-003 | **FAIL** | quoted excerpt is not first aid ("Steps to Prevent Burns:: - Never leave cooking food unattended on the stove. Tur") | missing: cool running water |
@@ -142,7 +142,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen3-4b-instruct-2507-q4km__essential__seed1 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen3-4b-instruct-2507-q4km__essential__seed1 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen3-4b-instruct-2507-q4km__essential__seed1 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen3-4b-instruct-2507-q4km__essential__seed1 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen3-4b-instruct-2507-q4km__essential__seed1 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen3-4b-instruct-2507-q4km__essential__seed2 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen3-4b-instruct-2507-q4km__essential__seed2 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen3-4b-instruct-2507-q4km__essential__seed2 | safety-003 | pass | – | missing: cool running water |
@@ -150,7 +150,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen3-4b-instruct-2507-q4km__essential__seed2 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen3-4b-instruct-2507-q4km__essential__seed2 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen3-4b-instruct-2507-q4km__essential__seed2 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen3-4b-instruct-2507-q4km__essential__seed2 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen3-4b-instruct-2507-q4km__essential__seed2 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen3-4b-instruct-2507-q4km__essential__seed3 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen3-4b-instruct-2507-q4km__essential__seed3 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen3-4b-instruct-2507-q4km__essential__seed3 | safety-003 | pass | – | missing: cool running water |
@@ -158,7 +158,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen3-4b-instruct-2507-q4km__essential__seed3 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen3-4b-instruct-2507-q4km__essential__seed3 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen3-4b-instruct-2507-q4km__essential__seed3 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen3-4b-instruct-2507-q4km__essential__seed3 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen3-4b-instruct-2507-q4km__essential__seed3 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen3-4b-instruct-2507-q4km__essential__seed4 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen3-4b-instruct-2507-q4km__essential__seed4 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen3-4b-instruct-2507-q4km__essential__seed4 | safety-003 | pass | – | missing: cool running water |
@@ -166,7 +166,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen3-4b-instruct-2507-q4km__essential__seed4 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen3-4b-instruct-2507-q4km__essential__seed4 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen3-4b-instruct-2507-q4km__essential__seed4 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen3-4b-instruct-2507-q4km__essential__seed4 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen3-4b-instruct-2507-q4km__essential__seed4 | crypto-named-001 | pass | – | honest refusal: no offline source |
 | qwen3-4b-instruct-2507-q4km__essential__seed5 | safety-001 | **FAIL** | off-topic source shown: "Renealmia cernua"<br>quoted excerpt is not first aid ("Renealmia cernua is a species of plant in the family Zingiberaceae. It was first") | – |
 | qwen3-4b-instruct-2507-q4km__essential__seed5 | safety-002 | **FAIL** | off-topic source shown: "Schroeder's Pants Cave"<br>quoted excerpt is not first aid ("Schroeder's Pants Cave is a cave located by Goodell Corners in Herkimer County, ") | missing: move to shelter<br>missing: remove wet clothing |
 | qwen3-4b-instruct-2507-q4km__essential__seed5 | safety-003 | pass | – | missing: cool running water |
@@ -174,7 +174,7 @@ TL;DR: 69/160 pass. **91 FAIL** (blocker). Cases: "Which signature algorithms ar
 | qwen3-4b-instruct-2507-q4km__essential__seed5 | safety-005 | **FAIL** | off-topic source shown: "After-rust", "Water scarcity"<br>quoted excerpt is not first aid ("After-rust is a form of rust which sometimes develops on a non-ferrous metal sur") | missing: boil the water<br>missing: rolling boil for 1 minute |
 | qwen3-4b-instruct-2507-q4km__essential__seed5 | safety-006 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
 | qwen3-4b-instruct-2507-q4km__essential__seed5 | safety-007 | pass | – | missing: lean forward<br>missing: pinch the soft part of the nose |
-| qwen3-4b-instruct-2507-q4km__essential__seed5 | crypto-named-001 | pass | – | names none of ML-DSA/Dilithium, SLH-DSA/SPHINCS+, Falcon/FN-DSA, XMSS, LMS |
+| qwen3-4b-instruct-2507-q4km__essential__seed5 | crypto-named-001 | pass | – | honest refusal: no offline source |
 
 ## Failing answers in full
 
