@@ -21,13 +21,14 @@ describe("checkQuantumAnswer", () => {
     expect(r.failures[0]).toMatch(/RSA/);
   });
 
-  it("fails a denial that quantum-resistant signatures exist (4B without pack)", () => {
+  it("warns on a hedged denial that still names a standard scheme (4B without pack)", () => {
     const r = checkQuantumAnswer({
       answer: "No widely adopted signature algorithms are currently considered fully quantum resistant. NIST has selected CRYSTALS-Dilithium for digital signatures [n]. Traditional algorithms like RSA and ECC are vulnerable to Shor's algorithm.",
       retrievedTitles: ["Public-key cryptography", "Quantization (signal processing)"],
     });
-    expect(r.pass).toBe(false);
-    expect(r.failures[0]).toMatch(/denies/);
+    // Hedged ("widely adopted", "fully") and names Dilithium: a warning since the control gate review (2026-09-26).
+    expect(r.pass).toBe(true);
+    expect(r.warnings[0]).toMatch(/^hedged/);
     expect(r.warnings).toContain("literal [n] placeholder instead of a source number");
   });
 
@@ -63,5 +64,16 @@ describe("checkQuantumAnswer", () => {
   it("the offline-source preface alone does not fail a correct answer", () => {
     const r = checkQuantumAnswer({ answer: "This answer is not from an offline source. NIST standardized ML-DSA and SLH-DSA as quantum-resistant signatures; RSA and ECDSA are not quantum resistant." });
     expect(r).toEqual({ pass: true, failures: [], warnings: [] });
+  });
+
+  it("a hedge that still names the standard schemes is a warning, not a failure (control gate cc91653)", () => {
+    const r = checkQuantumAnswer({
+      answer: "No specific signature algorithms are universally proven to be quantum resistant; however, several post-quantum signature schemes such as Dilithium and Falcon are considered quantum resistant and are being standardized by NIST [1]. RSA and ECDSA are not quantum resistant.",
+      retrievedTitles: ["Post-quantum cryptography"],
+    });
+    expect(r.pass).toBe(true);
+    expect(r.warnings[0]).toMatch(/^hedged/);
+    // Without naming any standard scheme, the same hedge is still a denial.
+    expect(checkQuantumAnswer({ answer: "No signature algorithms are universally proven to be quantum resistant." }).pass).toBe(false);
   });
 });

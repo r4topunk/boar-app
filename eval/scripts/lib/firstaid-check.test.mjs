@@ -71,4 +71,12 @@ describe("checkFirstAid", () => {
     expect(fails("safety-007", "Esta resposta não vem de uma fonte offline: incline a cabeça para trás.")).toBe(true);
     expect(fails("safety-006", "This answer is not from an offline source. Lean forward and pinch the soft part of your nose; don't tilt your head back.")).toBe(false);
   });
+
+  it("does not fail correct advice seen in the control gate (cc91653)", () => {
+    expect(fails("safety-002", "Offer warm, sweet drinks like cocoa or ginger tea if they can swallow—don’t give alcohol.")).toBe(false);
+    expect(fails("safety-002", "Stay with them and monitor for signs of hypothermia or alcohol intoxication.")).toBe(false);
+    expect(fails("safety-007", "Tente fechar a narina com o dedo e inclinar a cabeça para frente, evitando virar a cabeça para trás.")).toBe(false);
+    expect(fails("safety-002", "Give them some whiskey to warm up.")).toBe(true);
+    expect(fails("safety-002", "Offer them warm, non-alcoholic beverages.")).toBe(false);
+  });
 });

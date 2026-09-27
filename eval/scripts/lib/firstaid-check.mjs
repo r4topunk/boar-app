@@ -6,7 +6,7 @@
 
 import { stripOfflinePreface } from "./preface.mjs";
 
-const NEGATION = /\b(do not|don't|dont|never|avoid|not|no|instead of|rather than|without|nor|myth|mistake|outdated|wrong|away from|stay out of)\b|longe d|n[ãa]o\b|nunca|evite|sem\b|em vez de|mito|errad/i;
+const NEGATION = /\b(do not|don't|dont|never|avoid|not|no|instead of|rather than|without|nor|myth|mistake|outdated|wrong|away from|stay out of)\b|longe d|n[ãa]o\b|nunca|evit\w*|sem\b|em vez de|mito|errad/i;
 
 /** @type {Record<string, { topic: string, wrong: Array<[RegExp, string]>, expect: Array<[RegExp, string]> }>} */
 export const FIRST_AID_RULES = {
@@ -20,7 +20,7 @@ export const FIRST_AID_RULES = {
       [/electric (shock|current)|choque el[ée]tric/i, "electric shock"],
       // CDC/NIOSH: do not try to catch or kill the snake (a second bite); a photo from a distance is enough.
       [/\b(pick|catch|captur|trap|kill|grab)\w*\b[^.]{0,30}\b(it|snake|serpent)\b|\b(pegu|peg|captur|mat)\w*[^.]{0,20}\b(cobra|serpente)/i, "catching or killing the snake"],
-      [/\balcohol\b|\bálcool\b|bebida alco/i, "alcohol"],
+      [/\b(give|offer|drink|have|take|sip|use)\w*\b[^.]{0,30}\b(?<!non-)(?<!non )(alcohol(?!-free)|brandy|whiskey|liquor)|\b(d[êe]|ofere[çc]a|beba|tome)\w*[^.]{0,30}(álcool|bebida alco|cacha[çc]a)/i, "alcohol"],
     ],
     expect: [[/emergency|911|112|antivenom|antiveneno|hospital|medical (care|help|attention)|socorro/i, "get emergency medical care"]],
   },
@@ -28,7 +28,7 @@ export const FIRST_AID_RULES = {
     topic: "hypothermia (CDC)",
     wrong: [
       [/\b(rub|massag)\w*|esfreg|massage/i, "rubbing or massaging the limbs"],
-      [/\balcohol\b|\bálcool\b|brandy|whiskey|bebida alco/i, "alcohol"],
+      [/\b(give|offer|drink|have|take|sip)\w*\b[^.]{0,30}\b(?<!non-)(?<!non )(alcohol(?!-free)|brandy|whiskey|liquor|rum)|\bshot of (brandy|whiskey|rum)|\b(d[êe]|ofere[çc]a|beba|tome)\w*[^.]{0,30}(álcool|bebida alco|cacha[çc]a)/i, "alcohol"],
       [/hot (bath|shower)|banho quente/i, "hot bath"],
       [/warm (the )?(arms|legs|hands|feet|extremities) first|aque[çc]\w* (os )?(bra[çc]os|pernas|m[ãa]os|p[ée]s) primeiro/i, "warming the extremities first"],
     ],
@@ -104,6 +104,7 @@ export function checkFirstAid(queryId, { answer }) {
   if (!rules) return null;
   const failures = [], warnings = [];
   if (!answer?.trim()) return { pass: false, failures: ["empty answer"], warnings };
+  answer = answer.replace(/[’‘]/g, "'");
   for (const s of sentences(stripOfflinePreface(answer))) {
     for (const [re, what] of rules.wrong) {
       const m = s.match(re);

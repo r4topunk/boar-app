@@ -1,0 +1,2 @@
+{ "label": "control-cc91653", "tree": "/Users/r4to/Script/boar/wt/eval", "ref": "cc91653", "sha": "cc91653", "packsLoadable": 1, "seeds": "1 2 3 4 5", "models": "qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km", "pipeline": "app", "corpus": "essential",
+  "packs": { "boar-preparedness": "65dff5d9988a6fe2bffe17a4d3ab096a1a8f580d20b1ab18d0ada41bbbc0b4e8", "boar-crypto": "ae9fbd2c7a46a46a815d46d0283e7b192adb4c342b38a2adc4881e8f9d8831fb" }, "packSource": "tree catalog", "at": "2026-09-27T02:18:19Z", "host": "r4toMacMini" }

@@ -14,6 +14,7 @@ const NEGATION = /\bnot\b|n't|\bno longer\b|vulnerable|broken|\bbreak|insecure|\
 const DENIAL = /\b(no|none of|nenhum)\b[^.]*\b(signature|assinatura|algorithm|algoritmo)s?\b[^.]*(quantum[- ]resistant|resistentes? (a|à) qu[âa]ntic)/i;
 // Titles that are on topic for [1]: cryptography, signatures, post-quantum families.
 const ON_TOPIC = /cryptograph|criptograf|signature|assinatura|post-quantum|p[óo]s-qu[âa]ntic|quantum[- ]safe|lattice|hash-based|merkle|sphincs|falcon|dilithium|ml-dsa|slh-dsa|fn-dsa|xmss|\blms\b|nist|shor|public-key|digital signature|elliptic|rsa|ethereum eips|ethereum specs/i;
+const HEDGE = /\b(proven|definitive|single|universally|fully|guarantee[ds]?|widely)\b|comprovad|definitiv|garantid|amplamente/i;
 const STANDARD = /ML-DSA|Dilithium|SLH-DSA|SPHINCS\+?|Falcon|FN-DSA|XMSS|\bLMS\b|Leighton-Micali/i;
 
 const sentences = (text) => text.split(/(?<=[.!?;:])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
@@ -25,13 +26,19 @@ const citedIndexes = (text) => [...new Set([...text.matchAll(/\[(\d+)\]/g)].map(
  */
 export function checkQuantumAnswer({ answer, retrievedTitles = [] }) {
   const failures = [], warnings = [];
+  answer = answer.replace(/[’‘]/g, "'");
   const cited = citedIndexes(answer);
+  const namesStandard = STANDARD.test(answer);
   for (const s of sentences(stripOfflinePreface(answer))) {
     const m = s.match(CLASSICAL);
     if (m && RESISTANT.test(s) && !NEGATION.test(s)) {
       failures.push(`false claim${cited.length ? " in a cited answer" : ""}: "${m[0]}" called quantum resistant — "${s.slice(0, 160)}"`);
     }
-    if (DENIAL.test(s)) failures.push(`false claim: denies that standardized quantum-resistant signatures exist — "${s.slice(0, 160)}"`);
+    // "None is universally proven / no single definitive list" is a hedge, not a denial, when the answer names the schemes.
+    if (DENIAL.test(s)) {
+      if (namesStandard && HEDGE.test(s)) warnings.push(`hedged: "${s.slice(0, 120)}"`);
+      else failures.push(`false claim: denies that standardized quantum-resistant signatures exist — "${s.slice(0, 160)}"`);
+    }
   }
   if (retrievedTitles.length && !ON_TOPIC.test(retrievedTitles[0])) failures.push(`source [1] off topic: "${retrievedTitles[0]}"`);
   for (const i of cited) {
