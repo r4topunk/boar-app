@@ -68,6 +68,7 @@ import { placesForCopy, sourceName } from "./chat/placesFormat";
 import { locate } from "./chat/locationApi";
 import { suggestionsFor } from "./chat/suggestions";
 import { installedKnowledgeIds } from "./chat/knowledgeApi";
+import { bootMark, bootTimed } from "../services/bootMarks";
 
 const VERBATIM_MESSAGE_COUNT = 6;
 
@@ -225,11 +226,12 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
     try {
       setLoadError(null);
       setReady(false);
+      bootMark("chat.initModels:start");
       const llm = await resolveActiveModel("llm");
       const emb = await resolveActiveModel("embedding");
       setActiveModel(llm);
       setLoadStatus({ label: t("chat.model.loading", { label: llm.label }) });
-      await Promise.all([llamaEngine.load(llm.filename), embeddingEngine.load(emb.filename)]);
+      await Promise.all([bootTimed("chat.llm.load", () => llamaEngine.load(llm.filename)), bootTimed("chat.embedding.load", () => embeddingEngine.load(emb.filename))]);
       startAppMemoryTracking();
       const stopProgress = onSeedProgress((p) =>
         setLoadStatus({
@@ -238,11 +240,12 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
         })
       );
       setIndexing(true);
-      await seedKnowledgeBaseIfEmpty().finally(() => {
+      await bootTimed("chat.seedIfEmpty", () => seedKnowledgeBaseIfEmpty()).finally(() => {
         stopProgress();
         setIndexing(false);
       });
       setReady(true);
+      bootMark("chat.ready (input usable)");
     } catch (e: any) {
       // The native message is the one worth showing (the RAM estimate is only in the log now).
       setLoadErrorKind(e instanceof ModelLoadError ? e.kind : undefined);

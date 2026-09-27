@@ -12,18 +12,19 @@ import { listRecentExecutions } from "../../services/executionTelemetry";
 import { getDeviceTotalRamBytes } from "ram-monitor";
 import { fitFor } from "./adapters";
 import { decideInitialRoute } from "./initialRoute";
+import { bootMark, bootTimed } from "../../services/bootMarks";
 
 /** Same rule as ModelManager.requiredModelsPresent: on disk and complete. */
 const complete = (s: AssetStatus) => s.present && (!s.asset.sizeBytes || s.sizeOnDiskBytes === s.asset.sizeBytes);
 
 export async function initialRoute(modelManager: ModelManager): Promise<"Main" | "Setup"> {
-  const llms = [...MODEL_CATALOG, ...(await listDiscoveredModels())].filter((m) => m.kind === "llm");
+  const llms = [...MODEL_CATALOG, ...(await bootTimed("boot.discoveredModels", () => listDiscoveredModels()))].filter((m) => m.kind === "llm");
   const [requiredPresent, statuses, activeLlmId, speeds] = await Promise.all([
-    modelManager.requiredModelsPresent(),
-    Promise.all(llms.map((m) => modelManager.statusOf(m))),
+    bootTimed("boot.requiredModelsPresent", () => modelManager.requiredModelsPresent()),
+    bootTimed("boot.statusOf-llms", () => Promise.all(llms.map((m) => modelManager.statusOf(m)))),
     getActiveModelId("llm"),
     // Speeds only help the ranking; a missing history never blocks the boot.
-    listRecentExecutions(200).then(measuredSpeeds).catch(() => new Map<string, number>()),
+    bootTimed("boot.recentExecutions", () => listRecentExecutions(200)).then(measuredSpeeds).catch(() => new Map<string, number>()),
   ]);
   let totalRamBytes = 0;
   try {
@@ -32,6 +33,7 @@ export async function initialRoute(modelManager: ModelManager): Promise<"Main" |
     totalRamBytes = 0;
   }
   const installed = statuses.filter(complete).map((s) => s.asset);
+  bootMark("boot.fitFor-and-rank:start");
   const decision = decideInitialRoute({
     requiredPresent,
     installedLlms: installed.map((m) => ({
@@ -44,6 +46,7 @@ export async function initialRoute(modelManager: ModelManager): Promise<"Main" |
     totalRamBytes,
     activeLlmId,
   });
+  bootMark("boot.fitFor-and-rank:end");
   if (decision.setActiveLlmId) await setActiveModelId("llm", decision.setActiveLlmId);
   return decision.route;
 }

@@ -16,6 +16,7 @@ import { BackendInfo, cpuDeviceNames, initWithCpuFallback } from "./initFallback
 import type { LoadGuard, LoadMeta } from "./loadMarker";
 import { classifyLoadFailure, ModelLoadError } from "./loadError";
 import { loadGuard as appLoadGuard } from "./loadGuard";
+import { bootMark, bootTimed } from "../services/bootMarks";
 
 export { contextSizeForRam };
 
@@ -216,7 +217,7 @@ export class LlamaEngine {
     // compute buffers must be resident, so only those can refuse a load. A
     // file bigger than free RAM loads with a warning (weights stream from
     // storage). Best-effort — missing readouts skip the check.
-    const fit = await this.estimateFitAt(modelPath, fileSizeBytes, nCtx);
+    const fit = await bootTimed("llm.headerRead+fit", () => this.estimateFitAt(modelPath, fileSizeBytes, nCtx));
     if (fit?.verdict === "insufficient") {
       const message = describeFit(modelFilename, fit)!;
       throw new ModelLoadError(message, "memory", message);
@@ -228,6 +229,7 @@ export class LlamaEngine {
     await this.guard?.begin(meta, previous).catch((e: any) => console.warn("[engine] load marker:", e?.message ?? e));
     let loadedOk = false;
     try {
+      bootMark("llm.initLlama:start");
       const loaded = await initWithCpuFallback(
         initLlama,
         {
@@ -245,6 +247,7 @@ export class LlamaEngine {
       this.modelInfo = { filename: modelFilename, nCtx, nThreads, backend };
       this.loadedMeta = meta;
       loadedOk = true;
+      bootMark("llm.initLlama:end");
       this.arch = fit ? this.lastHeaderArch : await this.readArch(modelPath);
     } catch (e: any) {
       // The native error (llama.rn/llama.cpp) is terse ("Failed to load model"). The cause goes in

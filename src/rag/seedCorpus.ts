@@ -13,6 +13,7 @@ import { embeddingEngine } from "./embed";
 import minimumCorpus from "../../assets/corpus/corpus.json";
 import { CORPUS_CATALOG, CatalogModel } from "../models/manifest";
 import { isStopped, trackWork } from "./cancellation";
+import { bootMark, bootTimed } from "../services/bootMarks";
 
 /**
  * Knowledge base sources, layered:
@@ -171,11 +172,11 @@ async function seedStoppable(): Promise<void> {
 class SeedStopped extends Error {}
 
 async function seedNow(signal: AbortSignal): Promise<void> {
-  const db = await getDb();
+  const db = await bootTimed("seed.getDb", () => getDb());
   await deleteSeedChunks(RETIRED_SEED_IDS);
   const collections: SeedCollection[] = [
     { id: BUILTIN_COLLECTION_ID, docs: MINIMUM_CORPUS_DOCS },
-    ...(await loadDownloadedCorpusPacks()),
+    ...(await bootTimed("seed.readAndParseCorpusPacks", () => loadDownloadedCorpusPacks())),
   ];
   const total = collections.reduce((n, c) => n + c.docs.length, 0);
   for (const c of collections) {
@@ -200,6 +201,7 @@ async function seedNow(signal: AbortSignal): Promise<void> {
   const { count } = (await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count FROM chunks WHERE collection_id IS NULL`
   )) ?? { count: 0 };
+  bootMark(`seed.count ${count}/${total}`);
   if (count === total) {
     for (const c of collections) {
       if (!c.error) setStatus(c.id, { state: "indexed", done: c.docs.length, total: c.docs.length });

@@ -19,6 +19,7 @@ import { geoProvidersFrom } from "./src/routing/geoWiring";
 import { getCurrentPoint, getLocationFix } from "./src/services/location";
 import { installedPoiPacks, resolvePlace, searchPois } from "./src/rag/pois";
 import { POI_REGIONS } from "./src/rag/poiRegions";
+import { bootMark, bootTimed } from "./src/services/bootMarks";
 
 // Offline places: without this, every places question answers "places pack not installed".
 registerGeoProviders(
@@ -39,6 +40,7 @@ const modelManager = new ModelManager();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 // Boot timing (splash decision): how long the native splash covers the JS start. Read in logcat / Xcode.
 const BOOT_T0 = Date.now();
+bootMark("js-start");
 console.info(`[boot] js-start t=${BOOT_T0}`);
 
 function AppContent() {
@@ -53,7 +55,7 @@ function AppContent() {
     (async () => {
       // Setup unless the chat has an answer model it can load (and saves that one as active).
       // A failed disk read also lands in setup, never on a spinner or a chat that cannot answer.
-      setInitialRoute(await bootRoute(modelManager).catch(() => "Setup" as const));
+      setInitialRoute(await bootTimed("bootRoute", () => bootRoute(modelManager)).catch(() => "Setup" as const));
     })();
   }, []);
 
@@ -61,6 +63,7 @@ function AppContent() {
   useEffect(() => {
     if (!ready) return;
     console.info(`[boot] hide after=${Date.now() - BOOT_T0}ms`);
+    bootMark(fontError ? "splash-hide (font error)" : "splash-hide");
     SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
 
