@@ -9,7 +9,8 @@ import { fileURLToPath } from "node:url";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const [control, candidate] = process.argv.slice(2);
-const DISCLAIMER = /(n[ãa]o (vem|est[áa]) (de |em )?(uma |nenhuma )?fonte offline|not (from|in) (an |any )?offline source|n[ãa]o h[áa] (nenhuma )?fonte offline)/gi;
+// cd1478a: the model rewords it ("não está em um banco de dados offline"), so any offline store counts.
+const DISCLAIMER = /(n[ãa]o (vem|est[áa]) (de |em |n[ao] )?(um |uma |nenhuma |nenhum )?(fonte|banco de dados|base( de dados| de conhecimento)?|acervo|biblioteca) offline|not (from|in) (an |any )?offline (source|database|library|knowledge base)|n[ãa]o h[áa] (nenhuma )?fonte offline)/gi;
 function scan(label) {
   const hits = [];
   let n = 0;
