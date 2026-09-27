@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Duplicate "not from an offline source" disclaimer (gate 19bb043): the app's preface plus the model's own sentence
 // saying the same ("Essa resposta não está em uma fonte offline"). Counts gate answers (runs, pt, pt-compact, s32)
-// with two or more such sentences. Reported in the gate verdict (exit 1 = more than the control).
+// with two or more such sentences. Blocking (Boar 2026-09-27): exit 1 = more than the control.
 // Usage (from eval/): node scripts/dup-disclaimer.mjs <control-label> <candidate-label>
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
