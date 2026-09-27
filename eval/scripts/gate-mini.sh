@@ -165,6 +165,9 @@ if [ $PTSET = 1 ]; then mkdir -p eval/results/gate-pt
   V2IDS=\$(node -e 'console.log(require("fs").readFileSync("eval/dataset/questions.v2.jsonl","utf8").trim().split("\\n").map(JSON.parse).filter(q=>!q.id.startsWith("food-")).map(q=>q.id).join(","))')
   run --model qwen3-4b-instruct-2507-q4km --seed 42 --dataset v2 --ids \$V2IDS --pack \$PREP,\$CRYPTO --out eval/results/gate-pt/v2-en.jsonl
   run --model qwen3-4b-instruct-2507-q4km --seed 42 --dataset v2-pt --ids \$(echo \$V2IDS | sed 's/,/-pt,/g')-pt --pack \$PREP,\$CRYPTO --out eval/results/gate-pt/v2-pt.jsonl
+  # The Compacto in PT (Boar, 20e8c65): its confident errors on the same 41 PT items, against the fixed ceiling.
+  mkdir -p eval/results/gate-pt-compact
+  run --model qwen2.5-1.5b-instruct-q4km --seed 42 --dataset v2-pt --ids \$(echo \$V2IDS | sed 's/,/-pt,/g')-pt --pack \$PREP,\$CRYPTO --out eval/results/gate-pt-compact/v2-pt.jsonl
 fi
 if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
@@ -179,6 +182,7 @@ mkdir -p "$OUT/runs"
 rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
 [ "$PTSET" = 1 ] && mkdir -p "$OUT/pt" && rsync -az "$HOST:$DEST/eval/results/gate-pt/" "$OUT/pt/"
+[ "$PTSET" = 1 ] && mkdir -p "$OUT/pt-compact" && rsync -az "$HOST:$DEST/eval/results/gate-pt-compact/" "$OUT/pt-compact/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "retrieval": "$RETRIEVAL", "corpus": "$CORPUS",
   "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "places": { "world-places": "$WP_SHA", "berlin": "$BER_SHA" }, "suggestionsRef": "${GATE_SUGGESTIONS_REF:-$REF}", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
