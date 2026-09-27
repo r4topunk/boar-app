@@ -28,8 +28,9 @@ function ratio(label, lang) {
   const pairs = Object.entries(by).filter(([, o]) => o.boarA && o.boarB).map(([q, o]) => ({ q, ...combineOrders(o.boarA.mapped, o.boarB.mapped) }));
   const s = summarize(pairs, { seed: 21 });
   // Per item (Boar, after bc7db6d): BOAR's mean rubric score and correctness, to show which items moved the gap.
-  const answers = Object.fromEntries(readFileSync(src, "utf8").trim().split("\n").map((l) => JSON.parse(l)).map((r) => [r.queryId, r.answer ?? ""]));
-  const items = Object.fromEntries(pairs.map((p) => [p.q, { mean: Object.values(p.boar).reduce((a, x) => a + x, 0) / Object.values(p.boar).length, correct: p.boar.correctness, answer: answers[p.q] }]));
+  const rowsById = Object.fromEntries(readFileSync(src, "utf8").trim().split("\n").map((l) => JSON.parse(l)).map((r) => [r.queryId, r]));
+  const answers = Object.fromEntries(Object.entries(rowsById).map(([q, r]) => [q, r.answer ?? ""]));
+  const items = Object.fromEntries(pairs.map((p) => [p.q, { mean: Object.values(p.boar).reduce((a, x) => a + x, 0) / Object.values(p.boar).length, correct: p.boar.correctness, answer: answers[p.q], sources: rowsById[p.q]?.promptSources?.length ?? 0, cited: rowsById[p.q]?.citedTitles?.length ?? 0 }]));
   return { n: pairs.length, r: s.qualityRatio, ci: s.qualityRatioCI, items };
 }
 
@@ -49,8 +50,8 @@ const L = [`# PT vs EN: ${candidate} vs ${control}`, "",
 for (const lang of ["pt", "en"]) {
   const moved = Object.keys(per[candidate][lang]).map((q) => ({ q, c: per[control][lang][q], k: per[candidate][lang][q] }))
     .filter((x) => x.c && Math.abs(x.k.mean - x.c.mean) >= 0.5).sort((a, b) => (a.k.mean - a.c.mean) - (b.k.mean - b.c.mean));
-  L.push(`## ${lang.toUpperCase()} items that moved (|Δ mean score| ≥ 0.5)`, "", moved.length ? "| Item | Mean score control → candidate | Correctness control → candidate | Candidate answer |" : "None.", ...(moved.length ? ["|---|---|---|---|"] : []));
-  for (const x of moved) L.push(`| ${x.q} | ${x.c.mean.toFixed(1)} → **${x.k.mean.toFixed(1)}** | ${x.c.correct.toFixed(1)} → ${x.k.correct.toFixed(1)} | ${x.k.answer.slice(0, 140).replace(/\n/g, " ").replace(/\|/g, "/")} |`);
+  L.push(`## ${lang.toUpperCase()} items that moved (|Δ mean score| ≥ 0.5)`, "", moved.length ? "| Item | Mean score control → candidate | Correctness control → candidate | Sources in prompt / cited, control → candidate | Candidate answer |" : "None.", ...(moved.length ? ["|---|---|---|---|---|"] : []));
+  for (const x of moved) L.push(`| ${x.q} | ${x.c.mean.toFixed(1)} → **${x.k.mean.toFixed(1)}** | ${x.c.correct.toFixed(1)} → ${x.k.correct.toFixed(1)} | ${x.c.sources}/${x.c.cited} → ${x.k.sources !== x.c.sources ? `**${x.k.sources}**` : x.k.sources}/${x.k.cited} | ${x.k.answer.slice(0, 140).replace(/\n/g, " ").replace(/\|/g, "/")} |`);
   L.push("");
 }
 writeFileSync(join(EVAL_DIR, "reports", `pt-gap-${control}-vs-${candidate}.md`), L.join("\n"));
