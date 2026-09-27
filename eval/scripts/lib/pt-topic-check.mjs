@@ -8,12 +8,18 @@ const REFUSAL = /did(n't| not) find|(no|don't have a) (reliable |good )?(offline
 /** @returns {{ pass: boolean, failures: string[], warnings: string[] } | null} */
 export function checkPtTopic(row) {
   if (!row.queryId?.startsWith("ptt-")) return null;
-  const shown = [...new Set([...(row.citedTitles ?? []), ...(row.retrievedTitles ?? [])])];
-  const failures = [];
-  const never = shown.filter((t) => NEVER.test(t));
-  if (never.length) failures.push(`shows a forbidden source: ${never.map((t) => `"${t}"`).join(", ")}`);
+  // What the user sees: the cited sources (the card shows only those since a8ee6bf); older runs fall back to all sources.
+  const shown = [...new Set(row.citedTitles ?? row.retrievedTitles ?? [])];
+  const inPrompt = [...new Set(row.retrievedTitles ?? [])];
+  const failures = [], warnings = [];
+  const never = [...new Set([...shown, ...inPrompt])].filter((t) => NEVER.test(t));
+  if (never.length) failures.push(`forbidden source shown or in the prompt: ${never.map((t) => `"${t}"`).join(", ")}`);
   const off = shown.filter((t) => !ON_TOPIC.test(t) && !NEVER.test(t));
-  if (off.length) failures.push(`off-topic source shown: ${off.map((t) => `"${t}"`).join(", ")}`);
-  if (!shown.length && !REFUSAL.test(row.answer ?? "")) failures.push("no source and no honest refusal (answered from memory without saying so)");
-  return { pass: failures.length === 0, failures, warnings: shown.length ? [] : ["honest refusal"] };
+  if (off.length) failures.push(`off-topic source cited: ${off.map((t) => `"${t}"`).join(", ")}`);
+  if (!shown.length && !REFUSAL.test(row.answer ?? "") && !/not from an offline source|n[ãa]o (vem|[ée]) de (uma )?fonte offline/i.test(row.answer ?? "")) {
+    const junk = inPrompt.filter((t) => !ON_TOPIC.test(t));
+    failures.push(`no source cited and no honest refusal: answered from memory without saying so${junk.length ? ` (off-topic sources in the prompt: ${junk.slice(0, 3).map((t) => `"${t}"`).join(", ")})` : ""}`);
+  }
+  if (!shown.length && !failures.length) warnings.push("honest refusal or declared memory answer");
+  return { pass: failures.length === 0, failures, warnings };
 }
