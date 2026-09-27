@@ -15,7 +15,7 @@ const DENIAL = /\b(no|none of|nenhum)\b[^.]*\b(signature|assinatura|algorithm|al
 // Titles that are on topic for [1]: cryptography, signatures, post-quantum families.
 const ON_TOPIC = /cryptograph|criptograf|signature|assinatura|post-quantum|p[óo]s-qu[âa]ntic|quantum[- ]safe|lattice|hash-based|merkle|sphincs|falcon|dilithium|ml-dsa|slh-dsa|fn-dsa|xmss|\blms\b|nist|shor|public-key|digital signature|elliptic|rsa|ethereum eips|ethereum specs/i;
 const HEDGE = /\b(proven|definitive|single|universally|fully|guarantee[ds]?|widely)\b|comprovad|definitiv|garantid|amplamente/i;
-const REFUSAL = /did(n't| not) find|no (reliable |good )?(offline )?source|not (in|from) the offline library|won't answer from memory|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte|n[ãa]o est[áa] no acervo/i;
+const REFUSAL = /(don't|do not) support this answer|n[ãa]o sustentam esta resposta|did(n't| not) find|no (reliable |good )?(offline )?source|not (in|from) the offline library|won't answer from memory|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte|n[ãa]o est[áa] no acervo/i;
 const STANDARD = /ML-DSA|Dilithium|SLH-DSA|SPHINCS\+?|Falcon|FN-DSA|XMSS|\bLMS\b|Leighton-Micali/i;
 
 const sentences = (text) => text.split(/(?<=[.!?;:])\s+|\n+/).map((s) => s.trim()).filter(Boolean);

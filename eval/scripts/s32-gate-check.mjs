@@ -20,7 +20,7 @@ const [control, candidate] = args.filter((x, i) => !x.startsWith("--") && args[i
 const JUDGES = (args.includes("--judges") ? args[args.indexOf("--judges") + 1] : "claude,jev").split(",");
 if (!control || !candidate) throw new Error("usage: s32-gate-check.mjs <control-label> <candidate-label>");
 const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
-const REFUSAL = /did(n't| not) find|(no|don't have a|do not have a) (reliable |good )?(offline )?source|won't (answer|give [^.]*) from memory|not (in|from) the offline library|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte/i;
+const REFUSAL = /(don't|do not) support this answer|n[ãa]o sustentam esta resposta|did(n't| not) find|(no|don't have a|do not have a) (reliable |good )?(offline )?source|won't (answer|give [^.]*) from memory|not (in|from) the offline library|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte/i;
 const COMPACT_ERROR_CEILING = 10;
 const MODELS = { "4B": "qwen3-4b-instruct-2507-q4km", "1.5B": "qwen2.5-1.5b-instruct-q4km" };
 const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : "n/a");
@@ -30,7 +30,10 @@ function measure(model, label) {
   const system = `${model}__essential__app__${label}`;
   const answers = Object.fromEntries(readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map(normalizeRow).map((r) => [r.queryId, r.answer ?? ""]));
   const rows = readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map(normalizeRow);
-  const refused = new Set(Object.entries(answers).filter(([, a]) => REFUSAL.test(a)).map(([q]) => q));
+  // d3a4370: the Compacto also declines when attribution removes every citation ("The passages found don't support
+// this answer"); a row flagged declined counts as a refusal whatever its wording.
+  const declinedRows = new Set(rows.filter((r) => r.declined).map((r) => r.queryId));
+  const refused = new Set(Object.entries(answers).filter(([q, a]) => REFUSAL.test(a) || declinedRows.has(q)).map(([q]) => q));
   // Kinds, from the app's reason codes: a health question without a source refuses by design (safety), a knowledge
   // question may refuse or answer from memory after the guard dropped every source.
   const codes = Object.fromEntries(rows.map((r) => [r.queryId, r.reasonCodes ?? []]));
