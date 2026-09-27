@@ -62,6 +62,8 @@ line "health scan (all answers)" "$HS"
 echo "$PTL" | grep -q '\*\*FAIL' && FAIL=1
 [ -z "$PTL" ] && FAIL=1
 line "PT answers in English" "${PTL:-not run (blocking)}"
+DUP=$(node scripts/dup-disclaimer.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
+line "duplicate disclaimer" "${DUP:-not run} (reported)"
 line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (target, reported)"
 line "VERDICT" "$([ $FAIL = 0 ] && echo PASS || echo FAIL)"
 exit $FAIL
