@@ -34,6 +34,7 @@ RETRIEVAL="${GATE_RETRIEVAL:-app}"
 S32="${GATE_S32:-0}"
 PTSET="${GATE_PT:-0}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+LNG_IDS="$(node -e 'console.log(require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map(JSON.parse).filter(q=>q.id.startsWith("lng-")).map(q=>q.id).join(","))' "$ROOT/eval/dataset/questions.v1.jsonl")"
 S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/eval/dataset/subset.s32.v1.json")"
 DEST="boar/gate/$LABEL"
 
@@ -175,6 +176,8 @@ if [ $PTSET = 1 ]; then mkdir -p eval/results/gate-pt
   run --model qwen2.5-1.5b-instruct-q4km --seed 42 --dataset v2-pt --ids \$(echo \$V2IDS | sed 's/,/-pt,/g')-pt --pack \$PREP,\$CRYPTO --out eval/results/gate-pt-compact/v2-pt.jsonl
 fi
 if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
+# The 12 v1 language items (Boar 2026-09-27: lng-009 allergy sentence in French is a blocking fixed case), same setup as s32.
+if [ $S32 = 1 ]; then mkdir -p eval/results/gate-lng; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $LNG_IDS --out eval/results/gate-lng/\${m}.jsonl; done; fi
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
@@ -188,6 +191,7 @@ OUT="$ROOT/eval/results/gates/$LABEL"
 mkdir -p "$OUT/runs"
 rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
+[ "$S32" = 1 ] && mkdir -p "$OUT/lng" && rsync -az "$HOST:$DEST/eval/results/gate-lng/" "$OUT/lng/"
 [ "$PTSET" = 1 ] && mkdir -p "$OUT/pt" && rsync -az "$HOST:$DEST/eval/results/gate-pt/" "$OUT/pt/"
 [ "$PTSET" = 1 ] && mkdir -p "$OUT/pt-compact" && rsync -az "$HOST:$DEST/eval/results/gate-pt-compact/" "$OUT/pt-compact/"
 cat > "$OUT/meta.json" <<EOF
