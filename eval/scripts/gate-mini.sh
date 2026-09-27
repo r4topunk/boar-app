@@ -18,6 +18,8 @@
 # Also the "suggestions" item (RT-1): each empty-chat suggestion (src/i18n chat.suggestions, EN+PT) is asked with
 # the builtin corpus plus the corpus it declares (src/ui/chat/suggestions.ts SUGGESTION_SOURCES), and the app's
 # search top-3 must hold a title with one of its declared words (4B, seed 1: search is model-free).
+# Also the "places" item (PL-1): world-places + Berlin packs from the tree's catalog; Berlin by name and by GPS must list
+# real vegan venues with the OpenStreetMap source, Tokyo (no pack) must say there is no data (scripts/lib/places-check.mjs).
 # Exit: 0 = all pass, 1 = a case fails (blocker), 2 = incomplete (missing rows, or the tree cannot load packs).
 set -euo pipefail
 TREE="$(cd "$1" && pwd)"; REF="${2:-HEAD}"
@@ -55,6 +57,11 @@ node "$ROOT/eval/scripts/extract-suggestions.mjs" "$SUGROOT" "$TMP/questions.sug
 # wiki-vital5 (format-1 pack) from the tree's model manifest, when a suggestion declares it.
 VITAL_SHA="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const b=s.slice(s.indexOf("\"wiki-vital5\""));const m=b.match(/sha256: "([0-9a-f]{64})"/);console.log(m?m[1]:"")' "$TMP/src/models/manifest.ts" 2>/dev/null || true)"
 VITAL_URL="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const b=s.slice(s.indexOf("\"wiki-vital5\""));const m=b.match(/sourceUrl: "([^"]+)"/);console.log(m?m[1]:"")' "$TMP/src/models/manifest.ts" 2>/dev/null || true)"
+# Places item (PL-1): world-places + the Berlin city pack from the tree's catalog (src/rag/poiRegions.ts).
+place_field() { node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const k=process.argv[2];const b=k==="world"?s.slice(s.indexOf("WORLD_PLACES")):s.slice(s.indexOf("id: \""+k+"\""));const m=b.match(new RegExp(process.argv[3]+": \"([^\"]+)\""));console.log(m?m[1]:"")' "$TMP/src/rag/poiRegions.ts" "$1" "$2" 2>/dev/null || true; }
+WP_SHA="$(place_field world sha256)"; WP_URL="$(place_field world sourceUrl)"
+BER_SHA="$(place_field berlin sha256)"; BER_URL="$(place_field berlin sourceUrl)"
+HAS_PLACES=0; [ -n "$WP_SHA" ] && [ -n "$BER_SHA" ] && [ "$RETRIEVAL" = app ] && HAS_PLACES=1
 SUG_LINES=""; NEED_VITAL=0
 while IFS=$'\t' read -r packid ids; do
   case "$packid" in
@@ -100,6 +107,13 @@ if [ $NEED_VITAL = 1 ]; then
   echo "$VITAL_SHA  \$VITAL" | shasum -a 256 -c - || exit 3
 fi
 SUG_MODEL=$SUG_MODEL
+WP=\$PIN/$WP_SHA/world-places.sqlite; BER=\$PIN/$BER_SHA/berlin.sqlite
+if [ $HAS_PLACES = 1 ]; then
+  [ -f \$WP ] || { mkdir -p \$(dirname \$WP) && curl -sSfL -o \$WP.part "$WP_URL" && mv \$WP.part \$WP; }
+  [ -f \$BER ] || { mkdir -p \$(dirname \$BER) && curl -sSfL -o \$BER.part "$BER_URL" && mv \$BER.part \$BER; }
+  echo "$WP_SHA  \$WP" | shasum -a 256 -c - || exit 3
+  echo "$BER_SHA  \$BER" | shasum -a 256 -c - || exit 3
+fi
 O=eval/results/gate-runs; mkdir -p \$O
 run() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL --corpus $CORPUS "\$@" || echo "RUNFAIL \$*"; }
 runc() { npx --prefix eval tsx eval/runner/desktop.ts --gpu --pipeline $PIPELINE --retrieval $RETRIEVAL "\$@" || echo "RUNFAIL \$*"; }
@@ -113,6 +127,7 @@ for m in $MODELS; do for s in $SEEDS; do
   done
 done; done
 $SUG_LINES
+if [ $HAS_PLACES = 1 ]; then for m in $MODELS; do run --model \$m --seed 1 --dataset places --places \$WP,\$BER --out \$O/places__\${m}.jsonl; done; fi
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -139,7 +154,7 @@ rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$PTSET" = 1 ] && mkdir -p "$OUT/pt" && rsync -az "$HOST:$DEST/eval/results/gate-pt/" "$OUT/pt/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "retrieval": "$RETRIEVAL", "corpus": "$CORPUS",
-  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "suggestionsRef": "${GATE_SUGGESTIONS_REF:-$REF}", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
+  "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "places": { "world-places": "$WP_SHA", "berlin": "$BER_SHA" }, "suggestionsRef": "${GATE_SUGGESTIONS_REF:-$REF}", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
 EOF
 
 cd "$ROOT/eval"
@@ -149,7 +164,8 @@ RC=$?
 set -e
 N_MODELS=$(wc -w <<<"$MODELS"); N_SEEDS=$(wc -w <<<"$SEEDS"); N_CFG=$((1 + HAS_PACK))
 N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + $(grep -c . "$ROOT/eval/dataset/questions.safety-pt.jsonl") + 1 ))  # safety EN + PT + the quantum prompt
-EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG))
+N_PLACES=$(( HAS_PLACES * N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.places.jsonl") ))
+EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG + N_PLACES))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 echo "rows: $GOT / $EXPECTED expected"
 if [ "$RC" -ne 0 ]; then echo "GATE FAIL: eval/reports/regression-gate-$LABEL.md"; exit 1; fi

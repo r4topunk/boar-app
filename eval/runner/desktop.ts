@@ -99,7 +99,7 @@ const DEFAULT_STEP_TIMEOUT_MS = 120_000;
 const PERSONALITY_ID = "succinct" as const;
 const PLAIN_STOPS = ["\nUser:", "\n\nUser:", "\nQuestion:", "\n\nQuestion:"];
 
-interface Question { id: string; category: string; query: string; lang: string; gold: Array<{ source: string; title: string }>; suggestion?: { key: string; corpus: string[]; expect: string[] } }
+interface Question { id: string; category: string; query: string; lang: string; gold: Array<{ source: string; title: string }>; suggestion?: { key: string; corpus: string[]; expect: string[] }; context?: { lat: number; lon: number } }
 
 function args() {
   const a = process.argv.slice(2);
@@ -118,6 +118,8 @@ function args() {
     // app = import the tree's own retrieval (seedCorpus + retrieve + packs) through Node shims (eval/runner/app-shims);
     // mirror = this runner's copy of it (kept for trees too old to import).
     retrieval: get("--retrieval", "mirror") as "mirror" | "app",
+    // Offline places packs (world-places.sqlite + city packs), installed under documentDirectory/poi/ (app retrieval only).
+    places: get("--places"),
     sources: get("--sources", "system") as "system" | "user",
     out: get("--out"),
     seed: Number(get("--seed", "42")),
@@ -403,7 +405,7 @@ async function generate(llama: Llama, model: LlamaModel, query: string, chunks: 
  * corpus packs of --corpus and each --pack under its catalog filename in a documentDirectory of its own. The seeded
  * database is cached per (tree retrieval code, corpus, packs), so the 5,300 corpus embeddings are computed once.
  */
-async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packPaths: string[]) {
+async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packPaths: string[], placePaths: string[] = []) {
   const { registerHooks } = await import("node:module");
   const shim = (f: string) => new URL(`./app-shims/${f}`, import.meta.url).href;
   const SHIMS: Record<string, string> = {
@@ -457,6 +459,7 @@ async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packP
     link(p, filename);
     packs.push({ id, sha256: await sha256File(p), format: "2" as const });
   }
+  for (const p of placePaths) link(p, join("poi", p.split("/").pop()!));
   const { embeddingEngine } = await import(join(ROOT, "src/rag/embed.ts"));
   await embeddingEngine.load(emb.filename);
   const { seedKnowledgeBaseIfEmpty } = await import(join(ROOT, "src/rag/seedCorpus.ts"));
@@ -464,7 +467,22 @@ async function setupAppRetrieval(corpus: "bundled" | "essential" | "none", packP
   const { getDb } = await import(join(ROOT, "src/rag/db.ts"));
   const chunks = ((await (await getDb()).getFirstAsync("SELECT count(*) AS c FROM chunks")) as any)?.c ?? 0;
   const { retrieve } = await import(join(ROOT, "src/rag/retrieve.ts"));
-  return { retrieve: (q: string, k: number) => retrieve(q, k) as Promise<RetrievedChunk[]>, packs: packs as OpenPack[], chunks };
+  // Offline places, wired as App.tsx does (geoProvidersFrom + src/rag/pois.ts); only the device location is simulated,
+  // from the question's context, so "near me" is asked from a known point and a question without one has no fix.
+  let geo: any = null;
+  const point: { current: { lat: number; lon: number; accuracyM: number } | null } = { current: null };
+  if (existsSync(join(ROOT, "src/routing/geoWiring.ts")) && existsSync(join(ROOT, "src/rag/pois.ts"))) {
+    const { geoProvidersFrom } = await import(join(ROOT, "src/routing/geoWiring.ts"));
+    const pois = await import(join(ROOT, "src/rag/pois.ts"));
+    const regions = existsSync(join(ROOT, "src/rag/poiRegions.ts")) ? await import(join(ROOT, "src/rag/poiRegions.ts")) : { POI_REGIONS: [] };
+    const fix = async () => point.current ?? { error: "unavailable" as const };
+    geo = geoProvidersFrom({
+      installedPoiPacks: pois.installedPoiPacks, getCurrentPoint: fix, getLocationFix: fix,
+      resolvePlace: pois.resolvePlace, searchPois: pois.searchPois,
+      cities: () => (regions.POI_REGIONS ?? []).flatMap((r: any) => r.cities ?? []),
+    });
+  }
+  return { retrieve: (q: string, k: number) => retrieve(q, k) as Promise<RetrievedChunk[]>, packs: packs as OpenPack[], chunks, geo, point };
 }
 
 // ---------------------------------------------------------------- main
@@ -489,8 +507,11 @@ async function main() {
 
   const kb = new DesktopKnowledgeBase(embed);
   let retrievalImpl = "runner mirror of src/rag/retrieve.ts";
+  let appGeo: any = null, appPoint: { current: { lat: number; lon: number; accuracyM: number } | null } | null = null;
   if (opt.retrieval === "app") {
-    const appRetrieve = await setupAppRetrieval(opt.corpus, opt.pack?.split(",") ?? []);
+    const appRetrieve = await setupAppRetrieval(opt.corpus, opt.pack?.split(",") ?? [], opt.places?.split(",") ?? []);
+    appGeo = appRetrieve.geo;
+    appPoint = appRetrieve.point;
     kb.retrieve = appRetrieve.retrieve;
     kb.packs = appRetrieve.packs;
     retrievalImpl = `tree src/rag/retrieve.ts (app shims, ${appRetrieve.chunks} corpus chunks)`;
@@ -549,6 +570,7 @@ async function main() {
       deviceRamBytes: () => 8e9,
       // engine-routing 963e7ba: answer() waits for the built-in index; the runner indexes before the first question.
       knowledgeReady: async () => {},
+      getGeoProviders: () => appGeo,
     });
   }
 
@@ -568,6 +590,7 @@ async function main() {
     try {
       if (answerer) {
         lastGen = undefined; lastChunks = []; promptChunks = [];
+        if (appPoint) appPoint.current = q.context ? { lat: q.context.lat, lon: q.context.lon, accuracyM: 20 } : null;
         let appError: { code: string; message: string } | undefined;
         const res = await answerer.answer({ query: q.query }, (e: any) => { if (e.type === "done" && e.error) appError = e.error; }, appCtx).done;
         if (res.outcome === "error") throw new Error(`${appError?.code ?? "error"}: ${appError?.message ?? "answer failed"}`);
@@ -641,6 +664,8 @@ async function main() {
       pipeline: opt.pipeline,
       retrieval: retrievalImpl,
       suggestion: q.suggestion,
+      context: q.context,
+      places: opt.places?.split(",").map((p) => p.split("/").pop()),
       answerTier: app?.tier,
       modelCalled: app ? app.modelCalled : true,
       rawRetrievedTitles: app ? app.retrieved : undefined,

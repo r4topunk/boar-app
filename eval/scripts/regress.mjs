@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { PQ_QUERY_ID, checkQuantumAnswer } from "./lib/pq-check.mjs";
 import { checkFirstAid } from "./lib/firstaid-check.mjs";
 import { checkSuggestion } from "./lib/suggestion-check.mjs";
+import { checkPlaces } from "./lib/places-check.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const a = process.argv.slice(2);
@@ -22,7 +23,7 @@ const rows = [];
 for (const f of files) {
   for (const r of readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
     const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
-      : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : checkFirstAid(r.queryId, r);
+      : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : checkFirstAid(r.queryId, r);
     if (res) rows.push({ run: basename(f, ".jsonl"), queryId: r.queryId, query: r.query, answer: r.answer ?? "", sources: r.retrievedTitles ?? [], ...res });
   }
 }
