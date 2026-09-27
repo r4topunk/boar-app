@@ -472,7 +472,7 @@ async function main() {
         gen = lastGen;
         chunks = lastChunks;
         retrievalMs = res.receipt?.retrievalMs ?? 0;
-        const clip = (c: RetrievedChunk) => ({ title: c.title, body: c.body.slice(0, 2000) });
+        const clip = (c: RetrievedChunk) => ({ title: c.title, body: c.body.slice(0, 8000) });
         app = {
           text: res.text, tier: res.tier, sources: (res.sources ?? []).map((c: RetrievedChunk) => c.title), retrieved: lastChunks.map((c) => c.title),
           reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs,

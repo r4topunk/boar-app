@@ -38,11 +38,24 @@ export function citedSentences(text) {
 const words = (s) => new Set(s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 2));
 const jaccard = (x, y) => { const A = words(x), B = words(y); const i = [...A].filter((w) => B.has(w)).length; return i / Math.max(1, A.size + B.size - i); };
 
+/** The whole cited chunk when it fits, else the window around the claim's terms (Boar: never a blind prefix). */
+export function sourceWindow(claim, source, max = 6000, win = 3000) {
+  if (source.length <= max) return source;
+  const terms = [...words(claim)];
+  let best = 0, bestScore = -1;
+  for (let i = 0; i < source.length; i += 250) {
+    const seg = source.slice(i, i + win).toLowerCase();
+    const score = terms.filter((t) => seg.includes(t)).length;
+    if (score > bestScore) (bestScore = score), (best = i);
+  }
+  return source.slice(best, best + win);
+}
+
 let spent = 0;
 async function supported(claim, source) {
   const body = {
     model: "typesafe-ai/jev",
-    state: { claim, source: source.slice(0, 2000) },
+    state: { claim, source: sourceWindow(claim, source) },
     questions: {
       supported: {
         type: "boolean",
@@ -119,7 +132,7 @@ for (const [title, xs] of [["Unsupported citations (sample)", examples.unsupport
   for (const x of xs) L.push(`- ${x.cfg} · ${x.q} · p=${x.p.toFixed(2)} · source "${x.src}": ${x.claim.slice(0, 200)}`);
   L.push("");
 }
-L.push("Limits: a removed citation is one whose (source title, sentence) has no match in the shown answer (word Jaccard >= 0.6), so a rewritten sentence can count as removed; Jev sees at most 2000 characters of each source.", "");
+L.push("Limits: a removed citation is one whose (source title, sentence) has no match in the shown answer (word Jaccard >= 0.6), so a rewritten sentence can count as removed. Jev sees the whole cited chunk up to 6000 characters, else the 3000-character window with most of the claim's terms; runs recorded before runner 8000-char bodies (gates up to 383fe96) hold only the first 2000 characters.", "");
 writeFileSync(join(EVAL_DIR, "reports", `citations-${name}.md`), L.join("\n"));
 console.log(L.slice(0, 6 + Object.keys(byCfg).length).join("\n"));
 console.log(`Jev spend this run: US$${spent.toFixed(4)}`);
