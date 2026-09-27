@@ -132,6 +132,11 @@ if [ $HAS_PLACES = 1 ]; then for m in $MODELS; do run --model \$m --seed 1 --dat
 for m in $MODELS; do run --model \$m --seed 1 --dataset current-events --out \$O/current-events__\${m}.jsonl; done
 # Knowledge topic (target): sources a knowledge answer cites must be on topic.
 for m in $MODELS; do run --model \$m --seed 1 --dataset knowledge-topic --out \$O/knowledge-topic__\${m}.jsonl; done
+# PT topic (PT-1 lexicon names): "estações do ano" with and without accents, without and with the catalog packs.
+for m in $MODELS; do
+  run --model \$m --seed 1 --dataset pt-topic --out \$O/pt-topic__\${m}.jsonl
+  [ $HAS_PACK = 1 ] && run --model \$m --seed 1 --dataset pt-topic --pack \$PREP,\$CRYPTO --out \$O/pt-topic__\${m}__packs.jsonl
+done
 # Tile path ("I'm going to X"): the Berlin 1x1 tile + world-places, no city pack, when the gazetteer hosts it.
 TILE_INFO=\$(node eval/scripts/tile-info.mjs \$WP t-N52E013)
 if [ $HAS_PLACES = 1 ] && [ -n "\$TILE_INFO" ]; then
@@ -179,7 +184,8 @@ N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + $(grep -c
 N_PLACES=$(( HAS_PLACES * N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.places.jsonl") ))
 N_CE=$(( N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.current-events.jsonl") ))
 N_KT=$(( N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.knowledge-topic.jsonl") ))
-EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG + N_PLACES + N_CE + N_KT))
+N_PTT=$(( N_MODELS * N_CFG * $(grep -c . "$ROOT/eval/dataset/questions.pt-topic.jsonl") ))
+EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG + N_PLACES + N_CE + N_KT + N_PTT))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 N_TILE=$(cat "$OUT"/runs/places-tile__*.jsonl 2>/dev/null | grep -c . || true)
 GOT=$((GOT - N_TILE))  # tile rows exist only when the gazetteer hosts the tile; they are graded, not counted

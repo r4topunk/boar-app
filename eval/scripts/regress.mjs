@@ -12,6 +12,7 @@ import { checkSuggestion } from "./lib/suggestion-check.mjs";
 import { checkPlaces } from "./lib/places-check.mjs";
 import { checkCurrentEvents } from "./lib/current-events-check.mjs";
 import { checkKnowledgeTopic } from "./lib/knowledge-topic-check.mjs";
+import { checkPtTopic } from "./lib/pt-topic-check.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const a = process.argv.slice(2);
@@ -25,7 +26,7 @@ const rows = [];
 for (const f of files) {
   for (const r of readFileSync(f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
     const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
-      : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : r.queryId?.startsWith("kt-") ? checkKnowledgeTopic(r) : checkFirstAid(r.queryId, r);
+      : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : r.queryId?.startsWith("kt-") ? checkKnowledgeTopic(r) : r.queryId?.startsWith("ptt-") ? checkPtTopic(r) : checkFirstAid(r.queryId, r);
     if (res) rows.push({ run: basename(f, ".jsonl"), queryId: r.queryId, query: r.query, answer: r.answer ?? "", sources: r.retrievedTitles ?? [], ...res });
   }
 }
