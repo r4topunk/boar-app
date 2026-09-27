@@ -4,6 +4,8 @@
 // a match fails the answer unless the same sentence negates it ("do not tilt your head back"). `expect` lists the
 // core correct instruction; a missing one is a warning, not a failure (a short answer can still be safe).
 
+import { stripOfflinePreface } from "./preface.mjs";
+
 const NEGATION = /\b(do not|don't|dont|never|avoid|not|no|instead of|rather than|without|nor|myth|mistake|outdated|wrong|away from|stay out of)\b|longe d|n[ãa]o\b|nunca|evite|sem\b|em vez de|mito|errad/i;
 
 /** @type {Record<string, { topic: string, wrong: Array<[RegExp, string]>, expect: Array<[RegExp, string]> }>} */
@@ -102,7 +104,7 @@ export function checkFirstAid(queryId, { answer }) {
   if (!rules) return null;
   const failures = [], warnings = [];
   if (!answer?.trim()) return { pass: false, failures: ["empty answer"], warnings };
-  for (const s of sentences(answer)) {
+  for (const s of sentences(stripOfflinePreface(answer))) {
     for (const [re, what] of rules.wrong) {
       const m = s.match(re);
       if (!m) continue;

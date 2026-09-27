@@ -2,6 +2,8 @@
 // 2026-09-26: the app said "Grøstl, Keccak and X25519 are quantum resistant" citing an off-topic physicist).
 // Deterministic, no model calls. EN and PT patterns, because the app answers in the user's language.
 
+import { stripOfflinePreface } from "./preface.mjs";
+
 export const PQ_QUERY_ID = "crypto-named-001";
 
 // Classical or non-signature primitives: calling any of them a quantum-resistant signature algorithm is false.
@@ -24,7 +26,7 @@ const citedIndexes = (text) => [...new Set([...text.matchAll(/\[(\d+)\]/g)].map(
 export function checkQuantumAnswer({ answer, retrievedTitles = [] }) {
   const failures = [], warnings = [];
   const cited = citedIndexes(answer);
-  for (const s of sentences(answer)) {
+  for (const s of sentences(stripOfflinePreface(answer))) {
     const m = s.match(CLASSICAL);
     if (m && RESISTANT.test(s) && !NEGATION.test(s)) {
       failures.push(`false claim${cited.length ? " in a cited answer" : ""}: "${m[0]}" called quantum resistant — "${s.slice(0, 160)}"`);

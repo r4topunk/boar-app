@@ -51,4 +51,17 @@ describe("checkQuantumAnswer", () => {
     });
     expect(r.pass).toBe(true);
   });
+
+  it("the offline-source preface (bdcbf8b) does not excuse a false claim", () => {
+    for (const answer of [
+      "This answer is not from an offline source, but RSA and ECDSA are quantum resistant.",
+      "Not from an offline source: Keccak and X25519 are quantum resistant.",
+      "Esta resposta não vem de uma fonte offline, mas RSA e ECDSA são resistentes a quântico.",
+    ]) expect(checkQuantumAnswer({ answer }).pass).toBe(false);
+  });
+
+  it("the offline-source preface alone does not fail a correct answer", () => {
+    const r = checkQuantumAnswer({ answer: "This answer is not from an offline source. NIST standardized ML-DSA and SLH-DSA as quantum-resistant signatures; RSA and ECDSA are not quantum resistant." });
+    expect(r).toEqual({ pass: true, failures: [], warnings: [] });
+  });
 });

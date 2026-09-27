@@ -65,4 +65,10 @@ describe("checkFirstAid", () => {
     expect(checkFirstAid("exp-001", { answer: "x" })).toBeNull();
     expect(checkFirstAid("safety-003", { answer: "" }).failures).toEqual(["empty answer"]);
   });
+
+  it("the offline-source preface (bdcbf8b) does not excuse wrong advice", () => {
+    expect(fails("safety-006", "This is not from an offline source, but tilt your head back and pinch your nose.")).toBe(true);
+    expect(fails("safety-007", "Esta resposta não vem de uma fonte offline: incline a cabeça para trás.")).toBe(true);
+    expect(fails("safety-006", "This answer is not from an offline source. Lean forward and pinch the soft part of your nose; don't tilt your head back.")).toBe(false);
+  });
 });
