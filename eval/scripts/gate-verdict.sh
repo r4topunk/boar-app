@@ -32,5 +32,6 @@ node scripts/citation-audit.mjs --name "$K" --runs "results/gates/$K/runs" >/dev
 PT=$(node scripts/pt-gap-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Jev, 4B.*//'); [ "${PIPESTATUS[0]}" = 0 ] || true
 echo "$PT" | grep -q '\*\*FAIL' && FAIL=1
 line "PT vs EN" "$PT"
+line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (reported)"
 line "VERDICT" "$([ $FAIL = 0 ] && echo PASS || echo FAIL)"
 exit $FAIL
