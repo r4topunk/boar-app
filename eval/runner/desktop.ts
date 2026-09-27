@@ -547,6 +547,8 @@ async function main() {
       assembleChatMessages: (q: string, c: RetrievedChunk[], ...rest: any[]) => ((promptChunks = c), (assembleChatMessages as any)(q, c, ...rest)),
       contextSize: () => N_CTX,
       deviceRamBytes: () => 8e9,
+      // engine-routing 963e7ba: answer() waits for the built-in index; the runner indexes before the first question.
+      knowledgeReady: async () => {},
     });
   }
 
