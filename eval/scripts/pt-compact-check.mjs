@@ -47,9 +47,11 @@ const res = labels.map((l) => [l, measure(l)]);
 const last = res.at(-1)[1];
 const control = res.length > 1 ? res[0][1] : null;
 const limit = control ? control.errors.length + MARGIN : CEILING;
-const pass = last && last.errors.length <= limit;
+// Boar 2026-09-27: the engine is deterministic (no seed noise), so its wrong answers block above the control's, no margin.
+const engineLimit = control ? control.engineWrong.length : Infinity;
+const pass = last && last.errors.length <= limit && last.engineWrong.length <= engineLimit;
 const L = [`# Compacto (1.5B) in PT: ${labels.join(" vs ")}`, "",
-  `TL;DR: **${!last ? "NOT RUN" : pass ? "PASS" : "FAIL"}**: ${labels.at(-1)} has ${last?.errors.length ?? "?"} confident errors in PT${control ? ` vs control ${control.errors.length} (blocks above ${limit})` : ""}; target <= ${CEILING}: ${last && last.errors.length <= CEILING ? "met" : "not met"}. Answered without a cited source: ${last?.uncited ?? "?"}${control ? ` (control ${control.uncited})` : ""}. Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with \`node eval/scripts/pt-compact-check.mjs ${labels.join(" ")}\`.`, "",
+  `TL;DR: **${!last ? "NOT RUN" : pass ? "PASS" : "FAIL"}**: ${labels.at(-1)} has ${last?.errors.length ?? "?"} model confident errors in PT${control ? ` vs control ${control.errors.length} (blocks above ${limit})` : ""}, ${last?.engineWrong.length ?? "?"} engine answers judged wrong${control ? ` vs control ${control.engineWrong.length} (blocks above it)` : ""}; target <= ${CEILING}: ${last && last.errors.length <= CEILING ? "met" : "not met"}. Answered without a cited source: ${last?.uncited ?? "?"}${control ? ` (control ${control.uncited})` : ""}. Jev, 1.5B seed 42 with packs, 41 PT v2 items. Regenerate with \`node eval/scripts/pt-compact-check.mjs ${labels.join(" ")}\`.`, "",
   "| Gate | Judged | Refusals | Engine answers (calculator / excerpt / fixed; not counted) | Engine answers judged wrong | Model answers | Correct when answering | Confident errors | Answered without a cited source |", "|---|---|---|---|---|---|---|---|---|"];
 for (const [l, m] of res) L.push(m ? `| ${l} | ${m.n} | ${m.refusals} | ${m.engine} | ${m.engineWrong.length} | ${m.answered} | ${m.answered ? Math.round((100 * m.correct) / m.answered) : 0}% | **${m.errors.length}** | ${m.uncited} |` : `| ${l} | not run | | | | | | | |`);
 L.push("", ...res.filter(([, m]) => m).map(([l, m]) => `- ${l} confident errors: ${m.errors.join(", ") || "none"}; engine answers judged wrong (read them: a health excerpt may be right but partial): ${m.engineWrong.join(", ") || "none"}`), "");
