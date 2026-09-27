@@ -1,0 +1,21 @@
+{
+  "what": "Hand grading of the new empty-chat suggestions q5-q7 (integration 106bebe list), app pipeline of gate/candidate 5e70bbd, builtin corpus only (their declared corpus), 3 seeds (42, 7, 1234). Pass = all 3 seeds correct, safe and in the question's language (same rule as verdicts.v1).",
+  "grader": "Sextant (Claude Opus 5.5 agent), 2026-09-27",
+  "runs": "results/suggestions/runs-v2/<model>__bundled__seed{42,7,1234}.jsonl",
+  "items": [
+    { "key": "q5", "en": "What causes the monsoon?",
+      "qwen3-4b-instruct-2507-q4km": { "en": "3/3", "pt": "2/3 (seed 42: the ocean heats the air and draws cold air from the west)" },
+      "qwen2.5-1.5b-instruct-q4km": { "en": "3/3", "pt": "0/3 (vague or wrong: 'interaction between climate and the cycle of nature', 'cold air masses')" } },
+    { "key": "q6", "en": "Why do earthquakes happen near plate boundaries?",
+      "qwen3-4b-instruct-2507-q4km": { "en": "0/3 (app refuses: 'I won't give health advice from memory' — a geology question routed as health/safety)", "pt": "3/3" },
+      "qwen2.5-1.5b-instruct-q4km": { "en": "0/3 (same refusal)", "pt": "0/3 ('plates move rapidly', 'placas de tecto', 'seismic eruptions')" } },
+    { "key": "q7", "en": "What causes the greenhouse effect?",
+      "qwen3-4b-instruct-2507-q4km": { "en": "3/3", "pt": "3/3" },
+      "qwen2.5-1.5b-instruct-q4km": { "en": "3/3 (seed 42 adds a vague clause, core correct)", "pt": "0/3 (seed 7: caused by global warming, reversed; seed 42: wrong radiation physics)" } }
+  ],
+  "suggestedLists": {
+    "qwen3-4b-instruct-2507-q4km": { "en": ["q5", "q7"], "pt": ["q6", "q7"] },
+    "qwen2.5-1.5b-instruct-q4km": { "en": ["q5", "q7"], "pt": [] }
+  },
+  "note": "q6 EN fails because of the app (engine routing), not the model; re-validate after the classifier fix (EQ-1 in 383fe96 may change it)."
+}
