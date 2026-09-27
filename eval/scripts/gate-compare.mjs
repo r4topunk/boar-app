@@ -11,6 +11,7 @@ import { checkFirstAid } from "./lib/firstaid-check.mjs";
 import { checkSuggestion } from "./lib/suggestion-check.mjs";
 import { checkPlaces } from "./lib/places-check.mjs";
 import { checkCurrentEvents } from "./lib/current-events-check.mjs";
+import { checkKnowledgeTopic } from "./lib/knowledge-topic-check.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const a = process.argv.slice(2);
@@ -28,9 +29,9 @@ function load(label) {
     const cfg = f.replace(/\.jsonl$/, "").replace(/__seed\d+$/, "");
     for (const r of readFileSync(join(dir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
       const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
-        : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : checkFirstAid(r.queryId, r);
+        : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : r.queryId?.startsWith("kt-") ? checkKnowledgeTopic(r) : checkFirstAid(r.queryId, r);
       if (!res) continue;
-      const cell = ((out[cfg] ??= {})[r.queryId] ??= { pass: 0, n: 0, failures: [], modelCalled: 0, refusals: 0 });
+      const cell = ((out[cfg] ??= {})[r.queryId] ??= { pass: 0, n: 0, failures: [], modelCalled: 0, refusals: 0, target: !!res.target });
       if (res.warnings?.some((w) => w.startsWith("honest refusal"))) cell.refusals++;
       cell.n++;
       if (res.pass) cell.pass++;
@@ -54,6 +55,7 @@ for (const cfg of configs) for (const it of items) {
   const ca = A.cells[cfg]?.[it], cb = B.cells[cfg]?.[it];
   if (!ca && !cb) continue;
   let v = verdict(cb);
+  if (v === "FAIL" && cb?.target) v = "TARGET miss";
   if (v === "PASS" && noModel.includes(it) && cb.modelCalled > 0) v = "FAIL (model called)";
   if (v.startsWith("FAIL")) fails++;
   if (v === "MISSING") missing++;

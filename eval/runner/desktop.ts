@@ -586,13 +586,19 @@ async function main() {
     let chunks: RetrievedChunk[] = [];
     let retrievalMs = 0;
     let gen: GenResult | undefined;
-    let app: { text: string; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }> } | undefined;
+    let app: { text: string; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }>; cited?: number[]; citedTitles?: string[] } | undefined;
     try {
       if (answerer) {
         lastGen = undefined; lastChunks = []; promptChunks = [];
         if (appPoint) appPoint.current = q.context ? { lat: q.context.lat, lon: q.context.lon, accuracyM: 20 } : null;
         let appError: { code: string; message: string } | undefined;
-        const res = await answerer.answer({ query: q.query }, (e: any) => { if (e.type === "done" && e.error) appError = e.error; }, appCtx).done;
+        let cited: number[] | undefined;
+        const res = await answerer.answer({ query: q.query }, (e: any) => {
+          if (e.type === "done") {
+            if (e.error) appError = e.error;
+            if (Array.isArray(e.cited)) cited = e.cited; // engine-routing c884d7a: 1-based indexes into result.sources
+          }
+        }, appCtx).done;
         if (res.outcome === "error") throw new Error(`${appError?.code ?? "error"}: ${appError?.message ?? "answer failed"}`);
         gen = lastGen;
         chunks = lastChunks;
@@ -603,6 +609,7 @@ async function main() {
           reasonCodes: res.receipt?.reasonCodes ?? [], modelCalled: !!lastGen, ttftMs: res.receipt?.ttftMs,
           // Citation audit: the model's own text before any post-processing, the sources in its prompt, and the shown ones.
           modelText: (lastGen as GenResult | undefined)?.answer, promptSources: promptChunks.map(clip), shownSources: (res.sources ?? []).map(clip),
+          cited, citedTitles: cited?.map((i) => res.sources?.[i - 1]?.title).filter(Boolean),
         };
       } else {
         const r0 = performance.now();
@@ -672,6 +679,8 @@ async function main() {
       modelText: app?.modelText,
       promptSources: app?.promptSources,
       shownSources: app?.shownSources,
+      cited: app?.cited,
+      citedTitles: app?.citedTitles,
       retrievedTitles,
       expectedKbTitles,
       expectedKbHit: expectedKbTitles.length ? expectedKbTitles.every((t) => retrievedTitles.includes(t)) : null,
