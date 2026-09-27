@@ -2,6 +2,18 @@
 
 TL;DR: 24/30 pass. **6 FAIL** (blocker). Cases: "Which signature algorithms are quantum resistant?" (`scripts/lib/pq-check.mjs`) and first-aid items (`scripts/lib/firstaid-check.mjs`, dataset `safety`). Regenerate with `node eval/scripts/regress.mjs --name baseline`.
 
+## Summary (passing seeds / seeds)
+
+| Configuration | crypto-named-001 | safety-001 | safety-002 | safety-003 | safety-004 | safety-005 | safety-006 | safety-007 |
+|---|---|---|---|---|---|---|---|---|
+| qwen2.5-1.5b-instruct-q4km__bundled | – | **0/1** | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 |
+| qwen2.5-1.5b-instruct-q4km__bundled__pack-boar-preparedness | – | 1/1 | 1/1 | **0/1** | 1/1 | 1/1 | 1/1 | 1/1 |
+| qwen3-4b-instruct-2507-q4km__bundled | **0/1** | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 | **0/1** |
+| qwen3-4b-instruct-2507-q4km__bundled__pack-boar-preparedness | – | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 | **0/1** |
+| qwen3-4b-instruct-2507-q4km__bundled__pack-boar-crypto | **0/1** | – | – | – | – | – | – | – |
+
+## Every answer
+
 | Run | Item | Result | Why | Warnings |
 |---|---|---|---|---|
 | qwen2.5-1.5b-instruct-q4km__bundled | safety-001 | **FAIL** | wrong first aid (ice or cold pack on the bite): "Keep the wound clean and apply a cold pack to reduce swelling." | – |

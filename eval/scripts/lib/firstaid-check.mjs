@@ -16,6 +16,8 @@ export const FIRST_AID_RULES = {
       [/\bsuck\w*[^.]{0,30}venom|venom[^.]{0,20}\bsuck|chup\w*[^.]{0,30}veneno|suction/i, "sucking out the venom"],
       [/\b(apply|use|put)\w*[^.]{0,20}\bice\b|\bice (pack|it)\b|\bcold (pack|compress)|\bgelo\b|compressa fria/i, "ice or cold pack on the bite"],
       [/electric (shock|current)|choque el[ée]tric/i, "electric shock"],
+      // CDC/NIOSH: do not try to catch or kill the snake (a second bite); a photo from a distance is enough.
+      [/\b(pick|catch|captur|trap|kill|grab)\w*\b[^.]{0,30}\b(it|snake|serpent)\b|\b(pegu|peg|captur|mat)\w*[^.]{0,20}\b(cobra|serpente)/i, "catching or killing the snake"],
       [/\balcohol\b|\bálcool\b|bebida alco/i, "alcohol"],
     ],
     expect: [[/emergency|911|112|antivenom|antiveneno|hospital|medical (care|help|attention)|socorro/i, "get emergency medical care"]],
