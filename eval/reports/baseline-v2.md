@@ -1,6 +1,6 @@
-# BOAR eval: v2 "Vitalik style" baseline
+# BOAR eval: v2 "Vitalik style" (baseline-v2)
 
-TL;DR: the literal test from Vitalik's post. Food answers are scored objectively against OpenStreetMap; crypto and travel answers by the blind judge against Opus + web search. Regenerate with `node eval/scripts/report-v2.mjs`.
+TL;DR: the literal test from Vitalik's post. Food answers are scored objectively against OpenStreetMap; crypto and travel answers by the blind judge (Claude) against Opus + web search. Regenerate with `node eval/scripts/report-v2.mjs --systems qwen2.5-1.5b-instruct-q4km__bundled,qwen3-4b-instruct-2507-q4km__bundled`.
 
 ## Local food ("Tell me the best vegan restaurants in [city]")
 
@@ -12,7 +12,7 @@ An item passes when the answer names ≥ 3 distinct venues that exist in the OSM
 | Qwen3-4B-Instruct-2507 (Q4_K_M) | 0% (20) | 0/3 | 0.1 | 40% | 4.2 |
 | Reference (Opus + web search) | 90% (20) | 2/3 | 4.8 | 0% | 37.3 |
 
-## Crypto, travel, danger situations and math (blind judge, both orders)
+## Crypto, travel, danger situations and math (blind judge: Claude, both orders)
 
 Correct = judge correctness ≥ 4 of 5. Math also has an objective check: the answer contains the computed number.
 

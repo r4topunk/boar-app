@@ -26,6 +26,9 @@ const runsDir = join(EVAL_DIR, "results", "runs", dataset);
 const argv = process.argv.slice(2);
 const only = argv.includes("--systems") ? argv[argv.indexOf("--systems") + 1].split(",") : null;
 const reportName = argv.includes("--name") ? argv[argv.indexOf("--name") + 1] : "baseline-v2";
+// --judge jev: read the Jev judgments (results/judgments-jev) instead of the Claude ones.
+const judge = argv.includes("--judge") ? argv[argv.indexOf("--judge") + 1] : "claude";
+const judgeDir = judge === "jev" ? "judgments-jev" : "judgments";
 const systems = (existsSync(runsDir) ? readdirSync(runsDir).filter((f) => f.endsWith(".jsonl") && !/\.(pre-|invalid)/.test(f)).map((f) => f.replace(/\.jsonl$/, "")) : [])
   .filter((s) => !only || only.includes(s));
 
@@ -43,7 +46,7 @@ function foodScores(answers) {
 }
 
 function judged(system) {
-  const js = readJsonl(join(EVAL_DIR, "results", "judgments", dataset, `${system}__vs__${refName}.jsonl`)).filter((j) => j.ok);
+  const js = readJsonl(join(EVAL_DIR, "results", judgeDir, dataset, `${system}__vs__${refName}.jsonl`)).filter((j) => j.ok);
   const byQ = {};
   for (const j of js) (byQ[j.queryId] ??= {})[j.order] = j;
   const pairs = Object.entries(byQ).filter(([, o]) => o.boarA && o.boarB).map(([queryId, o]) => ({ queryId, category: o.boarA.category, ...combineOrders(o.boarA.mapped, o.boarB.mapped) }));
@@ -69,14 +72,14 @@ const sys = systems.map((s) => {
 });
 
 const L = [];
-L.push("# BOAR eval: v2 \"Vitalik style\" baseline", "");
-L.push("TL;DR: the literal test from Vitalik's post. Food answers are scored objectively against OpenStreetMap; crypto and travel answers by the blind judge against Opus + web search. Regenerate with `node eval/scripts/report-v2.mjs`.", "");
+L.push(`# BOAR eval: v2 "Vitalik style" (${reportName})`, "");
+L.push(`TL;DR: the literal test from Vitalik's post. Food answers are scored objectively against OpenStreetMap; crypto and travel answers by the blind judge (${judge === "jev" ? "Jev" : "Claude"}) against Opus + web search. Regenerate with \`node eval/scripts/report-v2.mjs ${argv.join(" ")}\`.`, "");
 L.push("## Local food (\"Tell me the best vegan restaurants in [city]\")", "");
 L.push("An item passes when the answer names ≥ 3 distinct venues that exist in the OSM snapshot for that city and diet.", "");
 L.push("| System | Pass (n) | Located items passed | Mean verified venues | Deflects | Median s |", "|---|---|---|---|---|---|");
 for (const s of sys) L.push(`| ${s.label} | ${pct(s.food.pass)} (${s.food.n}) | ${s.food.passLocated}/${s.food.nLocated} | ${fmt(s.food.meanVerified, 1)} | ${pct(s.food.deflect)} | ${fmt(s.medianS, 1)} |`);
 L.push(`| Reference (Opus + web search) | ${pct(refFood.pass)} (${refFood.n}) | ${refFood.passLocated}/${refFood.nLocated} | ${fmt(refFood.meanVerified, 1)} | ${pct(refFood.deflect)} | ${fmt(median(Object.values(refs).filter((r) => r.category?.startsWith("local-food")).map((r) => r.wallMs)) / 1000, 1)} |`, "");
-L.push("## Crypto, travel, danger situations and math (blind judge, both orders)", "");
+L.push(`## Crypto, travel, danger situations and math (blind judge: ${judge === "jev" ? "Jev" : "Claude"}, both orders)`, "");
 L.push("Correct = judge correctness ≥ 4 of 5. Math also has an objective check: the answer contains the computed number.", "");
 L.push("| System | Crypto correct | Travel correct | Danger correct | Math correct (judge) | Math number right | Quality ratio vs ref (95% CI) | Win / tie / loss |", "|---|---|---|---|---|---|---|---|");
 for (const s of sys) {

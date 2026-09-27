@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Two-judge report: Claude (judge.mjs) vs Jev (jev-judge.mjs, another model family) on the same pairs,
 // plus agreement of each judge with the 20 hand calibration labels. No model calls.
-// Usage (from eval/): node scripts/judge-agreement.mjs [--dataset v1] [--subset s32|all]
+// Usage (from eval/): node scripts/judge-agreement.mjs [--dataset v1] [--subset s32|all] [--system <run>]
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +31,11 @@ const CRYPTOPACK_COMPARISONS = [
   { label: "Qwen3-4B (no pack) vs reference", file: "qwen3-4b-instruct-2507-q4km__bundled__vs__claude-code__opus", sides: ["4B", "ref"] },
   { label: "Qwen3-4B + crypto pack vs Qwen3-4B (direct)", file: "qwen3-4b-instruct-2507-q4km__bundled__pack-boar-crypto__vs__qwen3-4b-instruct-2507-q4km__bundled", sides: ["4B+pack", "4B"] },
 ];
-const COMPARISONS = dataset === "cryptopack" ? CRYPTOPACK_COMPARISONS : V1_COMPARISONS;
+// --system <run>: Claude x Jev on one run vs the reference (e.g. the official headline slice).
+const oneSystem = get("--system");
+const COMPARISONS = oneSystem
+  ? [{ label: `${oneSystem} vs reference`, file: `${oneSystem}__vs__claude-code__opus`, sides: ["BOAR", "ref"] }]
+  : dataset === "cryptopack" ? CRYPTOPACK_COMPARISONS : V1_COMPARISONS;
 
 function combined(dir, file) {
   const byQ = {};
@@ -73,5 +77,5 @@ if (calib.length) {
   }
   L.push("");
 }
-writeFileSync(join(EVAL_DIR, "reports", `judges-${dataset}-${subset}.md`), L.join("\n") + "\n");
+writeFileSync(join(EVAL_DIR, "reports", `judges-${dataset}-${subset}${oneSystem ? `-${oneSystem}` : ""}.md`), L.join("\n") + "\n");
 console.log(L.join("\n"));
