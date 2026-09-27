@@ -35,6 +35,9 @@ line "PT vs EN" "$PT"
 DEN=$(node scripts/proposal-denial-check.mjs "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
 echo "$DEN" | grep -q '\*\*FAIL' && FAIL=1
 line "EIP/ERC/BIP denial" "$DEN"
+SCR=$(node scripts/screen-check.mjs "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
+echo "$SCR" | grep -q '\*\*FAIL' && FAIL=1
+line "chat screen [n] (CIT-2)" "$SCR"
 line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (target, reported)"
 line "VERDICT" "$([ $FAIL = 0 ] && echo PASS || echo FAIL)"
 exit $FAIL

@@ -557,11 +557,22 @@ async function main() {
 
   // --pipeline app: the tree's answerer decides retrieval use, compression, instant snippets and whether the model runs.
   let appAnswerTier: string | undefined;
+  // The chat screen (Prism CIT-2): every event goes through the tree's own reducer (src/ui/chat/answerReducer.ts), so
+  // the row records what the chat shows, not only the engine's final text.
+  let ui: { reducer: any; initial: any; showsSnippet: (s: any) => boolean } | null = null;
   let answerer: any = null, appCtx: any = null, lastGen: GenResult | undefined, lastChunks: RetrievedChunk[] = [], promptChunks: RetrievedChunk[] = [];
   if (opt.pipeline === "app") {
     const answerModule = "../../src/routing/answer", personalityModule = "../../src/constants/personalities";
     const { createAnswerer } = await import(answerModule);
     await assertPtLexicon();
+    if (existsSync(join(ROOT, "src/ui/chat/answerReducer.ts"))) {
+      try {
+        const red: any = await import(join(ROOT, "src/ui/chat/answerReducer.ts"));
+        let shows = (a: any) => !!a.instant && !a.extract;
+        try { shows = (await import(join(ROOT, "src/ui/chat/presentation.ts") as string)).showsInstantSnippet ?? shows; } catch {}
+        ui = { reducer: red.answerReducer, initial: red.initialAnswer, showsSnippet: shows };
+      } catch (e: any) { console.error(`[eval] chat reducer not loaded: ${e?.message ?? e}`); }
+    }
     const pm = await import(personalityModule);
     const personality = pm.getPersonality(pm.DEFAULT_PERSONALITY_ID ?? PERSONALITY_ID);
     appCtx = { systemPrompt: personality.systemPrompt, styleReminder: personality.styleReminder, maxTokens: MAX_TOKENS };
@@ -616,7 +627,7 @@ async function main() {
     let chunks: RetrievedChunk[] = [];
     let retrievalMs = 0;
     let gen: GenResult | undefined;
-    let app: { text: string; declined?: boolean; warnings?: Array<{ code?: string; message?: string; declined?: boolean }>; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }>; cited?: number[]; citedTitles?: string[] } | undefined;
+    let app: { text: string; declined?: boolean; warnings?: Array<{ code?: string; message?: string; declined?: boolean }>; tier: string; sources: string[]; retrieved: string[]; reasonCodes: string[]; modelCalled: boolean; ttftMs?: number; modelText?: string; promptSources?: Array<{ title: string; body: string }>; shownSources?: Array<{ title: string; body: string }>; cited?: number[]; citedTitles?: string[]; screen?: any } | undefined;
     try {
       if (answerer) {
         lastGen = undefined; lastChunks = []; promptChunks = [];
@@ -624,7 +635,9 @@ async function main() {
         let appError: { code: string; message: string } | undefined;
         let cited: number[] | undefined;
         const warnings: Array<{ code?: string; message?: string; declined?: boolean }> = [];
+        let uiState: any = null;
         const res = await answerer.answer({ query: q.query }, (e: any) => {
+          if (ui) try { uiState = ui.reducer(uiState ?? ui.initial(e.answerId), e); } catch {}
           if (e.type === "warning") warnings.push({ code: e.code, message: e.message, declined: e.declined });
           if (e.type === "done") {
             if (e.error) appError = e.error;
@@ -647,6 +660,11 @@ async function main() {
           // Citation audit: the model's own text before any post-processing, the sources in its prompt, and the shown ones.
           modelText: (lastGen as GenResult | undefined)?.answer, promptSources: promptChunks.map(clip), shownSources: (res.sources ?? []).map(clip),
           cited, citedTitles: cited?.map((i) => res.sources?.[i - 1]?.title).filter(Boolean),
+          screen: uiState ? {
+            // InstantSnippet shows the passage and, under it, a "[n]" button (sourceIndex + 1).
+            snippet: ui!.showsSnippet(uiState) && uiState.instant ? { text: uiState.instant.text, button: `[${uiState.instant.sourceIndex + 1}]` } : undefined,
+            extract: uiState.extract, fast: uiState.fast?.text, deep: uiState.deep?.text,
+          } : undefined,
         };
       } else {
         const r0 = performance.now();
@@ -719,6 +737,7 @@ async function main() {
       shownSources: app?.shownSources,
       cited: app?.cited,
       declined: app?.declined,
+      screen: app?.screen,
       warnings: app?.warnings,
       citedTitles: app?.citedTitles,
       retrievedTitles,
