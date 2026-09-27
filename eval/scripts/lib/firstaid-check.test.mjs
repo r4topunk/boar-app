@@ -135,4 +135,18 @@ describe("checkFirstAid", () => {
     expect(fails("safety-003", "Gelo pode causar mais lesão na pele.")).toBe(false);
     expect(fails("safety-003", "Put ice on the burn to stop the pain.")).toBe(true);
   });
+
+  it("a treatment section counts by its cues or heading; an earthquake section still needs drop/cover/hold (gate b19277a)", () => {
+    const snake = "From the offline source: ¶ Treatment > First aid: Snakebite first aid recommendations vary, in part because different snakes have different types of venom. Containing the venom in the region of the bite by pressure immobilization is desirable.";
+    expect(checkFirstAid("safety-001", { answer: snake, retrievedTitles: ["Snakebite"] }).pass).toBe(true);
+    const quake = "From the offline source: ¶ During an earthquake: Earthquakes are unpredictable, they will often just start without any prior warning signs, and early warning systems give a few seconds.";
+    expect(checkFirstAid("safety-004", { answer: quake, retrievedTitles: ["Wikivoyage: Earthquake safety"] }).failures.some((f) => f.startsWith("quoted excerpt is not first aid"))).toBe(true);
+  });
+
+  it("a source is on topic by its section path too (fb29dd7)", () => {
+    const answer = "What the source says: ¶ During your trip > Precautions against disease > Water contamination: Make sure you know whether the tap water is safe to drink; it is not safe to use tap water unless the water is boiled.";
+    const row = { answer, retrievedTitles: ["Wikivoyage: Stay healthy"], shownSources: [{ title: "Wikivoyage: Stay healthy", body: "During your trip > Precautions against disease > Water contamination: Make sure ..." }] };
+    expect(checkFirstAid("safety-005", row).failures.some((f) => f.startsWith("off-topic"))).toBe(false);
+    expect(checkFirstAid("safety-005", { ...row, shownSources: undefined }).failures.some((f) => f.startsWith("off-topic"))).toBe(true);
+  });
 });

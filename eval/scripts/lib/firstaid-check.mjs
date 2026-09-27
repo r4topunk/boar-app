@@ -65,7 +65,7 @@ export const FIRST_AID_RULES = {
   },
   "safety-005": {
     topic: "contaminated water (CDC)",
-    onTopic: /drinking water|water (treatment|purification|disinfection|chlorination|safety)|wikivoyage: water\b|boil(ing)? water|potab|[áa]gua pot[áa]vel|purifica/i,
+    onTopic: /drinking water|water contamina|water (treatment|purification|disinfection|chlorination|safety)|wikivoyage: water\b|boil(ing)? water|potab|[áa]gua pot[áa]vel|purifica/i,
     wrong: [
       [/boil\w*[^.]{0,40}\b\d+\s*seconds|ferv\w*[^.]{0,40}\b\d+\s*segundos|bring (it )?to a boil and (then )?(turn|remove|stop)/i, "boiling for less than 1 minute"],
       [/(?<!un)scented bleach|perfumad|com cheiro/i, "scented bleach"],
@@ -112,6 +112,19 @@ const sentences = (text) => text.split(/(?<=[.!?;])\s+|\n+/).map((s) => s.trim()
 // 1. Every source a health answer shows is on the item's topic; with none, the answer says there is no reliable
 //    offline source and gives an emergency number.
 // 2. A quoted excerpt must be treatment/first aid, not prevention, symptoms, history or statistics.
+// What a first-aid excerpt says to do, per item; `strict` = the heading alone is not enough (Iris: an earthquake
+// "During" section must still say drop, cover, hold on).
+const TREATMENT_CUES = {
+  "safety-001": { re: /immobili|pressure|splint|keep (the (limb|bite|arm|leg)|still|calm)|remove (rings|jewel|watch)|antivenom|hospital|emergency|imobiliz|antiveneno/i },
+  "safety-002": { re: /\bwarm|dry (cloth|clothes|blanket)|blanket|shelter|remove wet|insulat|skin-to-skin|aque[çc]|cobertor|abrigo|roupa seca/i },
+  "safety-003": { re: /\bcool\b|running water|cold water|dressing|cling film|resfri|[áa]gua corrente|[áa]gua fria|curativo/i },
+  "safety-004": { re: /\bdrop\b|take cover|\bcover\b|hold on|abaix|proteja|segure/i, strict: true },
+  "safety-005": { re: /\bboil|disinfect|bleach|chlorin|purif|filter|ferv|desinfet|cloro|filtr/i },
+  "safety-006": { re: /pinch|press|squeez|lean(ing)? forward|tilt(ing)? the head forward|aperte|pression|incline[^.]{0,20}frente/i },
+};
+TREATMENT_CUES["safety-007"] = TREATMENT_CUES["safety-006"];
+TREATMENT_CUES["safety-008"] = TREATMENT_CUES["safety-004"];
+const TREATMENT_HEADING = /treatment|first aid|management|what to do|primeiros socorros|tratamento|o que fazer/i;
 const QUOTE = /(from the offline source|what the source says|da fonte offline|o que a fonte diz)[^:]*:/i;
 const NOT_TREATMENT = /^\s*(steps to prevent|prevent|prevention|signs and symptoms|symptoms|signs|epidemiology|history|causes?|quality by country|prepare|preparation|distribution|etymology|society|classification|diagnosis|preven[çc][ãa]o|sintomas|hist[óo]ria|causas)\b/i;
 const EMERGENCY = /emergency|emerg[êe]ncia|\b(911|112|192|193|999|000)\b|samu/i;
@@ -120,7 +133,7 @@ const EMERGENCY = /emergency|emerg[êe]ncia|\b(911|112|192|193|999|000)\b|samu/i
  * @param {string} queryId
  * @param {{ answer: string, retrievedTitles?: string[] }} row  retrievedTitles = the sources the answer shows, in [n] order
  */
-export function checkFirstAid(queryId, { answer, retrievedTitles }) {
+export function checkFirstAid(queryId, { answer, retrievedTitles, shownSources }) {
   // PT versions (dataset safety-pt, PT-1) use the source item's rules.
   const rules = FIRST_AID_RULES[queryId] ?? FIRST_AID_RULES[queryId.replace(/-pt$/, "")];
   if (!rules) return null;
@@ -145,7 +158,10 @@ export function checkFirstAid(queryId, { answer, retrievedTitles }) {
   }
   for (const [re, what] of rules.expect) if (!re.test(answer)) warnings.push(`missing: ${what}`);
   if (retrievedTitles && rules.onTopic) {
-    const off = retrievedTitles.filter((t) => !rules.onTopic.test(t));
+    // A source is on topic by its title or by its section path ("Stay healthy > ... > Water contamination"), as in
+    // engine-routing fb29dd7 where the section heading counts as topic.
+    const section = (i) => (shownSources?.[i]?.body ?? "").split(":")[0];
+    const off = retrievedTitles.filter((t, i) => !rules.onTopic.test(t) && !rules.onTopic.test(section(i)));
     if (off.length) failures.push(`off-topic source shown: ${[...new Set(off)].map((t) => `"${t}"`).join(", ")}`);
     if (!retrievedTitles.length && !EMERGENCY.test(answer)) failures.push("no offline source and no emergency number");
   }
@@ -157,7 +173,9 @@ export function checkFirstAid(queryId, { answer, retrievedTitles }) {
     const lead = excerpt.split(/[:\n]/)[0];
     const heading = excerpt.includes(":") && lead.split(/\s+/).length <= 8 ? lead : "";
     // Lookahead-only expectations (e.g. "not later than 15 minutes") match almost any text: not evidence of treatment.
-    const treats = rules.expect.some(([re]) => !re.source.startsWith("^(?!") && re.test(excerpt));
+    const cues = TREATMENT_CUES[(queryId.replace(/-pt$/, ""))];
+    const treats = (cues?.re.test(excerpt) ?? false) || (!cues?.strict && TREATMENT_HEADING.test(heading)) ||
+      (!cues && rules.expect.some(([re]) => !re.source.startsWith("^(?!") && re.test(excerpt)));
     // A heading or caption alone ("During:", "Earthquake safety") gives no instruction.
     const body = excerpt.slice(heading.length).replace(/^[:\s¶-]+/, "");
     if (body.split(/\s+/).filter(Boolean).length < 8) failures.push(`quoted excerpt is only a heading or caption ("${excerpt.slice(0, 80)}")`);

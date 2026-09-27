@@ -10,6 +10,7 @@
 # Env: GATE_HOST (r4toMacMini), GATE_SEEDS ("1 2 3 4 5"), GATE_MODELS ("qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km"),
 #      GATE_CORPUS (essential = corpus + corpus-standard + corpus-full, the default install),
 #      GATE_SUGGESTIONS_REF=<ref> (suggestions from another ref),
+#      GATE_PT=1 (PT item: v2 non-food items in EN and PT, 4B seed 42 with the catalog packs, for the PT vs EN gap),
 #      GATE_S32=1 also answers the v1 s32 questions (seed 42, no packs) into results/gates/<label>/s32/ for the judges,
 #      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
 # Also the "suggestions" item (RT-1): each empty-chat suggestion (src/i18n chat.suggestions, EN+PT) is asked with
@@ -26,6 +27,7 @@ MODELS="${GATE_MODELS:-qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km}"
 PIPELINE="${GATE_PIPELINE:-app}"
 CORPUS="${GATE_CORPUS:-essential}"
 S32="${GATE_S32:-0}"
+PTSET="${GATE_PT:-0}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/eval/dataset/subset.s32.v1.json")"
 DEST="boar/gate/$LABEL"
@@ -108,6 +110,19 @@ for m in $MODELS; do for s in $SEEDS; do
   done
 done; done
 $SUG_LINES
+for m in $MODELS; do for s in $SEEDS; do
+  for cfg in none packs; do
+    [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
+    extra=(); name=\${m}__${CORPUS}__seed\$s
+    [ \$cfg = packs ] && extra=(--pack \$PREP,\$CRYPTO) && name=\${m}__${CORPUS}__packs__seed\$s
+    run --model \$m --seed \$s --dataset safety-pt \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
+  done
+done; done
+if [ $PTSET = 1 ]; then mkdir -p eval/results/gate-pt
+  V2IDS=\$(node -e 'console.log(require("fs").readFileSync("eval/dataset/questions.v2.jsonl","utf8").trim().split("\\n").map(JSON.parse).filter(q=>!q.id.startsWith("food-")).map(q=>q.id).join(","))')
+  run --model qwen3-4b-instruct-2507-q4km --seed 42 --dataset v2 --ids \$V2IDS --pack \$PREP,\$CRYPTO --out eval/results/gate-pt/v2-en.jsonl
+  run --model qwen3-4b-instruct-2507-q4km --seed 42 --dataset v2-pt --ids \$(echo \$V2IDS | sed 's/,/-pt,/g')-pt --pack \$PREP,\$CRYPTO --out eval/results/gate-pt/v2-pt.jsonl
+fi
 if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
 [ $HAS_PACK = 0 ] || { echo "$PREP_SHA  \$PREP" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$CRYPTO" | shasum -a 256 -c -; }
 EOF
@@ -118,6 +133,7 @@ OUT="$ROOT/eval/results/gates/$LABEL"
 mkdir -p "$OUT/runs"
 rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
 [ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
+[ "$PTSET" = 1 ] && mkdir -p "$OUT/pt" && rsync -az "$HOST:$DEST/eval/results/gate-pt/" "$OUT/pt/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "corpus": "$CORPUS",
   "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "packSource": "tree catalog", "wikiVital5": "$VITAL_SHA", "suggestionsRef": "${GATE_SUGGESTIONS_REF:-$REF}", "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
@@ -129,7 +145,7 @@ node scripts/regress.mjs --name "gate-$LABEL" --runs "results/gates/$LABEL/runs"
 RC=$?
 set -e
 N_MODELS=$(wc -w <<<"$MODELS"); N_SEEDS=$(wc -w <<<"$SEEDS"); N_CFG=$((1 + HAS_PACK))
-N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + 1 ))  # safety items + the quantum prompt
+N_ITEMS=$(( $(grep -c . "$ROOT/eval/dataset/questions.safety.jsonl") + $(grep -c . "$ROOT/eval/dataset/questions.safety-pt.jsonl") + 1 ))  # safety EN + PT + the quantum prompt
 EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
 echo "rows: $GOT / $EXPECTED expected"
