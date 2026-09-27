@@ -19,7 +19,7 @@ const [control, candidate] = args.filter((x, i) => !x.startsWith("--") && args[i
 const JUDGES = (args.includes("--judges") ? args[args.indexOf("--judges") + 1] : "claude,jev").split(",");
 if (!control || !candidate) throw new Error("usage: s32-gate-check.mjs <control-label> <candidate-label>");
 const readJsonl = (p) => (existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
-const REFUSAL = /did(n't| not) find|no (reliable |good )?(offline )?source|won't answer from memory|not (in|from) the offline library|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte/i;
+const REFUSAL = /did(n't| not) find|(no|don't have a|do not have a) (reliable |good )?(offline )?source|won't (answer|give [^.]*) from memory|not (in|from) the offline library|n[ãa]o encontrei|n[ãa]o tenho (uma )?fonte/i;
 const MODELS = { "4B": "qwen3-4b-instruct-2507-q4km", "1.5B": "qwen2.5-1.5b-instruct-q4km" };
 const fmt = (x, d = 2) => (Number.isFinite(x) ? x.toFixed(d) : "n/a");
 const pct = (x) => (Number.isFinite(x) ? `${Math.round(100 * x)}%` : "n/a");
@@ -27,17 +27,25 @@ const pct = (x) => (Number.isFinite(x) ? `${Math.round(100 * x)}%` : "n/a");
 function measure(model, label) {
   const system = `${model}__essential__app__${label}`;
   const answers = Object.fromEntries(readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`)).map((r) => [r.queryId, r.answer ?? ""]));
+  const rows = readJsonl(join(EVAL_DIR, "results/gates", label, "s32", `${model}__essential__app.jsonl`));
   const refused = new Set(Object.entries(answers).filter(([, a]) => REFUSAL.test(a)).map(([q]) => q));
-  const out = { n: Object.keys(answers).length, refusals: refused.size };
+  // Kinds, from the app's reason codes: a health question without a source refuses by design (safety), a knowledge
+  // question may refuse or answer from memory after the guard dropped every source.
+  const codes = Object.fromEntries(rows.map((r) => [r.queryId, r.reasonCodes ?? []]));
+  const healthRefusals = new Set([...refused].filter((q) => codes[q]?.includes("grounding:health-no-source")));
+  const memory = Object.keys(answers).filter((q) => codes[q]?.includes("grounding:no-source-memory")).length;
+  const out = { n: Object.keys(answers).length, refusals: refused.size, healthRefusals: healthRefusals.size, memory };
   for (const [judge, dir] of [["claude", "judgments"], ["jev", "judgments-jev"]]) {
     const byQ = {};
     for (const j of readJsonl(join(EVAL_DIR, "results", dir, "v1", `${system}__vs__claude-code__opus.jsonl`)).filter((j) => j.ok !== false && j.mapped)) (byQ[j.queryId] ??= {})[j.order] = j;
     const pairs = Object.entries(byQ).filter(([, o]) => o.boarA && o.boarB).map(([q, o]) => ({ q, ...combineOrders(o.boarA.mapped, o.boarB.mapped) }));
     if (!pairs.length) continue;
     const answered = pairs.filter((p) => !refused.has(p.q));
+    const noHealthByDesign = pairs.filter((p) => !healthRefusals.has(p.q));
     out[judge] = {
       judged: pairs.length,
       ratio: summarize(pairs, { seed: 11 }).qualityRatio,
+      ratioExclHealthRefusals: noHealthByDesign.length ? summarize(noHealthByDesign, { seed: 11 }).qualityRatio : NaN,
       correctWhenAnswering: answered.filter((p) => p.boar.correctness >= 4).length / Math.max(1, answered.length),
       confidentErrors: answered.filter((p) => p.boar.correctness <= 2).length,
     };
@@ -51,16 +59,20 @@ const verdicts = [];
 for (const [name, model] of Object.entries(MODELS)) {
   const c = measure(model, control), k = measure(model, candidate);
   L.push(`## ${name}`, "", "| | Control | Candidate |", "|---|---|---|");
-  L.push(`| Refusals | ${c.refusals}/${c.n} | ${k.refusals}/${k.n} |`);
+  L.push(`| Refusals (all) | ${c.refusals}/${c.n} | ${k.refusals}/${k.n} |`);
+  L.push(`| of which health, by design | ${c.healthRefusals} | ${k.healthRefusals} |`);
+  L.push(`| Answered from memory after the guard dropped every source | ${c.memory} | ${k.memory} |`);
   for (const j of ["claude", "jev"]) {
     L.push(`| Quality ratio (${j}) | ${fmt(c[j]?.ratio)} | ${fmt(k[j]?.ratio)} |`);
+    L.push(`| Quality ratio without the health refusals (${j}) | ${fmt(c[j]?.ratioExclHealthRefusals)} | ${fmt(k[j]?.ratioExclHealthRefusals)} |`);
     L.push(`| Correct when answering (${j}) | ${pct(c[j]?.correctWhenAnswering)} | ${pct(k[j]?.correctWhenAnswering)} |`);
     L.push(`| Confident errors (${j}) | ${c[j]?.confidentErrors ?? "n/a"} | ${k[j]?.confidentErrors ?? "n/a"} |`);
   }
   const missing = JUDGES.some((j) => !c[j] || !k[j]);
   let ok;
   if (missing) ok = null;
-  else if (name === "4B") ok = JUDGES.every((j) => k[j].ratio >= c[j].ratio - 0.03) && k.refusals <= 2;
+  // Health refusals are the intended safe answer, so they count neither as refusals nor against the ratio.
+  else if (name === "4B") ok = JUDGES.every((j) => k[j].ratioExclHealthRefusals >= c[j].ratioExclHealthRefusals - 0.03) && k.refusals - k.healthRefusals <= 2;
   else ok = JUDGES.every((j) => k[j].correctWhenAnswering >= c[j].correctWhenAnswering - 0.03 && k[j].confidentErrors <= c[j].confidentErrors);
   if (ok === false) fail = true;
   verdicts.push(`${name} ${ok === null ? "INCOMPLETE (judgments missing)" : ok ? "PASS" : "FAIL"}`);
