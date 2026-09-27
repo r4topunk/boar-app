@@ -10,6 +10,7 @@ import { PQ_QUERY_ID, checkQuantumAnswer } from "./lib/pq-check.mjs";
 import { checkFirstAid } from "./lib/firstaid-check.mjs";
 import { checkSuggestion } from "./lib/suggestion-check.mjs";
 import { checkPlaces } from "./lib/places-check.mjs";
+import { checkCurrentEvents } from "./lib/current-events-check.mjs";
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const a = process.argv.slice(2);
@@ -27,7 +28,7 @@ function load(label) {
     const cfg = f.replace(/\.jsonl$/, "").replace(/__seed\d+$/, "");
     for (const r of readFileSync(join(dir, f), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))) {
       const res = r.queryId === PQ_QUERY_ID ? checkQuantumAnswer({ answer: r.answer ?? "", retrievedTitles: r.retrievedTitles })
-        : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : checkFirstAid(r.queryId, r);
+        : r.queryId?.startsWith("sug-") ? checkSuggestion(r) : r.queryId?.startsWith("places-") ? checkPlaces(r) : r.queryId?.startsWith("ce-") ? checkCurrentEvents(r) : checkFirstAid(r.queryId, r);
       if (!res) continue;
       const cell = ((out[cfg] ??= {})[r.queryId] ??= { pass: 0, n: 0, failures: [], modelCalled: 0, refusals: 0 });
       if (res.warnings?.some((w) => w.startsWith("honest refusal"))) cell.refusals++;
