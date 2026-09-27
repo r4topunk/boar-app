@@ -9,6 +9,7 @@
 #   eval/ (runner, datasets, checks) comes from this worktree.
 # Env: GATE_HOST (r4toMacMini), GATE_SEEDS ("1 2 3 4 5"), GATE_MODELS ("qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km"),
 #      GATE_CORPUS (essential = corpus + corpus-standard + corpus-full, the default install),
+#      GATE_S32=1 also answers the v1 s32 questions (seed 42, no packs) into results/gates/<label>/s32/ for the judges,
 #      GATE_PIPELINE (app = the tree's createAnswerer, what the phone runs; direct = retrieval straight into the prompt).
 # Exit: 0 = all pass, 1 = a case fails (blocker), 2 = incomplete (missing rows, or the tree cannot load packs).
 set -euo pipefail
@@ -20,6 +21,8 @@ SEEDS="${GATE_SEEDS:-1 2 3 4 5}"
 MODELS="${GATE_MODELS:-qwen2.5-1.5b-instruct-q4km qwen3-4b-instruct-2507-q4km}"
 PIPELINE="${GATE_PIPELINE:-app}"
 CORPUS="${GATE_CORPUS:-essential}"
+S32="${GATE_S32:-0}"
+S32_IDS="$(node -e 'console.log(require(process.argv[1]).ids.join(","))' "$ROOT/eval/dataset/subset.s32.v1.json")"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DEST="boar/gate/$LABEL"
 # Pinned packs (sha256 from the knowledge catalog: src/rag/preparedness.ts, src/rag/cryptoPack.ts).
@@ -59,6 +62,7 @@ for m in $MODELS; do for s in $SEEDS; do
     run --model \$m --seed \$s --dataset cryptopack --ids crypto-named-001 \${extra[@]+"\${extra[@]}"} --out \$O/\$name.jsonl
   done
 done; done
+if [ $S32 = 1 ]; then mkdir -p eval/results/gate-s32; for m in $MODELS; do run --model \$m --seed 42 --dataset v1 --ids $S32_IDS --out eval/results/gate-s32/\${m}__${CORPUS}__app.jsonl; done; fi
 echo "$PREP_SHA  \$PACKS/boar-preparedness.sqlite" | shasum -a 256 -c - && echo "$CRYPTO_SHA  \$PACKS/boar-crypto.sqlite" | shasum -a 256 -c -
 EOF
 scp -q "$TMP/run.sh" "$HOST:$DEST/run.sh"
@@ -67,6 +71,7 @@ ssh "$HOST" "~/boar/bin/heavy Sextant bash -l ~/$DEST/run.sh" 2>&1 | grep -E "RU
 OUT="$ROOT/eval/results/gates/$LABEL"
 mkdir -p "$OUT/runs"
 rsync -az --delete "$HOST:$DEST/eval/results/gate-runs/" "$OUT/runs/"
+[ "$S32" = 1 ] && mkdir -p "$OUT/s32" && rsync -az "$HOST:$DEST/eval/results/gate-s32/" "$OUT/s32/"
 cat > "$OUT/meta.json" <<EOF
 { "label": "$LABEL", "tree": "$TREE", "ref": "$REF", "sha": "$SHA", "packsLoadable": $HAS_PACK, "seeds": "$SEEDS", "models": "$MODELS", "pipeline": "$PIPELINE", "corpus": "$CORPUS",
   "packs": { "boar-preparedness": "$PREP_SHA", "boar-crypto": "$CRYPTO_SHA" }, "at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)", "host": "$HOST" }
