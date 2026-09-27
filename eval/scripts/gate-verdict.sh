@@ -67,6 +67,8 @@ DUP=$(node scripts/dup-disclaimer.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | se
 echo "$DUP" | grep -q '\*\*FAIL' && FAIL=1
 [ -z "$DUP" ] && FAIL=1
 line "duplicate disclaimer" "${DUP:-not run (blocking)}"
+FW=$(node scripts/foreign-word-check.mjs "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ Regenerate.*//')
+line "trv-007 foreign word" "${FW:-not run}"
 line "EIP PT (cited page)" "$(node scripts/eip-pt-check.mjs "$C" "$K" 2>/dev/null | grep '^TL;DR' | sed -E 's/TL;DR: //; s/ \(EIP-4844.*//') (target, reported)"
 line "VERDICT" "$([ $FAIL = 0 ] && echo PASS || echo FAIL)"
 exit $FAIL
