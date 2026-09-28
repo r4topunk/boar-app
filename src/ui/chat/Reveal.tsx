@@ -1,9 +1,10 @@
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LayoutChangeEvent, View } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, useAnimatedReaction, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useTheme } from "../theme";
 import { CURVE, type Curve } from "../theme/motionSpec";
+import { MOTION_PROBE, probe } from "./motionProbe";
 import { REST, boundsAfter, boundsAtStart, hideFrom, revealDeadline, revealMove, revealOnLayout, revealTiming, type RevealMove } from "./revealTiming";
 
 const curves: Record<Curve, ReturnType<typeof Easing.bezier>> = {
@@ -34,11 +35,14 @@ export function Reveal({
   shown = true,
   appear = true,
   spaceBefore = 0,
+  probeId,
   children,
 }: {
   shown?: boolean;
   appear?: boolean;
   spaceBefore?: number;
+  /** TEMPORARY (motionProbe): names this block in the device log. */
+  probeId?: string;
   children?: ReactNode;
 }) {
   const { reduceMotion } = useTheme();
@@ -61,6 +65,7 @@ export function Reveal({
   // the declined text and its sources "vanished in one frame" on the iPhone (v9, F2-2).
   const runId = useRef(0);
   const settle = useCallback((id?: number) => {
+    if (probeId) probe("reveal.settle", { block: probeId, id, current: runId.current, shown: shownRef.current, stale: id != null && id !== runId.current });
     if (id != null && id !== runId.current) return;
     moving.current = false;
     if (deadline.current) clearTimeout(deadline.current);
@@ -76,7 +81,10 @@ export function Reveal({
   const arm = useCallback(
     (ms: number, id?: number) => {
       if (deadline.current) clearTimeout(deadline.current);
-      deadline.current = setTimeout(() => settle(id), ms);
+      deadline.current = setTimeout(() => {
+        if (probeId) probe("reveal.deadline", { block: probeId, id, ms });
+        settle(id);
+      }, ms);
     },
     [settle]
   );
@@ -94,6 +102,8 @@ export function Reveal({
       const end = boundsAfter(move);
       const bound = move.bound === "maxHeight" ? maxHeight : minHeight;
       const id = ++runId.current;
+      if (probeId)
+        probe("reveal.run", { block: probeId, id, show, bound: move.bound, from: move.from, to: move.to, moving: moving.current, maxNow: maxHeight.value, minNow: minHeight.value, natural: natural.current });
       if (!show) {
         // A hide starts from what shows now, never from a grow's unbounded cap (hideFrom).
         minHeight.value = REST.minHeight;
@@ -117,6 +127,7 @@ export function Reveal({
   );
 
   useEffect(() => {
+    if (probeId) probe("reveal.shown", { block: probeId, shown, natural: natural.current, mounted, maxNow: maxHeight.value, moving: moving.current });
     if (shown) {
       setMounted(true);
       // Shown again after a hide: grow back to the last measure (the next layout retargets it).
@@ -144,6 +155,7 @@ export function Reveal({
     (e: LayoutChangeEvent) => {
       const next = e.nativeEvent.layout.height;
       const step = revealOnLayout(natural.current, next, grows, spaceBefore);
+      if (probeId) probe("reveal.layout", { block: probeId, next, natural: natural.current, step, shown: shownRef.current, moving: moving.current });
       if (step === "wait") return;
       const previous = natural.current;
       natural.current = next;
@@ -157,10 +169,37 @@ export function Reveal({
 
   const style = useAnimatedStyle(() => ({ minHeight: minHeight.value, maxHeight: maxHeight.value, opacity: opacity.value }));
 
+  // TEMPORARY probe: mount/unmount, the bounds as the UI thread moves them, the frame's real height per commit.
+  useEffect(() => {
+    if (!probeId) return;
+    probe("reveal.mount", { block: probeId, shown, grows });
+    return () => probe("reveal.unmount", { block: probeId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const logBounds = useCallback((max: number, min: number, op: number) => {
+    if (probeId) probe("reveal.bounds", { block: probeId, max, min, op });
+  }, [probeId]);
+  useAnimatedReaction(
+    () => [maxHeight.value, minHeight.value, opacity.value] as const,
+    (now, before) => {
+      if (MOTION_PROBE && probeId && (!before || now[0] !== before[0] || now[1] !== before[1] || now[2] !== before[2])) {
+        scheduleOnRN(logBounds, now[0], now[1], now[2]);
+      }
+    },
+    [probeId, logBounds]
+  );
+  const onFrameLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      if (probeId) probe("reveal.frame", { block: probeId, height: e.nativeEvent.layout.height });
+    },
+    [probeId]
+  );
+
   const content = useMemo(() => (shown ? children : last.current), [shown, children]);
   if (!mounted && !shown) return null;
   return (
     <Animated.View
+      onLayout={probeId ? onFrameLayout : undefined}
       style={[{ overflow: "hidden" }, style]}
       pointerEvents={shown ? "auto" : "none"}
       importantForAccessibility={shown ? "auto" : "no-hide-descendants"}

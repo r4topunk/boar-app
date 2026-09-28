@@ -73,6 +73,7 @@ import { locate } from "./chat/locationApi";
 import { suggestionsFor } from "./chat/suggestions";
 import { installedKnowledgeIds } from "./chat/knowledgeApi";
 import { batchAnimatesLayout, flushDelay } from "./chat/streamBatch";
+import { probe } from "./chat/motionProbe";
 import { createBottomPin, FOLLOW_SLACK, heightChanged, jumpToLatestShown, keepEndOnResize } from "./chat/listPin";
 import { EnterOnce } from "./chat/EnterOnce";
 import { Swap } from "./chat/Swap";
@@ -267,7 +268,10 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
       const item = itemsRef.current.find((m) => m.id === messageId);
       return item?.kind === "assistant" && !!item.answer.weakDeclined;
     });
-    if (batchAnimatesLayout(batch.map((b) => b.event), declined)) motionRef.current.animateNextLayout();
+    const animates = batchAnimatesLayout(batch.map((b) => b.event), declined);
+    const kinds = batch.map((b) => b.event.type).filter((k) => k !== "token");
+    if (kinds.length) probe("screen.flush", { events: kinds.join(","), tokens: batch.length - kinds.length, declined, layoutAnim: animates });
+    if (animates) motionRef.current.animateNextLayout();
     setItems((prev) => {
       let next = prev;
       for (const { messageId, event } of batch) next = updateAnswer(next, messageId, (a) => answerReducer(a, event));
@@ -500,6 +504,7 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
   );
 
   const finish = useCallback(() => {
+    probe("screen.finish", { id: activeRef.current?.messageId });
     // No layout animation here (was F2-1): since CX-12 an answer with text ends on screen when its reveal
     // drains, not in this commit; a decline's note mounts in it, and the native layout animation over a
     // view mounting in a Reveal made it blink in whole for a frame (Prism F2-9).
@@ -620,6 +625,7 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
       const sessionId = activeSessionId;
       // A follow-up makes the answer live again, restored or not: its blocks move (iPhone v9, F2-2: on a
       // reopened conversation "Answer with AI" ran with plain views, and the declined text vanished in a frame).
+      probe("screen.followUp", { id: messageId, kind: typeof kind === "object" ? JSON.stringify(kind) : kind, wasFresh: askedIds.current.has(messageId) });
       askedIds.current.add(messageId);
       activeRef.current = { messageId, handle: null };
       setActive(activeRef.current);
@@ -1244,6 +1250,7 @@ const AssistantRow = memo(function AssistantRow({
   );
   return (
     <AssistantMessage
+      probeKey={item.id}
       answer={item.answer}
       question={item.question}
       waitingLibrary={waitingLibrary}

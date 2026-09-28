@@ -74,7 +74,7 @@ describe("chat visual minors (Prism CH-22..CH-28)", () => {
   });
   it("F2-9: the end notes fade in whole (no height reveal), with no layout animation on their commit", () => {
     const msg = read("AssistantMessage.tsx");
-    expect(msg).toMatch(/<Block shown=\{!!answer\.weakDeclined && !active\} fade>/);
+    expect(msg).toMatch(/<Block shown=\{!!answer\.weakDeclined && !active\} fade( probeId="\w+")?>/);
     expect(msg).toMatch(/<Block shown=\{!!note && !!done\} fade>/);
     const finish = read("../ChatScreen.tsx").match(/const finish = useCallback\(\(\) => \{[\s\S]*?\n  \}, \[\]\);/)![0];
     expect(finish).not.toMatch(/animateNextLayout\(\)/);
@@ -88,7 +88,7 @@ describe("chat visual minors (Prism CH-22..CH-28)", () => {
     const followUp = read("../ChatScreen.tsx").match(/const followUp = useCallback\([\s\S]*?setActive\(activeRef\.current\);/)![0];
     expect(followUp).toMatch(/askedIds\.current\.add\(messageId\);/);
     const msg = read("AssistantMessage.tsx");
-    expect(msg).toMatch(/<Reveal shown=\{shown\} appear=\{false\} spaceBefore=\{gap \?\? m\.gap\}>/);
+    expect(msg).toMatch(/<Reveal shown=\{shown\} appear=\{false\} spaceBefore=\{gap \?\? m\.gap\}( probeId=\{probeId\})?>/);
     expect(msg).toMatch(/<LayoutAnimationConfig skipEntering>\s*<View style=\{\{ alignSelf: "stretch" \}\}>/);
   });
 });

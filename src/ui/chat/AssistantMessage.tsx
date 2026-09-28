@@ -22,12 +22,15 @@ import { chatLargeText } from "./largeText";
 import Reanimated, { LayoutAnimationConfig } from "react-native-reanimated";
 import { Reveal } from "./Reveal";
 import { useSmoothText } from "./useSmoothText";
+import { probe } from "./motionProbe";
 import { answerStillShowing, isDraining } from "./streamReveal";
 import { Swap } from "./Swap";
 import { StepsSlot } from "./StepsSlot";
 import { useMotion } from "../theme/motion";
 
 export interface AssistantMessageProps {
+  /** TEMPORARY (motionProbe): the message id, for the device log. */
+  probeKey?: string;
   answer: AnswerState;
   /** This answer is the one running now. */
   active: boolean;
@@ -237,6 +240,9 @@ const TierBody = memo(function TierBody({
   const smooth = useSmoothText(answerText, streaming, !reduceMotion);
   const live = streaming || !smooth.settled;
   const draining = isDraining(streaming, smooth.settled);
+  useEffect(() => {
+    if (drainKey) probe("text.state", { tier: drainKey, streaming, settled: smooth.settled, draining, chars: answerText.length });
+  }, [drainKey, streaming, smooth.settled, draining, answerText.length]);
   useEffect(() => {
     if (!drainKey || !onDraining) return;
     onDraining(drainKey, draining);
@@ -929,9 +935,26 @@ const BlockMotion = createContext<{ appear: boolean; gap: number }>({ appear: fa
  * A restored answer doesn't move: plain views, no animated values for every block of the history (its
  * folds open with the DS's animateNextLayout, as in a fresh answer at rest).
  */
-function Block({ shown, gap, fade, children }: { shown: boolean; gap?: number; fade?: boolean; children?: ReactNode }) {
+function Block({
+  shown,
+  gap,
+  fade,
+  probeId,
+  children,
+}: {
+  shown: boolean;
+  gap?: number;
+  fade?: boolean;
+  /** TEMPORARY (motionProbe). */
+  probeId?: string;
+  children?: ReactNode;
+}) {
   const m = useContext(BlockMotion);
   const motion = useMotion();
+  const mode = !m.appear ? "plain" : fade ? "fade" : "reveal";
+  useEffect(() => {
+    if (probeId) probe("block.shown", { block: probeId, shown, mode });
+  }, [probeId, shown, mode]);
   if (!m.appear) return shown ? <View style={{ paddingTop: gap ?? m.gap }}>{children}</View> : null;
   // `fade`: an end note that comes in whole with the DS enter (a fade, 220 ms; 90 under reduce motion) and
   // no growing height: revealed by height it blinked in whole for a frame, then grew with its line cut
@@ -945,7 +968,7 @@ function Block({ shown, gap, fade, children }: { shown: boolean; gap?: number; f
   return (
     // appear={false}: a block grows in only when it shows after mounting hidden. What is already on screen
     // when an answer turns live (a follow-up on a restored one) or when the list remounts a row stays put.
-    <Reveal shown={shown} appear={false} spaceBefore={gap ?? m.gap}>
+    <Reveal shown={shown} appear={false} spaceBefore={gap ?? m.gap} probeId={probeId}>
       {children}
     </Reveal>
   );
@@ -962,6 +985,12 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   );
   const active = answerStillShowing(!!running, draining);
   const revealing = active && !running;
+  // TEMPORARY probe: the answer's own path (mount = a new or remounted row).
+  useEffect(() => {
+    probe("answer.mount", { id: props.probeKey, fresh: !!props.fresh });
+    return () => probe("answer.unmount", { id: props.probeKey });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const onRevealing = props.onRevealing;
   useEffect(() => {
     onRevealing?.(revealing);
@@ -1019,6 +1048,21 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless;
   const instantBanner = !!instantOnly && !!answer.instantDone && answer.instantDone.outcome !== "success";
   const emergency = answerShowsEmergencyNote(answer, props.question ?? "", placesOnly);
+  useEffect(() => {
+    probe("answer.state", {
+      id: props.probeKey,
+      fresh: !!props.fresh,
+      running: !!running,
+      active,
+      revealing,
+      declined: !!answer.weakDeclined,
+      outcome: answer.fast?.outcome ?? "-",
+      body: !!answer.fast?.text && showsAnswerBody(answer),
+      sources: sourcesShown,
+      cardMode,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.fresh, running, active, revealing, answer.weakDeclined, answer.fast?.outcome, !!answer.fast?.text, sourcesShown, cardMode]);
   // The body's block opens with its first words, not before (an empty block would grow a bare gap).
   const fastBody = !!answer.fast?.text && showsAnswerBody(answer);
   // Waiting for the user to pick a city: no clock, no receipt (nothing was answered yet).
@@ -1082,7 +1126,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
             )}
           </Block>
 
-          <Block shown={showsInstantSnippet(answer)}>
+          <Block shown={showsInstantSnippet(answer)} probeId="snippet">
             {showsInstantSnippet(answer) && <InstantSnippet answer={answer} isFinal={extractiveOnly} onOpenSource={onOpenSource} />}
           </Block>
           {/* NB-1: health/safety answers are the source's literal excerpt, with its [n], no model. */}
@@ -1119,7 +1163,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
             ) : null}
           </Block>
           {/* The steps and the text share one slot: the card gives way to the first words in place (D3, v2 P3). */}
-          <Block shown={fastSteps || fastBody}>
+          <Block shown={fastSteps || fastBody} probeId="body">
             <StepsSlot
               steps={fastSteps && steps ? <StepsCard steps={steps} still={ringStill} /> : null}
               body={
@@ -1178,7 +1222,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
           {/* Right under the text, before the sources (Iris, Prism NB-1): on a risky answer it weighs more than the list. */}
           <Block shown={emergency}>{emergency && <EmergencyNote />}</Block>
 
-          <Block shown={sourcesShown}>
+          <Block shown={sourcesShown} probeId="sources">
             {sourcesShown && (
               // CT-2: once the engine says which [n] stayed, the card lists only those; nothing cited = no card.
               // While it writes, only the count (Prism): no list that could shrink, no passage shown as a source yet.
@@ -1200,7 +1244,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
               </Swap>
             )}
           </Block>
-          <Block shown={!!answer.weakDeclined && !active} fade>
+          <Block shown={!!answer.weakDeclined && !active} fade probeId="declineNote">
             {answer.weakDeclined && !active &&
               (declineAfterSnippet(answer) ? (
                 <HeldAfterSnippet onAnswerAnyway={props.onAnswerAnyway} />
