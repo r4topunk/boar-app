@@ -43,14 +43,14 @@ for f in bge-small-en-v1.5-q8_0.gguf Qwen2.5-1.5B-Instruct-Q4_K_M.gguf corpus-st
 
 # probe the host-side recorder once; anything odd -> guest screenrecord for the whole run
 if [ "$REC" = emu ]; then
-  r=$($A emu screenrecord start --fps 60 --bit-rate 40000000 --time-limit 10 "$OUT/probe.webm" 2>&1 | tr -d '\r' | tr '\n' ' '); sleep 4
+  r=$($A emu screenrecord start --fps 60 --bit-rate 25000000 --time-limit 10 "$OUT/probe.webm" 2>&1 | tr -d '\r' | tr '\n' ' '); sleep 4
   $A emu screenrecord stop >/dev/null 2>&1; sleep 3; sz=$(stat -f %z "$OUT/probe.webm" 2>/dev/null || echo 0)
   log "probe emu screenrecord: '$r' size $sz"; [ "$sz" -lt 20000 ] && { REC=dev; log "falling back to REC=dev"; }
 fi
 { echo "apk $(basename "$APK") $(shasum -a 256 "$APK" | cut -c1-64)"; echo "avd boar_api35 Android $($A shell getprop ro.build.version.release) API $($A shell getprop ro.build.version.sdk) $($A shell getprop ro.product.cpu.abi) -gpu $GPU"
   $A shell wm size; $A shell wm density; $A shell dumpsys SurfaceFlinger | grep -m1 -E '^GLES:'; $A shell dumpsys display | grep -m1 -o -E 'renderFrameRate [0-9.]+|fps=[0-9.]+'
   grep -E '^hw.ramSize|^hw.cpu.ncore' $HOME/.android/avd/boar_api35.avd/config.ini; echo "host $(sysctl -n machdep.cpu.brand_string) $(sysctl -n hw.ncpu) cpu"
-  echo "recorder $REC: $([ $REC = emu ] && echo 'adb emu screenrecord --fps 60 --bit-rate 40000000 (webm VP8, host)' || echo 'adb shell screenrecord --bit-rate 100000000 (mp4 H.264, guest, VFR)')"
+  echo "recorder $REC: $([ $REC = emu ] && echo 'adb emu screenrecord --fps 60 --bit-rate 25000000 (webm VP8, host)' || echo 'adb shell screenrecord --bit-rate 100000000 (mp4 H.264, guest, VFR)')"
   echo "theme dark (cmd uimode night yes), show_touches 1, animation scales 1x, airplane mode on, AX font_scale $AX"; } | tr -d '\r' | tee "$OUT/device.txt"
 
 EN=(T_START="Get started" T_ESSENTIAL="Essential" T_CONTINUE="Continue" T_PICK="Choose files" T_DONE="Everything runs offline from now on." T_OPEN="Open BOAR"
@@ -82,7 +82,7 @@ TSV=$OUT/videos.tsv; echo -e "file\tlang\tfont\trecorder\tgpu\tseconds\tapp_fram
 RP=; RT=; RF=
 rec_start() { # $1 = file stem
   RF=$1; $A shell dumpsys gfxinfo $P reset >/dev/null 2>&1
-  if [ $REC = emu ]; then $A emu screenrecord start --fps 60 --bit-rate 40000000 --time-limit 180 "$OUT/$RF.webm" >/dev/null
+  if [ $REC = emu ]; then $A emu screenrecord start --fps 60 --bit-rate 25000000 --time-limit 180 "$OUT/$RF.webm" >/dev/null
   else ( $A shell screenrecord --bit-rate 100000000 --time-limit 180 /sdcard/rec.mp4 ) & RP=$!; fi
   RT=$(now); sleep 1
 }
