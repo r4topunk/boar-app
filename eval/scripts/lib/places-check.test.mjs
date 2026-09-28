@@ -21,4 +21,17 @@ describe("checkPlaces", () => {
   it("accepts the app's wording for a city without data (gate e39ce96)", () => {
     expect(checkPlaces({ queryId: "places-003", answer: "I don't have offline place data for Tokyo, so I won't list any restaurants rather than guess." }).pass).toBe(true);
   });
+
+  it("Rome from the t-N41E012 tile lists real vegan venues with the OpenStreetMap source (v1.1)", () => {
+    const ok = "Vegan places in Rome (OpenStreetMap):\n1. Flower Burger\n2. Passione Vegana\n3. iVegan";
+    expect(checkPlaces({ queryId: "places-004", answer: ok })).toEqual({ pass: true, failures: [], warnings: [] });
+    expect(checkPlaces({ queryId: "places-004", answer: "I don't have offline place data for Rome, so I won't list any restaurants rather than guess." }).pass).toBe(false);
+  });
+  it("Velletri (tile covers it, no kosher in OSM) must be an honest no-match, never 'no data' (T2-6)", () => {
+    const noMatch = "The offline map for Velletri has no place tagged kosher within 25 km, so I won't list any rather than guess.";
+    expect(checkPlaces({ queryId: "places-005", answer: noMatch })).toEqual({ pass: true, failures: [], warnings: [] });
+    expect(checkPlaces({ queryId: "places-005", answer: "O mapa offline de Velletri não tem nenhum lugar marcado como kosher num raio de 25 km, então não vou listar nenhum para não inventar." }).pass).toBe(true);
+    const noData = checkPlaces({ queryId: "places-005", answer: "I don't have offline place data for Velletri, so I won't list any restaurants rather than guess." });
+    expect(noData.pass).toBe(false);
+  });
 });

@@ -159,6 +159,15 @@ if [ $HAS_PLACES = 1 ] && [ -n "\$TILE_INFO" ]; then
   echo "\$TSHA  \$TILE" | shasum -a 256 -c - || exit 3
   for m in $MODELS; do run --model \$m --seed 1 --dataset places --places \$WP,\$TILE --out \$O/places-tile__\${m}.jsonl; done
 elif [ $HAS_PLACES = 1 ]; then echo "tile path: SKIP (gazetteer without a hosted t-N52E013 in its tile index)"; fi
+# Rome tile (Boar v1.1): gazetteer + t-N41E012 alone; Rome vegan lists real OSM venues (places-004), Velletri kosher is
+# an honest no-match, not "no data" (places-005). Graded like the Berlin tile rows, not counted.
+ROME_INFO=\$(node eval/scripts/tile-info.mjs \$WP t-N41E012)
+if [ $HAS_PLACES = 1 ] && [ -n "\$ROME_INFO" ]; then
+  RSHA=\${ROME_INFO%% *}; RURL=\${ROME_INFO#* }; ROME=\$PIN/\$RSHA/t-N41E012.sqlite
+  [ -f \$ROME ] || { mkdir -p \$(dirname \$ROME) && curl -sSfL -o \$ROME.part "\$RURL" && mv \$ROME.part \$ROME; }
+  echo "\$RSHA  \$ROME" | shasum -a 256 -c - || exit 3
+  for m in $MODELS; do run --model \$m --seed 1 --dataset places-rome --places \$WP,\$ROME --out \$O/places-tile-rome__\${m}.jsonl; done
+elif [ $HAS_PLACES = 1 ]; then echo "rome tile: SKIP (gazetteer without a hosted t-N41E012 in its tile index)"; fi
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
@@ -214,7 +223,7 @@ N_KT=$(( N_MODELS * $(grep -c . "$ROOT/eval/dataset/questions.knowledge-topic.js
 N_PTT=$(( N_MODELS * N_CFG * $(grep -c . "$ROOT/eval/dataset/questions.pt-topic.jsonl") ))
 EXPECTED=$((N_MODELS * N_SEEDS * N_CFG * N_ITEMS + N_SUG * N_MODELS + N_PLACES + N_CE + N_KT + N_PTT))
 GOT=$(cat "$OUT"/runs/*.jsonl 2>/dev/null | grep -c . || true)
-N_TILE=$(cat "$OUT"/runs/places-tile__*.jsonl 2>/dev/null | grep -c . || true)
+N_TILE=$(cat "$OUT"/runs/places-tile*__*.jsonl 2>/dev/null | grep -c . || true)
 GOT=$((GOT - N_TILE))  # tile rows exist only when the gazetteer hosts the tile; they are graded, not counted
 [ "$N_TILE" -gt 0 ] && echo "tile path: $N_TILE rows" || echo "tile path: not run (no hosted tile in the gazetteer)"
 echo "rows: $GOT / $EXPECTED expected"
