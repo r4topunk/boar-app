@@ -45,7 +45,7 @@ Font 1.0 on every flow, plus large font (`_ax`) on flows 01, 02 and 05. Maestro 
 
 ## How to read "fps"
 
-- **Container fps** (`r_frame_rate`): the rate the recorder writes. `emu` = `adb emu screenrecord --fps 60` encodes on the host at a fixed 60 fps, so a frame the app did not redraw shows up as a duplicate. `dev` = `adb shell screenrecord` has a variable frame rate and writes a frame only when the screen changes.
+- **Container fps** (`r_frame_rate`): the rate the recorder writes. `emu` = `adb emu screenrecord --fps 60` encodes on the host at a fixed 60 fps, so a frame the app did not redraw shows up as a duplicate. `dev` = `adb shell screenrecord` has a variable frame rate and writes a frame only when the screen changes. It encodes H.264 in software inside the emulator, on the same 4 vCPUs as the app, which lowers app frames/s. Compare builds only between videos made with the same recorder.
 - **Packets/s**: frames actually written, divided by the video length. For `dev` this is the real screen-update rate. For `emu` it is about 60 by construction.
 - **App frames/s**: frames the app rendered (`dumpsys gfxinfo`, reset when recording starts), divided by the recording's seconds. This is the app's real frame rate on this emulator. It counts idle stretches too, so compare builds with janky/s and p90, as in review/perf/GFXINFO.md. The janky % misleads when fewer frames are drawn.
 - The gfxinfo window is the whole recording: Maestro's ~5 s startup with the screen still, the flow, and a 1.5 s tail. For `02` it is almost all the send → answer stream.
