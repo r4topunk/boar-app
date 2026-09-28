@@ -35,7 +35,7 @@ lines = []
 for name in sorted(rows):
     r = rows[name]; p = probe(dest / name)
     lines.append(f"| `{name}` | {r['lang']} | {r['font']} | {r['recorder']} | {p['codec']} {p['size']} | {p['dur']} | {p['r_fps']} | "
-                 f"{p['packets']} ({p['pk_fps']}/s) | {r['app_frames']} ({r['app_fps']}/s) | {r['janky_pct'] or '-'} | {r['p90_ms'] or '-'} | {p['mb']} | {'ok' if r['flow_rc'] == '0' else 'rc=' + r['flow_rc']} |")
+                 f"{p['packets']} ({p['pk_fps']}/s) | {r['app_frames']} ({r['app_fps']}/s) | {r.get('janky_frames') or '-'} ({r.get('janky_per_s') or '-'}/s) | {r['janky_pct'] or '-'} | {r['p90_ms'] or '-'} | {p['mb']} | {'ok' if r['flow_rc'] == '0' else 'rc=' + r['flow_rc']} |")
 
 sha = dest.parent.name
 readme = f"""# Polish round videos, Android, integration {sha}
@@ -47,16 +47,17 @@ Font 1.0 on every flow, plus large font (`_ax`) on flows 01, 02 and 05. Maestro 
 
 - **Container fps** (`r_frame_rate`): the rate the recorder writes. `emu` = `adb emu screenrecord --fps 60` encodes on the host at a fixed 60 fps, so a frame the app did not redraw shows up as a duplicate. `dev` = `adb shell screenrecord` has a variable frame rate and writes a frame only when the screen changes.
 - **Packets/s**: frames actually written, divided by the video length. For `dev` this is the real screen-update rate. For `emu` it is about 60 by construction.
-- **App frames/s**: frames the app rendered (`dumpsys gfxinfo`, reset when recording starts), divided by the recording's seconds. This is the app's real frame rate on this emulator. It counts idle stretches too, so read it together with janky % and p90.
+- **App frames/s**: frames the app rendered (`dumpsys gfxinfo`, reset when recording starts), divided by the recording's seconds. This is the app's real frame rate on this emulator. It counts idle stretches too, so compare builds with janky/s and p90, as in review/perf/GFXINFO.md. The janky % misleads when fewer frames are drawn.
+- The gfxinfo window is the whole recording: Maestro's ~5 s startup with the screen still, the flow, and a 1.5 s tail. For `02` it is almost all the send → answer stream.
 - This is an emulator (arm64 AVD, see `-gpu` below), not a phone. Timing and smoothness are indicative only. Layout, order, and presence or absence of transitions are what these videos can show reliably.
 
 ## Files
 
-| file | lang | font | recorder | video | s | container fps | packets | app frames | janky % | p90 ms | MB | flow |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| file | lang | font | recorder | video | s | container fps | packets | app frames | janky frames | janky % | p90 ms | MB | flow |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 {chr(10).join(lines)}
 
-Names follow `<nn>-<flow>_<en|pt>[_ax]`. `01a` = setup 1→3 plus the start of the import, and `01b` = import → done → chat. The plan asked for `.mp4`. The `emu` recorder writes WebM (VP8), and ffmpeg/Prism read it the same way.
+Names follow `<nn>-<flow>_<en|pt>[_ax|_rm]`. `_rm` = reduce motion: Android "Remove animations", all three animation scales set to 0. RN's `isReduceMotionEnabled` reads `transition_animation_scale == 0`. `01a` = setup 1→3 plus the start of the import, and `01b` = import → done → chat. The plan asked for `.mp4`. The `emu` recorder writes WebM (VP8), and ffmpeg/Prism read it the same way.
 
 ## Device (per run)
 

@@ -1,11 +1,13 @@
 #!/bin/bash
 # Heavy job (inside the lock), polish round 28/09 (POLISH-2026-09-28.md #1): the 8 UI flows as video on the headless AVD.
 # Dark theme, EN and PT, font 1.0 on every flow + AX_SCALE on flows 01, 02 and 05. One file per flow/lang/font.
-# usage: [FLOWS="02"] [LANGS="en pt"] [AX_SCALE=1.3] [REC=emu|dev] [EMU_GPU=host] [FLOOR_GB=12] run-video.sh <apk> <sha>
+# usage: [FLOWS="02"] [LANGS="en pt"] [RM_LANGS="en"] [AX_SCALE=1.3] [REC=emu|dev] [EMU_GPU=host] [FLOOR_GB=12] run-video.sh <apk> <sha>
 #  REC=emu (default): the emulator encodes on the host (`adb emu screenrecord`, webm VP8, fixed --fps 60, guest CPU untouched).
 #    A 4 s probe runs right after boot; if it fails or comes out empty, the run falls back to REC=dev.
 #  REC=dev: `adb shell screenrecord` in the guest (H.264 mp4, --bit-rate 100 Mbps, variable frame rate up to the display's 60 Hz).
 #  EMU_GPU=host (default) renders on the host GPU; if the AVD does not boot with it in 240 s it restarts on swiftshader_indirect.
+#  RM_LANGS: languages that also get one flow-02 pass (font 1.0) with reduce motion = Android "Remove animations"
+#    (window/transition/animator scales 0; RN's isReduceMotionEnabled reads transition_animation_scale == 0). File suffix _rm.
 #  Real fps per video = app frames rendered (dumpsys gfxinfo, reset at record start) / seconds; written to videos.tsv.
 # Flows in ~/boar/android/e2e/flows-piston/video. Output: ~/boar/android/e2e-out/video-<sha>-<ts>/<nn>-<flow>_<en|pt>[_ax].<webm|mp4>
 set -uo pipefail
@@ -75,7 +77,7 @@ mf() {
   log "$label ($flow $L $*) rc=$rc $(( $(date +%s)-ts ))s"; [ $rc -ne 0 ] && { grep -E "FAILED|not found|Assertion" "$OUT/maestro/$label/maestro.out" | tail -3 | tee -a "$OUT/video.log"; $A exec-out screencap -p > "$OUT/maestro/$label/fail.png"; }
   return $rc
 }
-TSV=$OUT/videos.tsv; echo -e "file\tlang\tfont\trecorder\tgpu\tseconds\tapp_frames\tapp_fps\tjanky_pct\tp90_ms\tflow_rc" > $TSV
+TSV=$OUT/videos.tsv; echo -e "file\tlang\tfont\trecorder\tgpu\tseconds\tapp_frames\tapp_fps\tjanky_frames\tjanky_per_s\tjanky_pct\tp90_ms\tflow_rc" > $TSV
 RP=; RT=; RF=
 rec_start() { # $1 = file stem
   RF=$1; $A shell dumpsys gfxinfo $P reset >/dev/null 2>&1
@@ -89,13 +91,15 @@ rec_stop() { # $1 = flow rc; 1.5 s tail so the last transition settles on video
   else $A shell pkill -INT screenrecord; wait $RP 2>/dev/null; sleep 1; $A pull /sdcard/rec.mp4 "$OUT/$RF.mp4" >/dev/null; $A shell rm -f /sdcard/rec.mp4; ext=mp4; fi
   local g=$OUT/maestro/$RF.gfxinfo.txt; $A shell dumpsys gfxinfo $P | tr -d '\r' > $g
   local fr=$(grep -m1 'Total frames rendered' $g | awk -F': ' '{print $2}'); fr=${fr:-0}
+  local jn=$(grep -m1 '^Janky frames:' $g | sed -E 's/^Janky frames: ([0-9]+).*/\1/'); jn=${jn:-0}
   local jk=$(grep -m1 '^Janky frames:' $g | sed -E 's/.*\(([0-9.]+)%\).*/\1/'); local p90=$(grep -m1 '^90th percentile' $g | sed -E 's/.*: ([0-9]+)ms/\1/')
-  local L=$(echo $RF | sed -E 's/.*_(en|pt)(_ax)?$/\1/'); local fs=1.0; [[ $RF == *_ax ]] && fs=$AX
-  echo -e "$RF.$ext\t$L\t$fs\t$REC\t$GPU\t$s\t$fr\t$(python3 -c "print(round($fr/max($s,0.1),1))")\t$jk\t$p90\t$1" | tee -a $TSV
+  local L=$(echo $RF | sed -E 's/.*_(en|pt)(_ax|_rm)?$/\1/'); local fs=1.0; [[ $RF == *_ax ]] && fs=$AX
+  echo -e "$RF.$ext\t$L\t$fs\t$REC\t$GPU\t$s\t$fr\t$(python3 -c "print(round($fr/max($s,0.1),1))")\t$jn\t$(python3 -c "print(round($jn/max($s,0.1),1))")\t$jk\t$p90\t$1" | tee -a $TSV
 }
 # vf <nn-name> <flow> <lang> <suffix> [KEY=VALUE...]: recorded Maestro run
 vf() { local stem=$1_$3$4 flow=$2 L=$3; shift 4; rec_start $stem; mf $stem video/$flow $L "$@"; local rc=$?; rec_stop $rc; return $rc; }
 fontscale() { $A shell settings put system font_scale "$1"; }
+anim() { for k in window_animation_scale transition_animation_scale animator_duration_scale; do $A shell settings put global $k $1; done; log "animation scales $1 (transition_animation_scale=$($A shell settings get global transition_animation_scale | tr -d '\r'))"; }
 fresh() { $A shell am force-stop $P; $A shell pm clear $P >/dev/null; }
 has() { [[ " $FLOWS " == *" $1 "* ]]; }
 ready() { # $1 = lang: fresh app, setup + import not recorded, then in the chat
@@ -124,6 +128,12 @@ for L in $LANGS; do
     fontscale $AX; $A shell am force-stop $P
     has 02 && { mf 02-prep-$L-ax video/02-prep.yaml $L && vf 02-chat-send 02-chat-send.yaml $L _ax; }
     has 05 && vf 05-settings-nav 05-settings-nav.yaml $L _ax
+  fi
+  # reduce motion pass (flow 02, font 1.0): app restarted so it reads the setting at launch
+  if has 02 && [[ " ${RM_LANGS:-} " == *" $L "* ]]; then
+    fontscale 1.0; anim 0; $A shell am force-stop $P
+    mf 02-prep-$L-rm video/02-prep.yaml $L && vf 02-chat-send 02-chat-send.yaml $L _rm
+    anim 1; $A shell am force-stop $P
   fi
   if has 01; then fontscale $AX; fresh; vf 01a-setup 01a-setup.yaml $L _ax; vf 01b-setup-import 01b-setup-import.yaml $L _ax; fi
   fontscale 1.0
