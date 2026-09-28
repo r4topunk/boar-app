@@ -24,6 +24,7 @@ trap stop_emu EXIT
 boot() { # $1 = gpu mode; returns 1 if not booted in $2 s
   nohup $SDK/emulator/emulator -avd boar_api35 -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu $1 > "$OUT/emulator-$1.log" 2>&1 &
   local t=0; until [ "$($A shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ]; do sleep 5; t=$((t+5)); [ $t -gt $2 ] && return 1; done
+  return 0  # without it the function returns the loop body's last status (1 from the timeout test) even after a boot
 }
 t0=$(date +%s); log "start $SHA flows='$FLOWS' langs='$LANGS' ax=$AX rec=$REC gpu=$GPU floor $FLOOR GB free $(free) GB"
 ( while sleep 10; do f=$(free); [ "$f" -lt "$FLOOR" ] && { echo "[video] ABORT: free $f GB < $FLOOR"; stop_emu; kill $$; break; }; done ) & WD=$!
