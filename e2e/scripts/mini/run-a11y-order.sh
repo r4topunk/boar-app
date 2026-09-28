@@ -31,10 +31,14 @@ EN=(-e APP_ID=$P -e L=en -e T_START="Get started" -e T_ESSENTIAL="Essential" -e 
   -e Q_A="$QA" -e Q_B="$QB" -e Q_A_RE="What causes the monsoon.*")
 mf() { local ts=$(date +%s); mkdir -p "$OUT/maestro/$1"; (cd "$OUT/maestro/$1" && $HOME/.maestro/bin/maestro test "$F/$2" "${EN[@]}" --test-output-dir "$OUT/maestro/$1" > "$OUT/maestro/$1/maestro.out" 2>&1); local rc=$?
   log "$1 ($2) rc=$rc $(( $(date +%s)-ts ))s"; [ $rc -ne 0 ] && grep -E "FAILED|not found|Assertion" "$OUT/maestro/$1/maestro.out" | tail -3 | tee -a "$OUT/a11y.log"; return $rc; }
-dump() { $A shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; $A exec-out cat /sdcard/ui.xml > "$OUT/$1.xml"; $A exec-out screencap -p > "$OUT/$1.png"; }
+# the app must be in front before every dump (a stray Back once left the launcher and the shade in the dumps)
+front() { $A shell dumpsys activity activities | grep -m1 -E 'ResumedActivity' | grep -q "$P"; }
+ime_down() { $A shell dumpsys input_method | grep -q 'mInputShown=true' && $A shell input keyevent 4; sleep 1; }  # Back only while the keyboard is up
+dump() { front || { log "INVALID: $P not in front before dump $1"; $A exec-out screencap -p > "$OUT/$1-notfront.png"; exit 5; }
+  $A shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; $A exec-out cat /sdcard/ui.xml > "$OUT/$1.xml"; $A exec-out screencap -p > "$OUT/$1.png"; }
 mf setup prints/setup-to-chat.yaml || exit 3
 mf two-questions a11y/two-questions.yaml || exit 4
-dump 0-bottom
+ime_down; dump 0-bottom
 mf to-top a11y/to-top.yaml
 dump 1-top
 # walk down one screen at a time, as TalkBack's linear read scrolls forward
@@ -59,6 +63,7 @@ for f in sorted(glob.glob(os.path.join(out, "*.xml"))):
     for i, y, q in qs: print(f"   question {q} at tree index {i}, y={y}")
     for i, (y, lab) in enumerate(nodes): print(f"   {i:3d} y={y:5d} {lab[:90]!r}")
     seq += [q for _, _, q in qs]
+if not seq: print("\nINVALID: no question node in any dump (app not in front, or the question label differs from the text)")
 print("\nquestion order as met in tree order, dump by dump (0-bottom first, then top -> down):", " ".join(seq))
 PY
 if [ -n "${TALKBACK_APK:-}" ]; then

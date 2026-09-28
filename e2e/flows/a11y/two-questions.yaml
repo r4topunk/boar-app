@@ -26,4 +26,3 @@ appId: ${APP_ID || "team.sopa.aoair.offline"}
 - extendedWaitUntil:
     notVisible: ${T_STOP}
     timeout: 300000
-- hideKeyboard
