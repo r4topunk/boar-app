@@ -5,7 +5,8 @@
 // (places-004); Velletri, covered by that tile but with no kosher venue in OSM within 25 km (gold/places/places-005),
 // must say the map has no match, never "no data" (Tusk T2-6), and list nothing (places-005). "Kosher ramen in Rome"
 // (kosher venues exist, none serves ramen) must be a no-match naming both conditions (places-006). Qujing, whose sparse
-// tile t-N25E103 has no vegan place, may say no data or no match but must list nothing (places-007).
+// tile t-N25E103 has no vegan place, may say no data or no match but must list nothing (places-007). Cape Town from the
+// southern-hemisphere tile t-S34E018 alone lists real vegan venues with an OpenStreetMap source (places-008, WORLD_PLACES final).
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +17,9 @@ const GOLD = {
   "places-001": "gold/v2/food-001.json", "places-002": "gold/v2/food-001.json", "places-003": "gold/v2/food-006.json",
   "places-004": "gold/places/places-004.json", "places-005": "gold/places/places-005.json",
   "places-006": "gold/places/places-006.json", "places-007": "gold/places/places-007.json",
+  "places-008": "gold/places/places-008.json",
 };
-const HAS_DATA = new Set(["places-001", "places-002", "places-004"]);
+const HAS_DATA = new Set(["places-001", "places-002", "places-004", "places-008"]);
 const NO_MATCH_IDS = new Set(["places-005", "places-006"]);
 // Both filters named in the no-match (Tusk next16): the diet and the dish.
 const BOTH_TERMS = { "places-006": [/\bkosher\b/i, /\bramen\b/i] };

@@ -161,8 +161,9 @@ if [ $HAS_PLACES = 1 ] && [ -n "\$TILE_INFO" ]; then
 elif [ $HAS_PLACES = 1 ]; then echo "tile path: SKIP (gazetteer without a hosted t-N52E013 in its tile index)"; fi
 # World tiles alone (Boar v1.1): gazetteer + one 1x1 tile, no city pack. Rome t-N41E012: vegan lists real OSM venues
 # (places-004), Velletri kosher (places-005) and "kosher ramen in Rome" (places-006) are honest no-matches naming every
-# filter. Qujing t-N25E103 (sparse OSM, no vegan place): nothing invented (places-007). Graded like the Berlin tile rows.
-for pair in t-N41E012:rome t-N25E103:qujing; do
+# filter. Qujing t-N25E103 (sparse OSM, no vegan place): nothing invented (places-007). Cape Town t-S34E018 (southern
+# hemisphere, WORLD_PLACES final): vegan lists real OSM venues (places-008). Graded like the Berlin tile rows.
+for pair in t-N41E012:rome t-N25E103:qujing t-S34E018:capetown; do
   TID=\${pair%%:*}; TNAME=\${pair#*:}
   TINFO=\$(node eval/scripts/tile-info.mjs \$WP \$TID)
   if [ $HAS_PLACES = 1 ] && [ -n "\$TINFO" ]; then

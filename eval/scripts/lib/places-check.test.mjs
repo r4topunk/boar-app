@@ -27,6 +27,11 @@ describe("checkPlaces", () => {
     expect(checkPlaces({ queryId: "places-004", answer: ok })).toEqual({ pass: true, failures: [], warnings: [] });
     expect(checkPlaces({ queryId: "places-004", answer: "I don't have offline place data for Rome, so I won't list any restaurants rather than guess." }).pass).toBe(false);
   });
+  it("Cape Town from the southern t-S34E018 tile lists real vegan venues with the OpenStreetMap source (WORLD_PLACES final)", () => {
+    const ok = "Vegan places in Cape Town (OpenStreetMap):\n1. Romeo and Vero Vegan Butcherie\n2. Kanéla Café\n3. Truth Coffee Roasting";
+    expect(checkPlaces({ queryId: "places-008", answer: ok })).toEqual({ pass: true, failures: [], warnings: [] });
+    expect(checkPlaces({ queryId: "places-008", answer: "I don't have offline place data for Cape Town, so I won't list any restaurants rather than guess." }).pass).toBe(false);
+  });
   it("Velletri (tile covers it, no kosher in OSM) must be an honest no-match, never 'no data' (T2-6)", () => {
     const noMatch = "The offline map for Velletri has no place tagged kosher within 25 km, so I won't list any rather than guess.";
     expect(checkPlaces({ queryId: "places-005", answer: noMatch })).toEqual({ pass: true, failures: [], warnings: [] });

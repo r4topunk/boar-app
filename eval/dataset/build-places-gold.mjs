@@ -3,7 +3,8 @@
 // Boar tile files: places-004 = vegan venues in Rome (admin area Q220), places-005 = kosher venues within 25 km of
 // Velletri (none expected: the t-N41E012 tile covers Velletri, so the honest answer is "no match", not "no data"),
 // places-006 = kosher venues in Rome (some exist, none serves ramen: the no-match must name both conditions),
-// places-007 = vegan venues within 25 km of Qujing (tile t-N25E103 has 10 places, none vegan: nothing may be invented).
+// places-007 = vegan venues within 25 km of Qujing (tile t-N25E103 has 10 places, none vegan: nothing may be invented),
+// places-008 = vegan venues within 25 km of Cape Town (tile t-S34E018, WORLD_PLACES final @0d75f30: a southern-hemisphere tile).
 // Same query shape as build-v2.mjs osmFood. Writes gold/places/<id>.json; --refetch to overwrite.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -19,6 +20,7 @@ const CASES = [
   { id: "places-005", city: "Velletri", diet: "kosher", center: { lat: 41.68573, lon: 12.77753 }, radiusM: 25_000 },
   { id: "places-006", city: "Rome", diet: "kosher", scope: 'area["wikidata"="Q220"]->.a;nwr(area.a)', scopeNote: "admin area Q220" },
   { id: "places-007", city: "Qujing", diet: "vegan", center: { lat: 25.48333, lon: 103.78333 }, radiusM: 25_000 },
+  { id: "places-008", city: "Cape Town", diet: "vegan", center: { lat: -33.92584, lon: 18.42322 }, radiusM: 25_000 },
 ];
 
 async function overpass(scope, diet) {
