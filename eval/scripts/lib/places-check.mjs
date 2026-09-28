@@ -3,7 +3,9 @@
 // gold) with an OpenStreetMap source; Tokyo, with no pack, must say there is no offline data and list no venues.
 // Tile cases (Boar v1.1): Rome from the 1x1 tile t-N41E012 alone lists real vegan venues with an OpenStreetMap source
 // (places-004); Velletri, covered by that tile but with no kosher venue in OSM within 25 km (gold/places/places-005),
-// must say the map has no match, never "no data" (Tusk T2-6), and list nothing (places-005).
+// must say the map has no match, never "no data" (Tusk T2-6), and list nothing (places-005). "Kosher ramen in Rome"
+// (kosher venues exist, none serves ramen) must be a no-match naming both conditions (places-006). Qujing, whose sparse
+// tile t-N25E103 has no vegan place, may say no data or no match but must list nothing (places-007).
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,9 +15,13 @@ const DATASET_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "d
 const GOLD = {
   "places-001": "gold/v2/food-001.json", "places-002": "gold/v2/food-001.json", "places-003": "gold/v2/food-006.json",
   "places-004": "gold/places/places-004.json", "places-005": "gold/places/places-005.json",
+  "places-006": "gold/places/places-006.json", "places-007": "gold/places/places-007.json",
 };
 const HAS_DATA = new Set(["places-001", "places-002", "places-004"]);
-const NO_MATCH_IDS = new Set(["places-005"]);
+const NO_MATCH_IDS = new Set(["places-005", "places-006"]);
+// Both filters named in the no-match (Tusk next16): the diet and the dish.
+const BOTH_TERMS = { "places-006": [/\bkosher\b/i, /\bramen\b/i] };
+const SPARSE_IDS = new Set(["places-007"]);
 // noMatchAnswer (src/routing/geo.ts): "The offline map for X has no place tagged kosher within 25 km".
 const NO_MATCH = /offline map .{0,40}has no place|has no place (tagged|matching)|mapa offline .{0,40}n[ãa]o tem nenhum lugar/i;
 const OSM = /openstreetmap|\bosm\b|© ?openstreetmap/i;
@@ -34,8 +40,18 @@ export function checkPlaces(row) {
   if (HAS_DATA.has(id)) {
     if (!score.pass) failures.push(`fewer than 3 real vegan venues from OpenStreetMap (${score.verifiedDietVenues} matched${score.matched.length ? `: ${score.matched.slice(0, 5).join(", ")}` : ""})`);
     if (!OSM.test(sources)) failures.push("no OpenStreetMap source shown");
+  } else if (SPARSE_IDS.has(id)) {
+    if (!NO_DATA.test(answer) && !NO_MATCH.test(answer)) failures.push("does not say there is no matching place in the offline data");
+    if (listLines(answer) >= 1) failures.push(`lists venues although the offline data has none (${listLines(answer)} list lines)`);
+    if (gold.osm.venues.length) warnings.push(`OSM now has ${gold.osm.venues.length} ${gold.diet} venues near ${gold.city} (tile older than OSM?)`);
   } else if (NO_MATCH_IDS.has(id)) {
-    if (gold.osm.venues.length) failures.push(`gold has ${gold.osm.venues.length} ${gold.diet} venues: the case is no longer a no-match (refetch the gold)`);
+    const terms = BOTH_TERMS[id];
+    if (terms) {
+      const dish = /ramen/i;
+      if (!gold.osm.venues.length || gold.osm.venues.some((v) => dish.test(`${v.name} ${v.cuisine ?? ""}`))) failures.push("gold no longer fits (needs diet venues and none with the dish): refetch");
+      const missing = terms.filter((t) => !t.test(answer));
+      if (missing.length) failures.push(`no-match does not name every filter (missing ${missing.map(String).join(", ")})`);
+    } else if (gold.osm.venues.length) failures.push(`gold has ${gold.osm.venues.length} ${gold.diet} venues: the case is no longer a no-match (refetch the gold)`);
     if (!NO_MATCH.test(answer)) failures.push("does not say the offline map has no matching place");
     if (NO_DATA.test(answer)) failures.push("says there is no data although a map covers the area (no_match expected)");
     if (listLines(answer) >= 3) failures.push(`lists venues (${listLines(answer)} list lines)`);

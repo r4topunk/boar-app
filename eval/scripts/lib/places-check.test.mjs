@@ -34,4 +34,16 @@ describe("checkPlaces", () => {
     const noData = checkPlaces({ queryId: "places-005", answer: "I don't have offline place data for Velletri, so I won't list any restaurants rather than guess." });
     expect(noData.pass).toBe(false);
   });
+  it("kosher ramen in Rome: the no-match names both filters (a bare 'no place tagged kosher' is false)", () => {
+    const both = "The offline map for Rome has no place tagged kosher that matches \"ramen\" within 25 km, so I won't list any rather than guess.";
+    expect(checkPlaces({ queryId: "places-006", answer: both })).toEqual({ pass: true, failures: [], warnings: [] });
+    const dietOnly = checkPlaces({ queryId: "places-006", answer: "The offline map for Rome has no place tagged kosher within 25 km, so I won't list any rather than guess." });
+    expect(dietOnly.pass).toBe(false);
+    expect(checkPlaces({ queryId: "places-006", answer: "Kosher places in Rome (OpenStreetMap):\n1. Nonna Betta\n2. Ba'Ghetto\n3. Renato al ghetto" }).pass).toBe(false);
+  });
+  it("Qujing (sparse tile, no vegan place): no data or no match, and nothing listed", () => {
+    expect(checkPlaces({ queryId: "places-007", answer: "The offline map for Qujing has no place tagged vegan within 25 km, so I won't list any rather than guess." }).pass).toBe(true);
+    expect(checkPlaces({ queryId: "places-007", answer: "I don't have offline place data for Qujing, so I won't list any restaurants rather than guess." }).pass).toBe(true);
+    expect(checkPlaces({ queryId: "places-007", answer: "Vegan options in Qujing:\n1. Yuan Yi (western food)" }).pass).toBe(false);
+  });
 });

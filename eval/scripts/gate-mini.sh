@@ -159,15 +159,19 @@ if [ $HAS_PLACES = 1 ] && [ -n "\$TILE_INFO" ]; then
   echo "\$TSHA  \$TILE" | shasum -a 256 -c - || exit 3
   for m in $MODELS; do run --model \$m --seed 1 --dataset places --places \$WP,\$TILE --out \$O/places-tile__\${m}.jsonl; done
 elif [ $HAS_PLACES = 1 ]; then echo "tile path: SKIP (gazetteer without a hosted t-N52E013 in its tile index)"; fi
-# Rome tile (Boar v1.1): gazetteer + t-N41E012 alone; Rome vegan lists real OSM venues (places-004), Velletri kosher is
-# an honest no-match, not "no data" (places-005). Graded like the Berlin tile rows, not counted.
-ROME_INFO=\$(node eval/scripts/tile-info.mjs \$WP t-N41E012)
-if [ $HAS_PLACES = 1 ] && [ -n "\$ROME_INFO" ]; then
-  RSHA=\${ROME_INFO%% *}; RURL=\${ROME_INFO#* }; ROME=\$PIN/\$RSHA/t-N41E012.sqlite
-  [ -f \$ROME ] || { mkdir -p \$(dirname \$ROME) && curl -sSfL -o \$ROME.part "\$RURL" && mv \$ROME.part \$ROME; }
-  echo "\$RSHA  \$ROME" | shasum -a 256 -c - || exit 3
-  for m in $MODELS; do run --model \$m --seed 1 --dataset places-rome --places \$WP,\$ROME --out \$O/places-tile-rome__\${m}.jsonl; done
-elif [ $HAS_PLACES = 1 ]; then echo "rome tile: SKIP (gazetteer without a hosted t-N41E012 in its tile index)"; fi
+# World tiles alone (Boar v1.1): gazetteer + one 1x1 tile, no city pack. Rome t-N41E012: vegan lists real OSM venues
+# (places-004), Velletri kosher (places-005) and "kosher ramen in Rome" (places-006) are honest no-matches naming every
+# filter. Qujing t-N25E103 (sparse OSM, no vegan place): nothing invented (places-007). Graded like the Berlin tile rows.
+for pair in t-N41E012:rome t-N25E103:qujing; do
+  TID=\${pair%%:*}; TNAME=\${pair#*:}
+  TINFO=\$(node eval/scripts/tile-info.mjs \$WP \$TID)
+  if [ $HAS_PLACES = 1 ] && [ -n "\$TINFO" ]; then
+    XSHA=\${TINFO%% *}; XURL=\${TINFO#* }; XT=\$PIN/\$XSHA/\$TID.sqlite
+    [ -f \$XT ] || { mkdir -p \$(dirname \$XT) && curl -sSfL -o \$XT.part "\$XURL" && mv \$XT.part \$XT; }
+    echo "\$XSHA  \$XT" | shasum -a 256 -c - || exit 3
+    for m in $MODELS; do run --model \$m --seed 1 --dataset places-\$TNAME --places \$WP,\$XT --out \$O/places-tile-\${TNAME}__\${m}.jsonl; done
+  elif [ $HAS_PLACES = 1 ]; then echo "\$TNAME tile: SKIP (gazetteer without a hosted \$TID in its tile index)"; fi
+done
 for m in $MODELS; do for s in $SEEDS; do
   for cfg in none packs; do
     [ \$cfg = packs ] && [ $HAS_PACK = 0 ] && continue
