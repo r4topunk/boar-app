@@ -53,14 +53,18 @@ fi
 EN=(T_START="Get started" T_ESSENTIAL="Essential" T_CONTINUE="Continue" T_PICK="Choose files" T_DONE="Everything runs offline from now on." T_OPEN="Open BOAR"
   T_ASK="Ask something" T_MENU="Open menu" T_NEWCHAT="New chat" T_SEND="Send" T_STOP="Stop answer" T_SETTINGS="Settings" T_KNOWLEDGE="Knowledge"
   T_ASSISTANT="Assistant" T_MODELS="Models" T_PERFORMANCE="Performance" T_ASK_MODEL="Answer with AI" T_SOURCES="Sources? \\(?[0-9]" T_SOURCE1="Sources? 1:.*"
-  T_SHOW_MORE="Show [0-9]+ more" T_DETAILS="(Details|Performance details)" T_IMPORT_PLACES="Import places" T_VERIFIED="Verified:" T_DELETE="Delete" T_CANCEL="Cancel"
+  T_SHOW_MORE="Show [0-9]+ more" T_RECEIPT="Performance details:.*" T_IMPORT_PLACES="Import places" T_VERIFIED="Verified:" T_DELETE="Delete" T_CANCEL="Cancel"
   T_APPEARANCE="Appearance" T_LIGHT="Light" T_DARK="Dark" T_SYSTEM="System" T_LANGUAGE="Language" T_OTHER_LANG="Português" T_BACK_LANG="English"
+  T_CONV_MONSOON="What causes the monsoon.*" T_CONV_PLACES="best vegan restaurants.*" T_OPEN_SOURCE="Open source 1:.*" T_SOURCE_SHEET="Source 1"
+  T_PLACE_ROW=".*, source .+" T_DELETE_CONV="Delete conversation:.*"
   Q_MONSOON="What causes the monsoon?" Q_PLACES="best vegan restaurants in Rome")
 PT=(T_START="Começar" T_ESSENTIAL="Essencial" T_CONTINUE="Continuar" T_PICK="Escolher arquivos" T_DONE="Tudo roda offline a partir de agora." T_OPEN="Abrir o BOAR"
   T_ASK="Pergunte algo" T_MENU="Abrir menu" T_NEWCHAT="Nova conversa" T_SEND="Enviar" T_STOP="Parar resposta" T_SETTINGS="Ajustes" T_KNOWLEDGE="Conhecimento"
   T_ASSISTANT="Assistente" T_MODELS="Modelos" T_PERFORMANCE="Desempenho" T_ASK_MODEL="Responder com IA" T_SOURCES="Fontes? \\(?[0-9]" T_SOURCE1="Fontes? 1:.*"
-  T_SHOW_MORE="Mostrar mais [0-9]+" T_DETAILS="(Detalhes|Detalhes de desempenho)" T_IMPORT_PLACES="Importar lugares" T_VERIFIED="Verificado:" T_DELETE="Apagar" T_CANCEL="Cancelar"
+  T_SHOW_MORE="Mostrar mais [0-9]+" T_RECEIPT="Detalhes de desempenho:.*" T_IMPORT_PLACES="Importar lugares" T_VERIFIED="Verificado:" T_DELETE="Apagar" T_CANCEL="Cancelar"
   T_APPEARANCE="Aparência" T_LIGHT="Claro" T_DARK="Escuro" T_SYSTEM="Sistema" T_LANGUAGE="Idioma" T_OTHER_LANG="English" T_BACK_LANG="Português"
+  T_CONV_MONSOON="O que causa a monção.*" T_CONV_PLACES="melhores restaurantes veganos.*" T_OPEN_SOURCE="Abrir fonte 1:.*" T_SOURCE_SHEET="Fonte 1"
+  T_PLACE_ROW=".*, fonte .+" T_DELETE_CONV="Apagar conversa:.*"
   Q_MONSOON="O que causa a monção?" Q_PLACES="melhores restaurantes veganos em Roma")
 # mf <label> <flow> <en|pt> [KEY=VALUE...]: one Maestro run (not recorded unless wrapped by rec)
 mf() {
@@ -106,7 +110,10 @@ for L in $LANGS; do
   else ready $L || { log "setup $L failed: skipping $L"; continue; }; fi
   # 02: new chat + question pasted (keyboard up) off camera, then Send -> stages -> passage -> stream -> sources -> receipt on camera
   has 02 && { mf 02-prep-$L video/02-prep.yaml $L && vf 02-chat-send 02-chat-send.yaml $L ""; }
+  # 03-08 need a sourced conversation (02 leaves one; otherwise ask off camera) and 04/06 a places answer (off camera)
+  if ! has 02 && { has 03 || has 04 || has 06 || has 08; }; then mf ask-$L video/ask-offcam.yaml $L; fi
   has 03 && vf 03-drawer 03-drawer.yaml $L ""
+  { has 04 || has 06; } && mf places-$L video/places-prep.yaml $L
   has 04 && vf 04-sheets 04-sheets.yaml $L ""
   has 05 && vf 05-settings-nav 05-settings-nav.yaml $L ""
   has 06 && vf 06-expand 06-expand.yaml $L ""

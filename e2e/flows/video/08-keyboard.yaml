@@ -1,0 +1,18 @@
+# On camera (POLISH #1 flow 8): keyboard up/down with an answer on screen, then in an empty New chat.
+appId: ${APP_ID || "team.sopa.aoair.offline"}
+---
+- launchApp
+- runFlow: ../perf/to-chat.yaml
+- tapOn: ${T_ASK}
+- waitForAnimationToEnd:
+    timeout: 3000
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow: ../prints/new-chat.yaml
+- tapOn: ${T_ASK}
+- waitForAnimationToEnd:
+    timeout: 3000
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000

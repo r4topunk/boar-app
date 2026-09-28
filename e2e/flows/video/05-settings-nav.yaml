@@ -1,0 +1,42 @@
+# On camera (POLISH #1 flow 5): Settings -> Assistant -> back; Models; Knowledge; Performance (push/pop), back to the chat.
+appId: ${APP_ID || "team.sopa.aoair.offline"}
+---
+- launchApp
+- runFlow: ../perf/to-chat.yaml
+- tapOn: ${T_MENU}
+- tapOn: ${T_SETTINGS}
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: ${T_ASSISTANT}
+- waitForAnimationToEnd:
+    timeout: 3000
+- back
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element: ${T_MODELS}
+- tapOn: ${T_MODELS}
+- waitForAnimationToEnd:
+    timeout: 3000
+- back
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element: ${T_KNOWLEDGE}
+- tapOn: ${T_KNOWLEDGE}
+- waitForAnimationToEnd:
+    timeout: 3000
+- back
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element: ${T_PERFORMANCE}
+- tapOn: ${T_PERFORMANCE}
+- waitForAnimationToEnd:
+    timeout: 3000
+- back
+- waitForAnimationToEnd:
+    timeout: 3000
+- back
+- waitForAnimationToEnd:
+    timeout: 3000
