@@ -1,0 +1,10 @@
+rows control=615 candidate=615
+ref lines in MODEL rows (tokensGenerated>0): control=1 candidate=0
+  ctl ref pt-compact/v2-pt.jsonl|cry-008-pt|42|1 :: Fonte: [1] Ethereum, History > Continued development and milestones (2017–present) > CryptoKitties a
+paired=613 identical=611 differ=2
+[n] total paired: control=307 candidate=305 (delta -2)
+rows with fewer [n] than control: 2
+  LOST pt-compact/v2-pt.jsonl|cry-008-pt|42|1 1->0 (control had ref line)
+  LOST s32/qwen2.5-1.5b-instruct-q4km__essential__app.jsonl|mst-008|42|1 1->0 
+  PLACES runs/places-tile-capetown__qwen2.5-1.5b-instruct-q4km.jsonl|places-008|1|1 names=9 no dup
+  PLACES runs/places-tile-capetown__qwen3-4b-instruct-2507-q4km.jsonl|places-008|1|1 names=9 no dup
