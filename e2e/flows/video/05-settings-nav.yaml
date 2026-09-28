@@ -15,6 +15,7 @@ appId: ${APP_ID || "team.sopa.aoair.offline"}
     timeout: 3000
 - scrollUntilVisible:
     element: ${T_MODELS}
+    centerElement: true
 - tapOn: ${T_MODELS}
 - waitForAnimationToEnd:
     timeout: 3000
@@ -23,6 +24,7 @@ appId: ${APP_ID || "team.sopa.aoair.offline"}
     timeout: 3000
 - scrollUntilVisible:
     element: ${T_KNOWLEDGE}
+    centerElement: true
 - tapOn: ${T_KNOWLEDGE}
 - waitForAnimationToEnd:
     timeout: 3000
@@ -31,6 +33,7 @@ appId: ${APP_ID || "team.sopa.aoair.offline"}
     timeout: 3000
 - scrollUntilVisible:
     element: ${T_PERFORMANCE}
+    centerElement: true
 - tapOn: ${T_PERFORMANCE}
 - waitForAnimationToEnd:
     timeout: 3000
