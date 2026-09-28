@@ -28,14 +28,17 @@ def probe(f: Path) -> dict:
                           "-of", "json", str(f)], capture_output=True, text=True).stdout
     j = json.loads(out or "{}"); s = (j.get("streams") or [{}])[0]; fm = j.get("format", {})
     dur = float(fm.get("duration") or 0); pk = int(s.get("nb_read_packets") or 0)
+    ts = sorted(float(x) for x in subprocess.run(["nice", "-n", "19", "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                "packet=pts_time", "-of", "csv=p=0", str(f)], capture_output=True, text=True).stdout.split() if x.strip() not in ("", "N/A"))
+    peak = max((sum(1 for u in ts if t0 <= u < t0 + 1.0) for t0 in ts), default=0)
     return {"codec": s.get("codec_name", "?"), "size": f"{s.get('width')}x{s.get('height')}", "r_fps": s.get("r_frame_rate", "?"),
-            "dur": round(dur, 1), "packets": pk, "pk_fps": round(pk / dur, 1) if dur else 0, "mb": round(int(fm.get("size") or 0) / 1e6, 1)}
+            "dur": round(dur, 1), "packets": pk, "pk_fps": round(pk / dur, 1) if dur else 0, "mb": round(int(fm.get("size") or 0) / 1e6, 1), "peak": peak}
 
 lines = []
 for name in sorted(rows):
     r = rows[name]; p = probe(dest / name)
     lines.append(f"| `{name}` | {r['lang']} | {r['font']} | {r['recorder']} | {p['codec']} {p['size']} | {p['dur']} | {p['r_fps']} | "
-                 f"{p['packets']} ({p['pk_fps']}/s) | {r['app_frames']} ({r['app_fps']}/s) | {r.get('janky_frames') or '-'} ({r.get('janky_per_s') or '-'}/s) | {r['janky_pct'] or '-'} | {r['p90_ms'] or '-'} | {p['mb']} | {'ok' if r['flow_rc'] == '0' else 'rc=' + r['flow_rc']} |")
+                 f"{p['packets']} ({p['pk_fps']}/s) | {p['peak']} | {r['app_frames']} ({r['app_fps']}/s) | {r.get('janky_frames') or '-'} ({r.get('janky_per_s') or '-'}/s) | {r['janky_pct'] or '-'} | {r['p90_ms'] or '-'} | {p['mb']} | {'ok' if r['flow_rc'] == '0' else 'rc=' + r['flow_rc']} |")
 
 sha = dest.parent.name
 readme = f"""# Polish round videos, Android, integration {sha}
@@ -46,6 +49,7 @@ Font 1.0 on every flow, plus large font (`_ax`) on flows 01, 02 and 05. Maestro 
 ## How to read "fps"
 
 - **Container fps** (`r_frame_rate`): the rate the recorder writes. `emu` = `adb emu screenrecord --fps 60` encodes on the host at a fixed 60 fps, so a frame the app did not redraw shows up as a duplicate. `dev` = `adb shell screenrecord` has a variable frame rate and writes a frame only when the screen changes. It encodes H.264 in software inside the emulator, on the same 4 vCPUs as the app, which lowers app frames/s. Compare builds only between videos made with the same recorder.
+- **Peak fps (1 s)**: the most frames written in any 1 s window. With `dev`, this is the real rate during the busiest animation (60 = the display's full rate).
 - **Packets/s**: frames actually written, divided by the video length. For `dev` this is the real screen-update rate. For `emu` it is about 60 by construction.
 - **App frames/s**: frames the app rendered (`dumpsys gfxinfo`, reset when recording starts), divided by the recording's seconds. This is the app's real frame rate on this emulator. It counts idle stretches too, so compare builds with janky/s and p90, as in review/perf/GFXINFO.md. The janky % misleads when fewer frames are drawn.
 - The gfxinfo window is the whole recording: Maestro's ~5 s startup with the screen still, the flow, and a 1.5 s tail. For `02` it is almost all the send → answer stream.
@@ -53,8 +57,8 @@ Font 1.0 on every flow, plus large font (`_ax`) on flows 01, 02 and 05. Maestro 
 
 ## Files
 
-| file | lang | font | recorder | video | s | container fps | packets | app frames | janky frames | janky % | p90 ms | MB | flow |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| file | lang | font | recorder | video | s | container fps | packets | peak fps (1 s) | app frames | janky frames | janky % | p90 ms | MB | flow |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 {chr(10).join(lines)}
 
 Names follow `<nn>-<flow>_<en|pt>[_ax|_rm]`. `_rm` = reduce motion: Android "Remove animations", all three animation scales set to 0. RN's `isReduceMotionEnabled` reads `transition_animation_scale == 0`. `01a` = setup 1→3 plus the start of the import, and `01b` = import → done → chat. The plan asked for `.mp4`. The `emu` recorder writes WebM (VP8), and ffmpeg/Prism read it the same way.
