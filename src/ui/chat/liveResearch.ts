@@ -82,6 +82,8 @@ export interface PartSignal {
   index: number;
   count: number;
   question?: string;
+  /** The part's search is done and its sub-answer is being written (engine StageDetail.answering). */
+  answering?: boolean;
 }
 
 /**
@@ -90,12 +92,13 @@ export interface PartSignal {
  */
 export function partSignal(detail: unknown): { part: PartSignal | null; splitting: boolean } {
   if (!detail || typeof detail !== "object") return { part: null, splitting: false };
-  const d = detail as { index?: unknown; count?: unknown; subQuestion?: unknown };
+  const d = detail as { index?: unknown; count?: unknown; subQuestion?: unknown; answering?: unknown };
   const count = typeof d.count === "number" && d.count > 0 ? Math.floor(d.count) : null;
   const index = typeof d.index === "number" && d.index >= 0 ? Math.floor(d.index) : null;
   if (count == null || index == null) return { part: null, splitting: count == null && index == null };
   const question = typeof d.subQuestion === "string" ? oneLine(d.subQuestion) : "";
-  return { part: question ? { index: Math.min(index, count - 1), count, question } : { index: Math.min(index, count - 1), count }, splitting: false };
+  const at = { index: Math.min(index, count - 1), count, ...(d.answering === true ? { answering: true } : {}) };
+  return { part: question ? { ...at, question } : at, splitting: false };
 }
 
 /**
@@ -120,6 +123,8 @@ export function foldTimeline(prev: Timeline, input: { sources: readonly Chunk[];
     }
     if (next.current !== part.index) edit().current = part.index;
     if (part.question && next.parts[part.index].question !== part.question) edit().parts[part.index].question = part.question;
+    // The engine says the part's search is done (its sub-answer is being written), new articles or not.
+    if (part.answering && !next.parts[part.index].read) edit().parts[part.index].read = true;
   } else if (splitting && !next.multi && next.current !== -1 && next.order.length === 0) {
     edit().current = -1;
   }
@@ -248,7 +253,8 @@ export function timelinePillStep(tl: Timeline | null, phase: ResearchPhase | nul
 export function summaryItems(tl: Timeline): { key: string; opts: Record<string, unknown> }[] | null {
   const total = tl.order.length;
   if (!tl.multi && total === 0) return null;
-  const articles = { key: "chat.research.articles", opts: { count: total } };
+  // "0 articles" reads like a failure: with nothing found the pill says so in words.
+  const articles = total > 0 ? { key: "chat.research.articles", opts: { count: total } } : { key: "chat.research.noArticles", opts: {} };
   return tl.multi ? [{ key: "chat.research.parts", opts: { count: tl.parts.length } }, articles] : [articles];
 }
 

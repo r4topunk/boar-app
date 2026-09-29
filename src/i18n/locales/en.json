@@ -816,6 +816,7 @@
       "searchedLibrary": "Searched this phone’s library",
       "articles_one": "{{count}} article",
       "articles_other": "{{count}} articles",
+      "noArticles": "no articles",
       "parts_one": "{{count}} part",
       "parts_other": "{{count}} parts",
       "more_one": "+{{count}} more",

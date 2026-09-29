@@ -314,3 +314,23 @@ describe("live research copy (en/pt in sync)", () => {
     expect(en.chat.research.noneNew).toBe("No new articles");
   });
 });
+
+describe("foldTimeline: the engine's answering signal", () => {
+  it("marks a part as read when its sub-answer starts, even with no new article", () => {
+    const tl = replay([
+      { sources: [], detail: part(0, 2, "First?") },
+      { sources: [], detail: { ...part(0, 2, "First?"), answering: true } },
+    ]);
+    expect(tl.parts[0].read).toBe(true);
+    expect(tl.parts[0].articles).toEqual([]);
+    expect(tl.parts[1].read).toBeFalsy();
+  });
+
+  it("says 'no articles' in words instead of '0 articles' in the pill", () => {
+    const tl = replay([{ sources: [], detail: part(0, 3, "First?") }]);
+    expect(summaryItems(tl)).toEqual([
+      { key: "chat.research.parts", opts: { count: 3 } },
+      { key: "chat.research.noArticles", opts: {} },
+    ]);
+  });
+});

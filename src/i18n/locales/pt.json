@@ -816,6 +816,7 @@
       "searchedLibrary": "Busca no acervo deste celular",
       "articles_one": "{{count}} artigo",
       "articles_other": "{{count}} artigos",
+      "noArticles": "sem artigos",
       "parts_one": "{{count}} parte",
       "parts_other": "{{count}} partes",
       "more_one": "+{{count}} outro",
