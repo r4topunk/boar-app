@@ -49,7 +49,10 @@ public class VoiceInputModule: Module {
       return onDevice ? "on-device" : "unavailable"
     }
 
-    AsyncFunction("startListening") { (promise: Promise) in
+    // Same arguments as Android: the JS always passes requireOnDevice. iOS ignores it (it is always
+    // on-device), but Expo rejects a call with more arguments than the function declares, so without
+    // it the mic did nothing.
+    AsyncFunction("startListening") { (_ requireOnDevice: Bool, promise: Promise) in
       Self.requestPermissions { granted in
         guard granted else {
           promise.reject("E_PERMISSION_DENIED", "Microphone or speech recognition permission denied")
