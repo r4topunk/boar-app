@@ -55,7 +55,10 @@ shape and comparable.
 3. **A development build of BOAR** installed (`npx expo run:android`, or
    `npm run eval:device -- --install` builds and installs one). Release builds
    can't be driven this way on purpose: request pickup only exists in
-   development builds, and reading results needs a debuggable app.
+   development builds, and reading results needs a debuggable app. The other
+   way round, a development build can't share its runs (Evaluation › Share
+   results): the server accepts only release builds, see
+   [RESULTS_SCORE.md](RESULTS_SCORE.md#which-builds-can-share).
 4. **Metro running** in another terminal: `make start` (or
    `npx expo start --localhost`).
 5. **Models downloaded** in the app (Settings → Models). The tool never

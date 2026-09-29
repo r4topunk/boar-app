@@ -15,11 +15,52 @@ Only after the user reads the "What will be shared" screen and presses Share:
 - **App:** BOAR version and the evaluation set version.
 - **Every answer of the run:** the question, the answer, the model and its timings, the
   sources retrieved.
-- **A random id** created in the app the first time it shares. The server keeps only its
-  SHA-256, to allow 20 runs per install per day and to refuse the same run twice.
+- **A signature from the phone's hardware key**, made for BOAR in the phone's secure hardware
+  (Android Keystore, iOS App Attest), so runs can't be sent from a script or an emulator. The
+  first share also sends the key's certificate chain, which shows the Android security patch
+  level and whether the bootloader is unlocked. The key is the phone's only id: it allows 3
+  runs in 24 hours, 1 hour apart, and refuses the same run twice. See
+  [supabase/README.md](../supabase/README.md).
 
 Not sent: chats, documents, name, location, contacts. The offline build has no network
 access and can't share.
+
+## How a share works
+
+1. **Challenge.** The app asks `submit-results` for a one-time challenge (valid 5 minutes,
+   usable once).
+2. **The phone's key.** On the first share the app makes a key in the phone's secure hardware
+   (`modules/device-key`): an Android Keystore key whose certificate carries that challenge,
+   or an iOS App Attest key. The key never leaves the hardware.
+3. **Signature.** The app signs `challenge.payload`, where the payload is the exact JSON
+   listed above, and sends the challenge, the payload, the signature and, the first time, the
+   key's certificate chain.
+4. **Server checks.** The function checks the chain (Android: Google's attestation root, not
+   revoked, a key in secure hardware for `team.sopa.aoair` signed with BOAR's release key;
+   iOS: Apple's App Attest root and BOAR's App ID), then the signature. From then on the phone
+   is known by its key and only signs.
+5. **Limits and storing.** In one database transaction: the same run twice is answered
+   "already shared", then 3 runs per phone in 24 hours, at least 1 hour apart, 6 per network
+   a day and 300 an hour in total. Then the run, its answers and its scores are stored.
+6. **Plausibility.** Answers must be to the evaluation set's own questions, once each. A run
+   with impossible timings or memory is kept, but its scores stay hidden until someone looks.
+
+Stored runs can't be changed or deleted, not even with the server's secret key; only the
+database owner can hide a score or block a device. What the app says for each answer
+(shared, already shared, cooldown or daily limit with the time sharing opens again, network
+limit, refused) is in `src/eval/shareResults.pure.ts`.
+
+### Which builds can share
+
+Only BOAR's release builds, signed with the project's release key (`make apk-downloader`, or
+a release APK published after v1.0.0, which had no sharing). Development builds (`npx expo run:android`, the dev client)
+and debug builds are refused: they are signed with Expo's debug key, which anyone can use,
+so a modified app could pass as BOAR. The offline build has no network permission. iOS sharing
+opens once the function's `APPLE_APP_ID` is set.
+
+A release build installs as its own app (`team.sopa.aoair`) next to a development build
+(`team.sopa.aoair.dev`), with its own storage: import the models from files instead of
+downloading them again.
 
 ## What is public
 
@@ -30,8 +71,8 @@ publishable key, and sorted or filtered on any column, for example:
 GET /rest/v1/eval_scores?soc=eq.MT6897&order=median_tok_per_sec.desc
 ```
 
-It holds the hardware and the per-model numbers, never the install hash. The raw runs and
-answers (`eval_runs`, `eval_rows`) are not readable with the publishable key. A junk entry can
+It holds the hardware and the per-model numbers, never the phone's key or its id. The raw
+runs and answers (`eval_runs`, `eval_rows`) are not readable with the publishable key. A junk entry can
 be hidden (`eval_scores.hidden`) without deleting it.
 
 ## Score v1

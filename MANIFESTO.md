@@ -73,7 +73,8 @@ BOAR is a tool for anyone curious about what phones can really do.
   You get load time, time to first token, tokens/sec, peak memory and every
   answer side by side. See [docs/EVAL_QUERIES.md](docs/EVAL_QUERIES.md).
 - **Share your results.** Different phones, different chips, different numbers.
-  A result from your device is data nobody else has.
+  A result from your device is data nobody else has. Each run is signed by your
+  phone's hardware, so the shared numbers come from real phones.
 - **Break it.** Ask the questions a 1B model fails on. Find where retrieval pulls
   in nonsense. Open an issue with the output.
 - **Build the missing pieces.** Expert-aware caching for mixture-of-experts

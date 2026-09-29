@@ -214,6 +214,10 @@ npm run pack:push -- build/knowledge-pack/<id>.sqlite  # copy onto a USB-connect
   problem. Don't spend time chasing it.
 - **A stale `android/` directory causing weird build errors after editing
   `app.json`**: see the `--clean` note above.
+- **"Share results" is refused from a development build**: on purpose. The server
+  only accepts runs signed by a hardware key of a release build signed with BOAR's
+  release key (`make apk-downloader`, installed as `team.sopa.aoair` next to the
+  dev build). See `docs/RESULTS_SCORE.md` ("Which builds can share").
 - **Don't run destructive git/native-reset commands to "fix" a build
   problem** (`rm -rf android`, force-pushes, etc.) without checking
   `git status` first and understanding why the build actually failed —
