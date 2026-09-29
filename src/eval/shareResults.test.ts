@@ -5,7 +5,8 @@ import {
   describeCores,
   inferenceFeatures,
   parseCpuFeatures,
-  shareResultFromStatus,
+  shareOutcome,
+  signedMessage,
   submitResultsUrl,
 } from "./shareResults.pure";
 import type { EvalResultRow } from "./evalHarness.pure";
@@ -27,9 +28,8 @@ describe("submitResultsUrl", () => {
 
 describe("buildSubmission", () => {
   it("takes the run id and set version from the rows and sends every row", () => {
-    const s = buildSubmission([row("a"), row("b")], { platform: "android", osVersion: "15", brand: "POCO", model: "X6", ramBytes: 12e9 }, "install-1", "1.0.0");
+    const s = buildSubmission([row("a"), row("b")], { platform: "android", osVersion: "15", brand: "POCO", model: "X6", ramBytes: 12e9 }, "1.0.0");
     expect(s).toEqual({
-      installId: "install-1",
       run: { runId: "eval-1", evalSetVersion: "1", appVersion: "1.0.0", platform: "android", osVersion: "15", deviceBrand: "POCO", deviceModel: "X6", ramBytes: 12e9 },
       rows: [row("a"), row("b")],
     });
@@ -39,28 +39,44 @@ describe("buildSubmission", () => {
     const run = buildSubmission(
       [row("a")],
       { platform: "android", soc: "", hardware: "mt6897", cpuCores: 8, cpuFeatures: ["i8mm"], coreMaxFreqKHz: [2200000, 3350000], apiLevel: 35 },
-      "i",
       "1"
     ).run;
     expect(run).toMatchObject({ soc: undefined, hardware: "mt6897", cpuCores: 8, cpuFeatures: ["i8mm"], coreMaxFreqKHz: [2200000, 3350000], apiLevel: 35 });
   });
 
   it("leaves out a RAM figure the device couldn't read", () => {
-    expect(buildSubmission([row("a")], { platform: "android", ramBytes: 0 }, "i", "1").run.ramBytes).toBeUndefined();
+    expect(buildSubmission([row("a")], { platform: "android", ramBytes: 0 }, "1").run.ramBytes).toBeUndefined();
   });
 });
 
-describe("shareResultFromStatus", () => {
+describe("shareOutcome", () => {
   it.each([
     [201, "shared"],
     [409, "already-shared"],
     [429, "rate-limited"],
     [400, "rejected"],
     [401, "rejected"],
+    [412, "rejected"],
     [500, "failed"],
+    [503, "failed"],
     [0, "failed"],
   ] as const)("%i -> %s", (status, result) => {
-    expect(shareResultFromStatus(status)).toBe(result);
+    expect(shareOutcome(status).result).toBe(result);
+  });
+
+  it("tells the cooldown from the daily limit and keeps the time the server gave", () => {
+    const at = "2026-09-29T16:23:54.043438+00:00";
+    expect(shareOutcome(429, { error: "cooldown", retryAt: at })).toEqual({ result: "cooldown", retryAt: at });
+    expect(shareOutcome(429, { error: "rate_limited", retryAt: at })).toEqual({ result: "rate-limited", retryAt: at });
+    expect(shareOutcome(429, { error: "rate_limited", retryAt: "soon" })).toEqual({ result: "rate-limited", retryAt: undefined });
+    expect(shareOutcome(429, null)).toEqual({ result: "rate-limited", retryAt: undefined });
+    expect(shareOutcome(429, { error: "network_limited" })).toEqual({ result: "network-limited" });
+  });
+});
+
+describe("signedMessage", () => {
+  it("is the challenge, a dot, then the exact payload the server receives", () => {
+    expect(signedMessage("abc", '{"run":{}}')).toBe('abc.{"run":{}}');
   });
 });
 

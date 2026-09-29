@@ -59,7 +59,7 @@ export function SharePreview({ visible, rows, device, appVersion, sending, onCan
             </Text>
           </View>
 
-          <Section title={t("evaluation.preview.phoneSection")}>
+          <Section title={t("evaluation.preview.phoneSection")} footer={t("evaluation.preview.keyNote")}>
             <ListRow title={t("evaluation.preview.phone")} value={[device.brand, device.model].filter(Boolean).join(" ") || "—"} />
             <ListRow title={t("evaluation.preview.chipset")} value={describeChipset(device) ?? "—"} />
             <ListRow title={t("evaluation.preview.cpu")} value={cpu || "—"} />

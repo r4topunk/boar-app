@@ -45,8 +45,8 @@ interface Settings {
   loadCrashedIds?: string[];
   /** The last load crash, until the chat shows it once (src/inference/loadGuard.ts consumeLoadCrash). */
   pendingLoadCrash?: StoredLoadCrash | null;
-  /** Random id created the first time this install shares results (src/eval/shareResults.ts). */
-  installId?: string;
+  /** The server's id for this phone's sharing key, once it has accepted the key (src/eval/shareResults.ts). */
+  shareDeviceId?: string;
   /** The menu's live line (RAM, storage, last speed). On unless turned off in Settings. */
   showLiveStats?: boolean;
 }
@@ -170,14 +170,16 @@ export async function setActiveModelId(kind: AssetKind, id: string): Promise<voi
   });
 }
 
-/** This install's random id for shared results, created on first use. Only its SHA-256 is stored server-side. */
-export async function getOrCreateInstallId(create: () => string): Promise<string> {
+/** The server's id for this phone's hardware sharing key; undefined until a share registers it. */
+export async function getShareDeviceId(): Promise<string | undefined> {
+  return (await readSettings()).shareDeviceId;
+}
+
+export async function setShareDeviceId(id: string | undefined): Promise<void> {
   return serialized(async () => {
     const s = await readSettings();
-    if (s.installId) return s.installId;
-    s.installId = create();
+    s.shareDeviceId = id;
     await writeSettings(s);
-    return s.installId;
   });
 }
 
