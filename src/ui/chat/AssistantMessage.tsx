@@ -1,7 +1,7 @@
 import React, { createContext, memo, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, useWindowDimensions, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Badge, Banner, Button, Card, Icon, IconButton, IconSlot, IconText, LARGE_TEXT_SCALE, LineSlot, Mascot, MetaLine, Text, TextAction, useOpticalLine, type IconName } from "../components";
+import { Badge, Banner, Button, Card, Icon, IconButton, IconSlot, IconText, LARGE_TEXT_SCALE, LineSlot, Mascot, MetaLine, Text, TextAction, useOpticalLine, type IconName, type OpticalLine } from "../components";
 import { MarkdownMessage } from "../components/MarkdownMessage";
 import { icon, useTheme, useTokens } from "../theme";
 import { META_SEPARATOR, metaItems } from "../components/metaItems";
@@ -26,6 +26,7 @@ import { answerStillShowing, isDraining } from "./streamReveal";
 import { Swap } from "./Swap";
 import { StepsSlot } from "./StepsSlot";
 import { useMotion } from "../theme/motion";
+import { articlesSpoken, deepSourcesFrom, liveStripShown, MAX_ARTICLES, researchArticles, rowGrows, sameArticles, type ArticleMark, type ResearchArticles } from "./liveResearch";
 
 export interface AssistantMessageProps {
   answer: AnswerState;
@@ -110,12 +111,89 @@ const StepSpinner = memo(function StepSpinner({ still = false }: { still?: boole
   );
 });
 
+/** An article's mark (LIVE_RESEARCH): its source's initial in a small raised square, or the documents icon. */
+function ArticleMarkView({ mark, line }: { mark: ArticleMark; line: OpticalLine }) {
+  const t = useTokens();
+  return (
+    <LineSlot line={line}>
+      <View
+        style={{
+          minWidth: line.iconSize,
+          minHeight: line.iconSize,
+          borderRadius: t.radius.xs,
+          backgroundColor: t.color.bg.raised,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {mark.kind === "letter" ? (
+          <Text variant="caption" weight="semibold" color="secondary" maxFontSizeMultiplier={1.5}>
+            {mark.letter}
+          </Text>
+        ) : (
+          <Icon name="file-text" size={line.iconSize - t.space.xs} color={t.color.text.secondary} />
+        )}
+      </View>
+    </LineSlot>
+  );
+}
+
+/**
+ * The articles the search found, under the searching step (LIVE_RESEARCH): one quiet row per article,
+ * first found first, up to 3, then "+N". A row that arrives while the card is on screen grows in
+ * (Reveal: height on the UI thread and a fade, so the card never jumps); rows there at mount show in
+ * place. Rows are only ever added, never reordered or removed, so incremental `sources` events read calm.
+ */
+function ArticleRows({ articles, none }: { articles: ResearchArticles | null; none: boolean }) {
+  const t = useTokens();
+  const { t: tr } = useTranslation();
+  const line = useOpticalLine("footnote");
+  const atMount = useRef<ReadonlySet<string>>(new Set(articles?.shown.map((a) => a.key) ?? [])).current;
+  const moreAtMount = useRef((articles?.more ?? 0) > 0).current;
+  return (
+    <>
+      {articles?.shown.map((a) => (
+        <Reveal key={a.key} appear={rowGrows(a.key, atMount)} spaceBefore={t.space.xs}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: t.space.sm }}>
+            <ArticleMarkView mark={a.mark} line={line} />
+            <Text variant="footnote" color="secondary" numberOfLines={1} style={{ flex: 1 }}>
+              {a.title}
+            </Text>
+          </View>
+        </Reveal>
+      ))}
+      <Reveal shown={!!articles && articles.more > 0} appear={!moreAtMount} spaceBefore={t.space.xs}>
+        <Text variant="caption" color="secondary" numeric>
+          {tr("chat.research.more", { count: articles?.more ?? 0 })}
+        </Text>
+      </Reveal>
+      <Reveal shown={none} appear spaceBefore={t.space.xs}>
+        <Text variant="footnote" color="secondary">
+          {tr("chat.research.none")}
+        </Text>
+      </Reveal>
+    </>
+  );
+}
+
 /**
  * What the answer is doing, as the mockup's step card: every step from the start (generatingSteps), each
  * with its icon; on the right a check when done, the turning ring on the current one, a small dot for the
- * ones still to come. Visual only; the reader hears stage changes through the screen's announcer.
+ * ones still to come. Under the searching step, the articles found so far (ArticleRows). Visual only; the
+ * reader hears stage changes through the screen's announcer, and the sources strip reads the articles.
  */
-const StepsCard = memo(function StepsCard({ steps, still }: { steps: GeneratingStep[]; still: boolean }) {
+const StepsCard = memo(function StepsCard({
+  steps,
+  still,
+  articles = null,
+  none = false,
+}: {
+  steps: GeneratingStep[];
+  still: boolean;
+  articles?: ResearchArticles | null;
+  /** Searched and nothing on the topic (weak sources, no passage): one quiet line instead of rows. */
+  none?: boolean;
+}) {
   const t = useTokens();
   // Icon-align round: leading icon and trailing status on the optical centre of the label's first line.
   const line = useOpticalLine("footnote");
@@ -124,9 +202,19 @@ const StepsCard = memo(function StepsCard({ steps, still }: { steps: GeneratingS
       {steps.map((s) => (
         <View key={s.key} style={{ flexDirection: "row", alignItems: "flex-start", gap: icon.gap }}>
           <IconSlot name={s.icon} line={line} color={s.status === "active" ? t.color.accent.solid : t.color.text.secondary} />
-          <Text variant="footnote" weight={s.status === "active" ? "semibold" : "regular"} color={s.status === "pending" ? "secondary" : "primary"} style={{ flex: 1 }}>
-            {s.label}
-          </Text>
+          {/* The label and, under the searching step, what it found; the status stays on the label's line. */}
+          <View style={{ flex: 1 }}>
+            {/* The searching step holds one line: a Deep Research sub-question changes it in place, never the card's height. */}
+            <Text
+              variant="footnote"
+              weight={s.status === "active" ? "semibold" : "regular"}
+              color={s.status === "pending" ? "secondary" : "primary"}
+              numberOfLines={s.key === "search" ? 1 : undefined}
+            >
+              {s.label}
+            </Text>
+            {s.key === "search" && <ArticleRows articles={articles} none={none && s.status === "done"} />}
+          </View>
           {s.status === "done" ? (
             <IconSlot name="check" line={line} color={t.color.status.success.solid} edge="end" />
           ) : (
@@ -142,7 +230,34 @@ const StepsCard = memo(function StepsCard({ steps, still }: { steps: GeneratingS
       ))}
     </Card>
   );
-}, (a, b) => a.still === b.still && sameSteps(a.steps, b.steps));
+}, (a, b) => a.still === b.still && a.none === b.none && sameSteps(a.steps, b.steps) && sameArticles(a.articles ?? null, b.articles ?? null));
+
+/**
+ * While the text streams (LIVE_RESEARCH): the articles the answer is using, in one line under the text,
+ * where the count-only "Found N passages" sat. The steps card has left by then; once the answer is done
+ * the sources card takes this slot (Swap). One focus for readers, read when reached, never announced.
+ */
+function LiveSourcesStrip({ articles }: { articles: ResearchArticles }) {
+  const t = useTokens();
+  const { t: tr } = useTranslation();
+  const line = useOpticalLine("footnote");
+  return (
+    <Card radius="card" padding="compact">
+      <View accessible accessibilityRole="text" accessibilityLabel={articlesSpoken(articles, tr)} style={{ flexDirection: "row", alignItems: "flex-start", gap: icon.gap }}>
+        <IconSlot name="book-open" line={line} color={t.color.text.secondary} />
+        {/* The names shrink first; "+N" never truncates. */}
+        <Text variant="footnote" color="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+          {articles.shown.map((a) => a.title).join(META_SEPARATOR)}
+        </Text>
+        {articles.more > 0 && (
+          <Text variant="footnote" color="secondary" numeric style={{ flexShrink: 0 }}>
+            {tr("chat.research.more", { count: articles.more })}
+          </Text>
+        )}
+      </View>
+    </Card>
+  );
+}
 
 /** Seconds since the answer started, as the mockup's pill at the right of the name (the receipt takes its place when done). */
 function Elapsed({ locale, step }: { locale: string; step?: string }) {
@@ -1007,6 +1122,18 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   // D3: the card shrinks at the first words while they take its place (the pill keeps the progress).
   const stepsShown = stepsCardShown(answer, steps);
   const fastSteps = !answer.deep && stepsShown && !props.waitingLibrary;
+  // What the search found, as rows in the steps card, then as the strip under the streaming text (LIVE_RESEARCH).
+  // Not for a places answer: its "sources" are the places, listed by their own card. Memoized on the sources,
+  // which a token doesn't touch, so the card's memo holds while the text streams.
+  const liveArticles = useMemo(() => (answer.places ? null : researchArticles(answer.sources)), [answer.places, answer.sources]);
+  const noArticle = !!answer.weakSources && answer.sources.length === 0;
+  // A Deepen's card lists what its own search adds (the first answer's articles are in the sources card above).
+  const deepFrom = useRef<number | null>(null);
+  deepFrom.current = deepSourcesFrom(deepFrom.current, !!answer.deep && !answer.deep.outcome, answer.sources.length);
+  const deepStart = deepFrom.current;
+  const deepArticles = useMemo(() => (deepStart == null ? null : researchArticles(answer.sources, MAX_ARTICLES, deepStart)), [answer.sources, deepStart]);
+  // The steps card is on screen (it lists the articles): no second list of the same articles below it.
+  const stepsOnScreen = fastSteps || (!!answer.deep && stepsShown);
   const fastStreaming = running && !answer.deep && !answer.fast?.outcome;
   const deepStreaming = running && !!answer.deep && !answer.deep.outcome;
 
@@ -1016,7 +1143,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   const waitingForCity = answer.places?.coverage === "needs_place" || locating;
   const fresh = !!props.fresh;
   const motion = useMemo(() => ({ appear: fresh, gap: t.space.md }), [fresh, t.space.md]);
-  const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless;
+  const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless && liveStripShown(cardMode, stepsOnScreen);
   const instantBanner = !!instantOnly && !!answer.instantDone && answer.instantDone.outcome !== "success";
   const emergency = answerShowsEmergencyNote(answer, props.question ?? "", placesOnly);
   // The body's block opens with its first words, not before (an empty block would grow a bare gap).
@@ -1121,7 +1248,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
           {/* The steps and the text share one slot: the card gives way to the first words in place (D3, v2 P3). */}
           <Block shown={fastSteps || fastBody}>
             <StepsSlot
-              steps={fastSteps && steps ? <StepsCard steps={steps} still={ringStill} /> : null}
+              steps={fastSteps && steps ? <StepsCard steps={steps} still={ringStill} articles={liveArticles} none={noArticle} /> : null}
               body={
                 fastBody && answer.fast ? (
                   <TierBody tier={answer.fast} streaming={fastStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="fast" onDraining={onDraining} />
@@ -1143,7 +1270,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
                 </Text>
                 <View style={{ paddingTop: t.space.sm }}>
                   <StepsSlot
-                    steps={stepsShown && steps ? <StepsCard steps={steps} still={ringStill} /> : null}
+                    steps={stepsShown && steps ? <StepsCard steps={steps} still={ringStill} articles={deepArticles} none={noArticle} /> : null}
                     body={<TierBody tier={answer.deep} streaming={deepStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="deep" onDraining={onDraining} />}
                     released={!active || !!answer.deep.outcome}
                   />
@@ -1181,15 +1308,20 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
           <Block shown={sourcesShown}>
             {sourcesShown && (
               // CT-2: once the engine says which [n] stayed, the card lists only those; nothing cited = no card.
-              // While it writes, only the count (Prism): no list that could shrink, no passage shown as a source yet.
+              // While it writes, the articles in one line (LIVE_RESEARCH; was the count only, Prism): no numbered
+              // list that could shrink, no passage shown as a cited source yet.
               // The count crossfades into the list while the block's height follows (SEND-MOTION S7).
               <Swap swapKey={cardMode === "found" || cardMode === "related" ? cardMode : "list"}>
                 {cardMode === "found" ? (
-                  <Card radius="card" padding="compact">
-                    <IconText icon="book-open" variant="footnote" color="secondary" iconColor={t.color.text.secondary}>
-                      {tr("chat.sources.found", { count: answer.sources.length })}
-                    </IconText>
-                  </Card>
+                  liveArticles ? (
+                    <LiveSourcesStrip articles={liveArticles} />
+                  ) : (
+                    <Card radius="card" padding="compact">
+                      <IconText icon="book-open" variant="footnote" color="secondary" iconColor={t.color.text.secondary}>
+                        {tr("chat.sources.found", { count: answer.sources.length })}
+                      </IconText>
+                    </Card>
+                  )
                 ) : cardMode === "related" && split ? (
                   <Card radius="card" padding="compact">
                     <RelatedSources answer={answer} indexes={split.related} />

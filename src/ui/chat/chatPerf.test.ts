@@ -29,7 +29,8 @@ describe("chat perf guards (LAYOUT-AUDIT)", () => {
     expect(am.match(/Animated\.loop/g)).toHaveLength(1);
     expect(am).toMatch(/const turning = !reduceMotion && !still;/);
     expect(am).toMatch(/<StepSpinner still=\{still\} \/>/);
-    expect(am.match(/<StepsCard steps=\{steps\} still=\{ringStill\} \/>/g)).toHaveLength(2);
+    // Both step cards (fast, deep) pass the still ring; the live articles ride along (LIVE_RESEARCH).
+    expect(am.match(/<StepsCard steps=\{steps\} still=\{ringStill\} articles=\{(live|deep)Articles\} none=\{noArticle\} \/>/g)).toHaveLength(2);
     expect(am).toMatch(/const ringStill = !stepSpinnerRuns\(answer\);/);
   });
 });
