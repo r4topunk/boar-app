@@ -1,7 +1,7 @@
 import React, { createContext, memo, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, useWindowDimensions, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Badge, Banner, Button, Card, Icon, IconButton, IconSlot, IconText, LARGE_TEXT_SCALE, LineSlot, Mascot, MetaLine, Text, TextAction, useOpticalLine, type IconName, type OpticalLine } from "../components";
+import { Badge, Banner, Button, Card, Icon, IconButton, IconSlot, IconText, LARGE_TEXT_SCALE, LineSlot, Mascot, MetaLine, Text, TextAction, useOpticalLine, type IconName } from "../components";
 import { MarkdownMessage } from "../components/MarkdownMessage";
 import { icon, useTheme, useTokens } from "../theme";
 import { META_SEPARATOR, metaItems } from "../components/metaItems";
@@ -9,14 +9,14 @@ import { splitThinking } from "../../services/thinking";
 import { cleanCitations } from "../../services/citations";
 import { splitInlineBullets } from "../../services/answerFormat";
 import { answerPhase, canDeepen, isLocating, noSourceKind, type AnswerState, type TierState } from "./answerReducer";
-import { declineAfterSnippet, declineCopy, answerReceiptShort, pillStep, snippetAutoCollapses, generatingSteps, noticeShown, stepsCardShown, showsAnswerBody, noSourceNote, offersAskModel, receiptTagKey, showsInstantSnippet, stepSpinnerRuns, sourceLanguageLead, previewText, receiptDetails, receiptLine, type GeneratingStep } from "./presentation";
+import { declineAfterSnippet, declineCopy, answerReceiptShort, pillStep, snippetAutoCollapses, generatingSteps, noticeShown, stepsCardShown, showsAnswerBody, noSourceNote, offersAskModel, receiptTagKey, showsInstantSnippet, sourceLanguageLead, previewText, receiptDetails, receiptLine } from "./presentation";
 import { answerSourceSplit, groupSources, sourcesCardMode, relevanceBands, bestBand, BAND_FILL, sourceParts, type RelevanceBand } from "./sourceLabel";
 import { answerShowsEmergencyNote } from "./safetyNote";
 import { withoutUncitedPreface } from "./uncitedPreface";
 import { formatSeconds } from "./shareFormat";
 import { LocatingPrompt, PlacesCard } from "./PlacesCard";
 import type { AnswerReceipt } from "./answerEvents";
-import { sameAnswerFields, sameNumbers, sameSteps } from "./renderEquality";
+import { sameAnswerFields, sameNumbers } from "./renderEquality";
 import { lineSlop } from "./touch";
 import { chatLargeText } from "./largeText";
 import Reanimated, { LayoutAnimationConfig } from "react-native-reanimated";
@@ -24,9 +24,9 @@ import { Reveal } from "./Reveal";
 import { useSmoothText } from "./useSmoothText";
 import { answerStillShowing, isDraining } from "./streamReveal";
 import { Swap } from "./Swap";
-import { StepsSlot } from "./StepsSlot";
 import { useMotion } from "../theme/motion";
-import { articlesSpoken, deepSourcesFrom, liveStripShown, MAX_ARTICLES, researchArticles, rowGrows, sameArticles, type ArticleMark, type ResearchArticles } from "./liveResearch";
+import { deepSectionLabeled, deepSourcesFrom, emptyTimeline, foldTimeline, researchPhase, summaryItems, type Timeline } from "./liveResearch";
+import { ResearchPanel } from "./ResearchCard";
 
 export interface AssistantMessageProps {
   answer: AnswerState;
@@ -61,6 +61,18 @@ export interface AssistantMessageProps {
   onAnswerAnyway?: () => void;
   onUseLocation?: () => void;
   onGetMap?: () => void;
+}
+
+/**
+ * One tier's research timeline (LIVE_RESEARCH): while `on` (the tier runs), each render folds what the
+ * answer shows into it (the events keep no history: which part found which article is only known here);
+ * after, it stays as it was, for the pill. Null for answers that never researched in this mount (history).
+ * `foldTimeline` returns the same object when nothing changed, so the panel's memo holds while text streams.
+ */
+function useTimeline(on: boolean, sources: AnswerState["sources"], from: number, detail: unknown, searching: boolean): Timeline | null {
+  const ref = useRef<Timeline | null>(null);
+  if (on) ref.current = foldTimeline(ref.current ?? emptyTimeline(), { sources: from > 0 ? sources.slice(from) : sources, detail, searching });
+  return ref.current;
 }
 
 function useElapsedSeconds(running: boolean): number {
@@ -110,154 +122,6 @@ const StepSpinner = memo(function StepSpinner({ still = false }: { still?: boole
     />
   );
 });
-
-/** An article's mark (LIVE_RESEARCH): its source's initial in a small raised square, or the documents icon. */
-function ArticleMarkView({ mark, line }: { mark: ArticleMark; line: OpticalLine }) {
-  const t = useTokens();
-  return (
-    <LineSlot line={line}>
-      <View
-        style={{
-          minWidth: line.iconSize,
-          minHeight: line.iconSize,
-          borderRadius: t.radius.xs,
-          backgroundColor: t.color.bg.raised,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {mark.kind === "letter" ? (
-          <Text variant="caption" weight="semibold" color="secondary" maxFontSizeMultiplier={1.5}>
-            {mark.letter}
-          </Text>
-        ) : (
-          <Icon name="file-text" size={line.iconSize - t.space.xs} color={t.color.text.secondary} />
-        )}
-      </View>
-    </LineSlot>
-  );
-}
-
-/**
- * The articles the search found, under the searching step (LIVE_RESEARCH): one quiet row per article,
- * first found first, up to 3, then "+N". A row that arrives while the card is on screen grows in
- * (Reveal: height on the UI thread and a fade, so the card never jumps); rows there at mount show in
- * place. Rows are only ever added, never reordered or removed, so incremental `sources` events read calm.
- */
-function ArticleRows({ articles, none }: { articles: ResearchArticles | null; none: boolean }) {
-  const t = useTokens();
-  const { t: tr } = useTranslation();
-  const line = useOpticalLine("footnote");
-  const atMount = useRef<ReadonlySet<string>>(new Set(articles?.shown.map((a) => a.key) ?? [])).current;
-  const moreAtMount = useRef((articles?.more ?? 0) > 0).current;
-  return (
-    <>
-      {articles?.shown.map((a) => (
-        <Reveal key={a.key} appear={rowGrows(a.key, atMount)} spaceBefore={t.space.xs}>
-          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: t.space.sm }}>
-            <ArticleMarkView mark={a.mark} line={line} />
-            <Text variant="footnote" color="secondary" numberOfLines={1} style={{ flex: 1 }}>
-              {a.title}
-            </Text>
-          </View>
-        </Reveal>
-      ))}
-      <Reveal shown={!!articles && articles.more > 0} appear={!moreAtMount} spaceBefore={t.space.xs}>
-        <Text variant="caption" color="secondary" numeric>
-          {tr("chat.research.more", { count: articles?.more ?? 0 })}
-        </Text>
-      </Reveal>
-      <Reveal shown={none} appear spaceBefore={t.space.xs}>
-        <Text variant="footnote" color="secondary">
-          {tr("chat.research.none")}
-        </Text>
-      </Reveal>
-    </>
-  );
-}
-
-/**
- * What the answer is doing, as the mockup's step card: every step from the start (generatingSteps), each
- * with its icon; on the right a check when done, the turning ring on the current one, a small dot for the
- * ones still to come. Under the searching step, the articles found so far (ArticleRows). Visual only; the
- * reader hears stage changes through the screen's announcer, and the sources strip reads the articles.
- */
-const StepsCard = memo(function StepsCard({
-  steps,
-  still,
-  articles = null,
-  none = false,
-}: {
-  steps: GeneratingStep[];
-  still: boolean;
-  articles?: ResearchArticles | null;
-  /** Searched and nothing on the topic (weak sources, no passage): one quiet line instead of rows. */
-  none?: boolean;
-}) {
-  const t = useTokens();
-  // Icon-align round: leading icon and trailing status on the optical centre of the label's first line.
-  const line = useOpticalLine("footnote");
-  return (
-    <Card padding="compact" radius="card" style={{ gap: t.space.sm }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-      {steps.map((s) => (
-        <View key={s.key} style={{ flexDirection: "row", alignItems: "flex-start", gap: icon.gap }}>
-          <IconSlot name={s.icon} line={line} color={s.status === "active" ? t.color.accent.solid : t.color.text.secondary} />
-          {/* The label and, under the searching step, what it found; the status stays on the label's line. */}
-          <View style={{ flex: 1 }}>
-            {/* The searching step holds one line: a Deep Research sub-question changes it in place, never the card's height. */}
-            <Text
-              variant="footnote"
-              weight={s.status === "active" ? "semibold" : "regular"}
-              color={s.status === "pending" ? "secondary" : "primary"}
-              numberOfLines={s.key === "search" ? 1 : undefined}
-            >
-              {s.label}
-            </Text>
-            {s.key === "search" && <ArticleRows articles={articles} none={none && s.status === "done"} />}
-          </View>
-          {s.status === "done" ? (
-            <IconSlot name="check" line={line} color={t.color.status.success.solid} edge="end" />
-          ) : (
-            <LineSlot line={line}>
-              {s.status === "active" ? (
-                <StepSpinner still={still} />
-              ) : (
-                <View style={{ width: t.space.sm, height: t.space.sm, borderRadius: t.radius.full, backgroundColor: t.color.line.hairline }} />
-              )}
-            </LineSlot>
-          )}
-        </View>
-      ))}
-    </Card>
-  );
-}, (a, b) => a.still === b.still && a.none === b.none && sameSteps(a.steps, b.steps) && sameArticles(a.articles ?? null, b.articles ?? null));
-
-/**
- * While the text streams (LIVE_RESEARCH): the articles the answer is using, in one line under the text,
- * where the count-only "Found N passages" sat. The steps card has left by then; once the answer is done
- * the sources card takes this slot (Swap). One focus for readers, read when reached, never announced.
- */
-function LiveSourcesStrip({ articles }: { articles: ResearchArticles }) {
-  const t = useTokens();
-  const { t: tr } = useTranslation();
-  const line = useOpticalLine("footnote");
-  return (
-    <Card radius="card" padding="compact">
-      <View accessible accessibilityRole="text" accessibilityLabel={articlesSpoken(articles, tr)} style={{ flexDirection: "row", alignItems: "flex-start", gap: icon.gap }}>
-        <IconSlot name="book-open" line={line} color={t.color.text.secondary} />
-        {/* The names shrink first; "+N" never truncates. */}
-        <Text variant="footnote" color="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-          {articles.shown.map((a) => a.title).join(META_SEPARATOR)}
-        </Text>
-        {articles.more > 0 && (
-          <Text variant="footnote" color="secondary" numeric style={{ flexShrink: 0 }}>
-            {tr("chat.research.more", { count: articles.more })}
-          </Text>
-        )}
-      </View>
-    </Card>
-  );
-}
 
 /** Seconds since the answer started, as the mockup's pill at the right of the name (the receipt takes its place when done). */
 function Elapsed({ locale, step }: { locale: string; step?: string }) {
@@ -1084,6 +948,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
     return () => onRevealing?.(false);
   }, [onRevealing, revealing]);
   const t = useTokens();
+  const blockMotion = useMotion();
   const { t: tr } = useTranslation();
   const phase = answerPhase(answer);
   // No strong source: no [n] citations, even if weak passages came back (weak-sources spec rule 4).
@@ -1118,41 +983,57 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   const lastStep = useRef<string | undefined>(undefined);
   if (currentStep) lastStep.current = currentStep;
   const shownStep = pillStep(currentStep, lastStep.current);
-  const ringStill = !stepSpinnerRuns(answer);
-  // D3: the card shrinks at the first words while they take its place (the pill keeps the progress).
+  // D3: the live research card stays until the answer's own text starts, then folds into its pill.
   const stepsShown = stepsCardShown(answer, steps);
-  const fastSteps = !answer.deep && stepsShown && !props.waitingLibrary;
-  // What the search found, as rows in the steps card, then as the strip under the streaming text (LIVE_RESEARCH).
-  // Not for a places answer: its "sources" are the places, listed by their own card. Memoized on the sources,
-  // which a token doesn't touch, so the card's memo holds while the text streams.
-  const liveArticles = useMemo(() => (answer.places ? null : researchArticles(answer.sources)), [answer.places, answer.sources]);
+  // The answer's own tier: the fast one, or the deep one for a question the router sent straight to the deep
+  // tier (no fast pass). Only a Deepen (deep after fast) is a section of its own, titled "Deeper answer".
+  const isDeepen = deepSectionLabeled(answer);
+  const deepOnly = !!answer.deep && !answer.fast;
+  const firstTier = deepOnly ? answer.deep : answer.fast;
+  const fastSteps = !isDeepen && stepsShown && !props.waitingLibrary;
+  const deepLive = isDeepen && stepsShown;
+  // LIVE_RESEARCH (direction A): each pass's research as a timeline, folded from what the answer shows on
+  // each render while it runs, then kept for the pill. Not for places (its sources are places).
+  const rPhase = researchPhase(phase);
   const noArticle = !!answer.weakSources && answer.sources.length === 0;
-  // A Deepen's card lists what its own search adds (the first answer's articles are in the sources card above).
+  const fastTl = useTimeline(
+    running && !stopping && !isDeepen && !answer.places && !props.waitingLibrary && !firstTier?.outcome,
+    answer.sources,
+    0,
+    firstTier?.detail,
+    rPhase === "searching"
+  );
+  // A Deepen's timeline lists what its own search appends (the first answer's articles are in its sources card).
   const deepFrom = useRef<number | null>(null);
-  deepFrom.current = deepSourcesFrom(deepFrom.current, !!answer.deep && !answer.deep.outcome, answer.sources.length);
-  const deepStart = deepFrom.current;
-  const deepArticles = useMemo(() => (deepStart == null ? null : researchArticles(answer.sources, MAX_ARTICLES, deepStart)), [answer.sources, deepStart]);
-  // The steps card is on screen (it lists the articles): no second list of the same articles below it.
-  const stepsOnScreen = fastSteps || (!!answer.deep && stepsShown);
-  const fastStreaming = running && !answer.deep && !answer.fast?.outcome;
-  const deepStreaming = running && !!answer.deep && !answer.deep.outcome;
+  deepFrom.current = deepSourcesFrom(deepFrom.current, isDeepen && !answer.deep?.outcome, answer.sources.length);
+  const deepTl = useTimeline(running && !stopping && isDeepen && !answer.deep?.outcome, answer.sources, deepFrom.current ?? 0, answer.deep?.detail, rPhase === "searching");
+  // The pill only where a model answered: an extractive-only answer shows its passage, not "1 article".
+  const fastPill = !!fastTl && !fastSteps && !!firstTier && summaryItems(fastTl) != null;
+  const deepPill = !!deepTl && !deepLive && summaryItems(deepTl) != null;
+  // The research card or its pill carries the articles while the answer runs: no count card below as well.
+  const researchCarries = fastSteps || fastPill || deepLive || deepPill;
+  const fastStreaming = running && !isDeepen && !firstTier?.outcome;
+  const deepStreaming = running && isDeepen && !answer.deep?.outcome;
+  const bodyEnter = useMemo(() => blockMotion.entering(), [blockMotion]);
 
-  const topReceipt = answer.fast?.receipt ?? (instantOnly ? answer.instantDone?.receipt : undefined);
+  // A question routed straight to the deep tier: its receipt is the answer's, by the name.
+  const topReceipt = answer.fast?.receipt ?? (deepOnly ? answer.deep?.receipt : instantOnly ? answer.instantDone?.receipt : undefined);
   const receipt = useReceipt(topReceipt, locale, receiptTagKey(answer), !!answer.weakDeclined);
   const locating = isLocating(answer);
   const waitingForCity = answer.places?.coverage === "needs_place" || locating;
   const fresh = !!props.fresh;
   const motion = useMemo(() => ({ appear: fresh, gap: t.space.md }), [fresh, t.space.md]);
-  const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless && liveStripShown(cardMode, stepsOnScreen);
+  const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless && !(cardMode === "found" && researchCarries);
   const instantBanner = !!instantOnly && !!answer.instantDone && answer.instantDone.outcome !== "success";
   const emergency = answerShowsEmergencyNote(answer, props.question ?? "", placesOnly);
   // The body's block opens with its first words, not before (an empty block would grow a bare gap).
-  const fastBody = !!answer.fast?.text && showsAnswerBody(answer);
+  const fastBody = !!firstTier?.text && showsAnswerBody(answer);
   // Waiting for the user to pick a city: no clock, no receipt (nothing was answered yet).
   const deepenNow = !active && phase === "done" && canDeepen(answer);
   const deepenEst = answer.deepAvailable?.estSeconds ? formatSeconds(answer.deepAvailable.estSeconds * 1000, locale) : null;
   // A decline has its receipt too, time only (Prism CX-9, NOVO NORTE P2).
-  const pill = waitingForCity ? null : active && !answer.deep ? "elapsed" : receipt ? "receipt" : null;
+  // A deep-tier-only answer has no first receipt to show meanwhile: its clock runs like a fast answer's.
+  const pill = waitingForCity ? null : active && !isDeepen ? "elapsed" : receipt ? "receipt" : null;
   return (
     <BlockMotion.Provider value={motion}>
       {/* The row's first mount (a new answer is empty then; a recycled or reopened one is whole) enters nothing:
@@ -1245,35 +1126,30 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
               </Card>
             ) : null}
           </Block>
-          {/* The steps and the text share one slot: the card gives way to the first words in place (D3, v2 P3). */}
-          <Block shown={fastSteps || fastBody}>
-            <StepsSlot
-              steps={fastSteps && steps ? <StepsCard steps={steps} still={ringStill} articles={liveArticles} none={noArticle} /> : null}
-              body={
-                fastBody && answer.fast ? (
-                  <TierBody tier={answer.fast} streaming={fastStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="fast" onDraining={onDraining} />
-                ) : null
-              }
-              released={!active || !!answer.fast?.outcome}
-            />
+          {/* The research card, folding into its pill above the text at the first words (LIVE_RESEARCH, D3). */}
+          <Block shown={fastSteps || fastPill || fastBody}>
+            {fastTl && (fastSteps || fastPill) ? <ResearchPanel timeline={fastTl} phase={fastSteps ? rPhase : null} live={fastSteps} none={noArticle} /> : null}
+            {fastBody && firstTier ? (
+              <Reanimated.View entering={bodyEnter}>
+                <TierBody tier={firstTier} streaming={fastStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="fast" onDraining={onDraining} />
+              </Reanimated.View>
+            ) : null}
           </Block>
-          <Block shown={noticeShown(answer.fast, interrupted && !answer.deep)}>
-            <Notice tier={answer.fast} snippetShown={!!answer.instant} interrupted={interrupted && !answer.deep} onRetry={props.onRetry} />
+          <Block shown={noticeShown(firstTier, interrupted && !isDeepen)}>
+            <Notice tier={firstTier} snippetShown={!!answer.instant} interrupted={interrupted && !isDeepen} onRetry={props.onRetry} />
           </Block>
 
-          <Block shown={!!answer.deep}>
-            {answer.deep && (
+          {/* A Deepen only: a question routed to the deep tier is the answer itself, above (iPhone, r4to). */}
+          <Block shown={isDeepen}>
+            {isDeepen && answer.deep && (
               <View style={{ paddingTop: t.space.md, borderTopWidth: t.size.hairline, borderTopColor: t.color.line.hairline }}>
                 {/* A section overline in secondary, like the others: ember isn't decoration (Prism CH-22). */}
                 <Text variant="label" color="secondary" header>
                   {tr("chat.deep.title")}
                 </Text>
                 <View style={{ paddingTop: t.space.sm }}>
-                  <StepsSlot
-                    steps={stepsShown && steps ? <StepsCard steps={steps} still={ringStill} articles={deepArticles} none={noArticle} /> : null}
-                    body={<TierBody tier={answer.deep} streaming={deepStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="deep" onDraining={onDraining} />}
-                    released={!active || !!answer.deep.outcome}
-                  />
+                  {deepTl && (deepLive || deepPill) ? <ResearchPanel timeline={deepTl} phase={deepLive ? rPhase : null} live={deepLive} /> : null}
+                  <TierBody tier={answer.deep} streaming={deepStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="deep" onDraining={onDraining} />
                 </View>
                 <Block shown={noticeShown(answer.deep, interrupted)} gap={t.space.sm}>
                   <Notice tier={answer.deep} snippetShown={false} interrupted={interrupted} onRetry={props.onRetry} />
@@ -1308,20 +1184,16 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
           <Block shown={sourcesShown}>
             {sourcesShown && (
               // CT-2: once the engine says which [n] stayed, the card lists only those; nothing cited = no card.
-              // While it writes, the articles in one line (LIVE_RESEARCH; was the count only, Prism): no numbered
-              // list that could shrink, no passage shown as a cited source yet.
+              // While it writes, only the count (Prism), and not even that while the research card or its pill
+              // carries the articles (LIVE_RESEARCH): the list comes in once the engine says which [n] stayed.
               // The count crossfades into the list while the block's height follows (SEND-MOTION S7).
               <Swap swapKey={cardMode === "found" || cardMode === "related" ? cardMode : "list"}>
                 {cardMode === "found" ? (
-                  liveArticles ? (
-                    <LiveSourcesStrip articles={liveArticles} />
-                  ) : (
-                    <Card radius="card" padding="compact">
-                      <IconText icon="book-open" variant="footnote" color="secondary" iconColor={t.color.text.secondary}>
-                        {tr("chat.sources.found", { count: answer.sources.length })}
-                      </IconText>
-                    </Card>
-                  )
+                  <Card radius="card" padding="compact">
+                    <IconText icon="book-open" variant="footnote" color="secondary" iconColor={t.color.text.secondary}>
+                      {tr("chat.sources.found", { count: answer.sources.length })}
+                    </IconText>
+                  </Card>
                 ) : cardMode === "related" && split ? (
                   <Card radius="card" padding="compact">
                     <RelatedSources answer={answer} indexes={split.related} />
