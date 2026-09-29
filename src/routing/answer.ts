@@ -103,6 +103,7 @@ import type {
   AnswerStageName,
   AnswerTier,
   SourceChunk,
+  StageDetail,
 } from "./events";
 import type { ModelRole } from "./types";
 import type { RetrievedChunk } from "../rag/retrieve.types";
@@ -295,6 +296,9 @@ export interface EffectiveAnswerModel {
 
 /** The bundled PT->EN lexicon's names: every caller gets the PT topic guard (the eval runner passed no englishNames, gate ea5978c). */
 const defaultEnglishNames = (query: string) => englishNamesIn(query, ptLexicon());
+
+/** Multi-pass sources: sub-questions score on their own scales, so there is no comparable relevance. */
+const withoutRelevance = (s: RetrievedChunk[]): RetrievedChunk[] => s.map(({ relevance: _r, ...c }: SourceChunk) => c);
 
 /** Receipts of answers no model wrote (fixed answers, source excerpts). */
 const NOT_A_MODEL = new Set(["grounding-guard", "extractive", "none", "places", "calculator"]);
@@ -562,7 +566,7 @@ export function createAnswerer(deps: AnswerDeps) {
       const markVisible = () => {
         if (firstVisibleAt === null) firstVisibleAt = deps.now();
       };
-      const stage = (name: AnswerStageName, tier: AnswerTier, modelId?: string, detail?: { index?: number; count?: number }) =>
+      const stage = (name: AnswerStageName, tier: AnswerTier, modelId?: string, detail?: StageDetail) =>
         emit({ type: "stage", answerId, stage: name, tier, modelId, detail, at: deps.now() });
 
       // Arithmetic (temperature, fuel economy, Naismith, currency at a given rate, battery Wh) is answered
@@ -1067,16 +1071,24 @@ export function createAnswerer(deps: AnswerDeps) {
             ctx.maxTokens,
             (p) => {
               if (p.stage === "synthesizing") stage("synthesizing", genTier, genLlm.id);
-              else stage("retrieving", genTier, genLlm.id, { index: p.subQuestionIndex, count: p.subQuestionCount });
+              else
+                stage("retrieving", genTier, genLlm.id, {
+                  index: p.subQuestionIndex,
+                  count: p.subQuestionCount,
+                  ...(p.subQuestion ? { subQuestion: p.subQuestion } : {}),
+                });
             },
             onToken,
             () => stopRequested,
             {
               retrieveK: gen.retrieveK,
+              // Each sub-question's sources as soon as they are known (a prefix of the final list, same
+              // numbers), instead of only after every sub-answer is written. The answer's sources are
+              // still the final list below.
+              onPartialSources: (s) => emit({ type: "sources", answerId, tier: genTier, sources: withoutRelevance(s) }),
               onSources: (s) => {
                 sources = s;
-                // Sub-questions score on their own scales: no comparable relevance.
-                emit({ type: "sources", answerId, tier: genTier, sources: s.map(({ relevance: _r, ...c }: SourceChunk) => c) });
+                emit({ type: "sources", answerId, tier: genTier, sources: withoutRelevance(s) });
               },
             }
           );

@@ -38,6 +38,8 @@ export interface StageDetail {
   count?: number;
   /** 0..1 when measurable. Not emitted for prefill: llama.rn has no prompt-progress callback. */
   progress?: number;
+  /** Multi-pass "retrieving" with index/count: the sub-question being researched (model-written text). */
+  subQuestion?: string;
 }
 
 export interface AnswerReceipt {
@@ -158,7 +160,11 @@ export type AnswerEvent =
   | (Base & {
       type: "sources";
       tier: AnswerTier;
-      /** Global, deduplicated, stable numbering: "[n]" in the answer text refers to sources[n - 1]. */
+      /**
+       * Global, deduplicated, stable numbering: "[n]" in the answer text refers to sources[n - 1].
+       * A multi-pass answer sends one after each sub-question that found new sources: each list is
+       * the previous one plus new sources at the end (numbers never change); the last is the final list.
+       */
       sources: SourceChunk[];
     })
   | (Base & {
