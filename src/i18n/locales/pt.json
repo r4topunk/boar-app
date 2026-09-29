@@ -181,7 +181,7 @@
       "input": "Entrada",
       "voice": "Entrada por voz",
       "voiceNotInBuild": "Não incluída nesta versão offline: o BOAR não tem acesso ao microfone.",
-      "voiceNote": "Usa o reconhecimento de fala do celular. Em alguns aparelhos ele envia o áudio para um serviço online, por isso vem desligado.",
+      "voiceNote": "Usa o reconhecimento de fala do celular. No iPhone o áudio fica no aparelho. Em alguns Androids ele pode usar um serviço online, e o app pergunta antes.",
       "performance": "Desempenho",
       "about": "Sobre o BOAR",
       "recovery": "Recuperação",
