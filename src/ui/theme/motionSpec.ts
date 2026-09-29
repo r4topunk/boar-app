@@ -25,6 +25,17 @@ export const DELAY = { skeleton: 150 } as const;
 export const TRAVEL = 8;
 
 /**
+ * A "pop" enter (a new item joining a live list, e.g. an article found while BOAR researches): it
+ * starts at this scale and grows to 1 with the enter curve. Dropped under reduce motion (a fade only).
+ */
+export const POP_SCALE = 0.9;
+
+/** An enter's starting scale: POP_SCALE for a pop, 1 otherwise or under reduce motion. */
+export function enterScale(pop: boolean, reduceMotion: boolean): number {
+  return pop && !reduceMotion ? POP_SCALE : 1;
+}
+
+/**
  * - enter: something appears (sheet, toast, content after a skeleton, a new step, an expanded item).
  * - exit: something leaves. In a content swap it is the short half of the crossfade.
  * - change: a state changes in place (selection border/fill, check, radio dot, stepper segment).

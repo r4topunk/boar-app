@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Easing as RNEasing, type EasingFunction as RNEasingFunction, LayoutAnimation } from "react-native";
 import { cubicBezier, Easing, Keyframe, LinearTransition, ReduceMotion } from "react-native-reanimated";
 import { useTheme } from "./ThemeContext";
-import { CURVE, crossfadeSpec, type Curve, motionSpec, type MotionRole, type MotionSpec } from "./motionSpec";
+import { CURVE, crossfadeSpec, type Curve, enterScale, motionSpec, type MotionRole, type MotionSpec } from "./motionSpec";
 
 /**
  * The only place that turns motion roles into animations (DS §6). Screens and components ask for a
@@ -46,11 +46,11 @@ function offset(travel: Travel, distance: number): { translateX: number; transla
   }
 }
 
-function enterKeyframe(spec: MotionSpec, from: Travel, delay: number) {
+function enterKeyframe(spec: MotionSpec, from: Travel, delay: number, scale = 1) {
   const o = offset(from, spec.travel);
   return new Keyframe({
-    0: { opacity: 0, transform: [{ translateX: o.translateX }, { translateY: o.translateY }] },
-    100: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }], easing: reCurves[spec.curve] },
+    0: { opacity: 0, transform: [{ translateX: o.translateX }, { translateY: o.translateY }, { scale }] },
+    100: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }, { scale: 1 }], easing: reCurves[spec.curve] },
   })
     .duration(spec.duration)
     .delay(delay)
@@ -79,9 +79,12 @@ export function buildMotion(reduceMotion: boolean) {
       const s = motionSpec(role, reduceMotion, opts);
       return { duration: s.duration, easing: rnCurves[s.curve] };
     },
-    /** Reanimated `entering`: fade in over `enter`, travelling from `from` (dropped under reduce motion). */
-    entering({ from = "none", delay = 0 }: { from?: Travel; delay?: number } = {}) {
-      return enterKeyframe(motionSpec("enter", reduceMotion), from, delay);
+    /**
+     * Reanimated `entering`: fade in over `enter`, travelling from `from` (dropped under reduce motion).
+     * `pop`: also grows from POP_SCALE (a new item joining a live list); a fade only under reduce motion.
+     */
+    entering({ from = "none", delay = 0, pop = false }: { from?: Travel; delay?: number; pop?: boolean } = {}) {
+      return enterKeyframe(motionSpec("enter", reduceMotion), from, delay, enterScale(pop, reduceMotion));
     },
     /** Reanimated `exiting`: fade out over `exit` (`swap`: the 90 ms half of a crossfade). */
     exiting({ to = "none", swap = false }: { to?: Travel; swap?: boolean } = {}) {
