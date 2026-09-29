@@ -1076,6 +1076,7 @@ export function createAnswerer(deps: AnswerDeps) {
                   index: p.subQuestionIndex,
                   count: p.subQuestionCount,
                   ...(p.subQuestion ? { subQuestion: p.subQuestion } : {}),
+                  ...(p.answering ? { answering: true } : {}),
                 });
             },
             onToken,

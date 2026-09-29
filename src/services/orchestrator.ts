@@ -25,6 +25,8 @@ export interface ResearchProgress {
   subQuestionCount?: number;
   /** "researching" only: the sub-question being researched, as the decomposition wrote it. */
   subQuestion?: string;
+  /** "researching" only: its search is done and its sub-answer is being written. */
+  answering?: boolean;
 }
 
 export interface ResearchResult {
@@ -198,6 +200,7 @@ export async function runDeepResearch(
     allChunks = merged.sources;
     // The chat can show this sub-question's sources now, not after every sub-answer is written.
     if (grew) options.onPartialSources?.(allChunks, { subQuestionIndex: i, subQuestionCount: subQuestions.length });
+    onProgress?.({ stage: "researching", subQuestionIndex: i, subQuestionCount: subQuestions.length, subQuestion: subQuestions[i], answering: true });
     const answer = await researchSubQuestion(subQuestions[i], chunks, merged.indexMaps[i], systemPrompt, history, markTimedOut);
     subResults.push({ subQuestion: subQuestions[i], answer });
   }

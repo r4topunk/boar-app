@@ -117,7 +117,12 @@ describe("runDeepResearch partial sources (retrieval progress)", () => {
       undefined,
       undefined,
       256,
-      (p) => log.push(p.stage === "researching" ? `researching:${p.subQuestionIndex}:${p.subQuestion}` : p.stage),
+      (p) =>
+        log.push(
+          p.stage === "researching"
+            ? `${p.answering ? "answering" : "researching"}:${p.subQuestionIndex}:${p.subQuestion}:gen${calls.length}`
+            : p.stage
+        ),
       undefined,
       undefined,
       {
@@ -135,10 +140,13 @@ describe("runDeepResearch partial sources (retrieval progress)", () => {
     const f = ids(r.citations).join(",");
     expect(log).toEqual([
       "decomposing",
-      "researching:0:What caused the French Revolution?",
+      "researching:0:What caused the French Revolution?:gen1",
       `partial:0/2:${ids(partials[0]).join(",")}:gen1`,
-      "researching:1:What caused the Industrial Revolution?",
+      // After its search and before its sub-answer: the UI shows the part as being read, new articles or not.
+      "answering:0:What caused the French Revolution?:gen1",
+      "researching:1:What caused the Industrial Revolution?:gen2",
       `partial:1/2:${f}:gen2`,
+      "answering:1:What caused the Industrial Revolution?:gen2",
       `final:${f}:gen3`,
       "synthesizing",
     ]);

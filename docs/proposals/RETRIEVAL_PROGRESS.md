@@ -33,8 +33,8 @@ After:
 
 ```
 stage retrieving (decomposing)
-stage retrieving {index 0, count N, subQuestion} -> retrieve -> sources [s1..sa]        -> sub-answer 0
-stage retrieving {index 1, count N, subQuestion} -> retrieve -> sources [s1..sa..sb]    -> sub-answer 1
+stage retrieving {index 0, count N, subQuestion} -> retrieve -> sources [s1..sa]        -> stage retrieving {…, answering} -> sub-answer 0
+stage retrieving {index 1, count N, subQuestion} -> retrieve -> sources [s1..sa..sb]    -> stage retrieving {…, answering} -> sub-answer 1
 ...
 sources (final, same list as the last partial) -> stage synthesizing -> tokens -> done
 ```
@@ -50,6 +50,7 @@ interface StageDetail {
   progress?: number;
   /** Multi-pass "retrieving" with index/count: the sub-question being researched (model-written text). */
   subQuestion?: string; // NEW, optional
+  answering?: boolean; // NEW, optional: the sub-question's search is done and its sub-answer is being written (sent for every part, new sources or not)
 }
 
 // unchanged shape; widened timing

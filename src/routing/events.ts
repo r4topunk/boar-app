@@ -40,6 +40,8 @@ export interface StageDetail {
   progress?: number;
   /** Multi-pass "retrieving" with index/count: the sub-question being researched (model-written text). */
   subQuestion?: string;
+  /** Multi-pass "retrieving" with index/count: that sub-question's search is done and its sub-answer is being written. */
+  answering?: boolean;
 }
 
 export interface AnswerReceipt {
