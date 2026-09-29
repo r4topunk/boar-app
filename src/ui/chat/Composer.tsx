@@ -48,6 +48,8 @@ const ComposerView = forwardRef<TextInput, Props>(function Composer(
   const { t: tr } = useTranslation();
   const ready = status === "ready";
   const field = useRef<TextInput>(null);
+  // The field's text when voice input started; each transcript is appended to it, not to the last partial.
+  const voiceBase = useRef("");
   useImperativeHandle(ref, () => field.current as TextInput);
   const empty = value.trim().length === 0;
   const mode = sendMode(canSend, empty);
@@ -142,7 +144,14 @@ const ComposerView = forwardRef<TextInput, Props>(function Composer(
       {/* In the model-error state the whole composer is dimmed, as the mockup: the card above is where to act (E-5). */}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: t.space.sm, opacity: blocked ? t.opacity.disabled : 1 }}>
         {voiceEnabled && (
-          <VoiceInputButton disabled={!ready} onTranscript={(text) => onChange(value ? `${value} ${text}` : text)} />
+          <VoiceInputButton
+            disabled={!ready}
+            onListenStart={() => {
+              voiceBase.current = value;
+            }}
+            // Partial results stream into the field after what was typed before listening.
+            onTranscript={(text) => onChange(voiceBase.current ? `${voiceBase.current} ${text}` : text)}
+          />
         )}
         {/* The mockup's question pill: 52 tall for a line, s1, hairline border (focus colour when focused), 18 side
             padding; same radius and padding at any height. The text sits on its bottom (the caret's line stays in

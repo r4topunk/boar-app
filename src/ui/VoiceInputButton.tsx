@@ -5,6 +5,9 @@ import { isVoiceInputAvailable, startListening, stopListening, type VoiceEvent }
 
 interface Props {
   disabled?: boolean;
+  /** Called when listening starts, so the caller can keep what was already typed. */
+  onListenStart?: () => void;
+  /** What was heard so far: each partial result as it arrives, then the final text. */
   onTranscript: (text: string) => void;
 }
 
@@ -17,7 +20,7 @@ let caveatShown = false;
  * on GrapheneOS / de-Googled builds: when it's missing the button isn't shown,
  * and the first use explains that it may not be offline.
  */
-export function VoiceInputButton({ disabled, onTranscript }: Props) {
+export function VoiceInputButton({ disabled, onListenStart, onTranscript }: Props) {
   const { t } = useTranslation();
   const announce = useAnnounce();
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -33,8 +36,10 @@ export function VoiceInputButton({ disabled, onTranscript }: Props) {
   const listen = async () => {
     setListening(true);
     announce(t("chat.announce.listening"));
+    onListenStart?.();
     try {
       const result = await startListening((event: VoiceEvent) => {
+        if (event.type === "partial") onTranscript(event.text);
         if (event.type === "error") setListening(false);
       });
       if (result) onTranscript(result);
