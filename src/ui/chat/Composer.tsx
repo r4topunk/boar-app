@@ -244,7 +244,8 @@ const ComposerView = forwardRef<TextInput, Props>(function Composer(
             accessibilityLabel={tr("chat.composer.label")}
             placeholder={placeholder}
             placeholderTextColor={t.color.text.secondary}
-            editable={!blocked}
+            // Read-only while listening: the live transcript rewrites the field, so a typed edit would be lost.
+            editable={!blocked && !listening}
             accessibilityState={{ disabled: blocked }}
             multiline
             submitBehavior="newline"

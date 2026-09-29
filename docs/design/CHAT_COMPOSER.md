@@ -43,7 +43,7 @@ to 11 pt, to stay on the last line's centre.
 | Model loading (asking works) | mode chip | "Type while the model loads" | as above; send works (answer() waits) |
 | Before loads start / indexing | mode chip | loading/indexing placeholder | send muted, hint says why |
 | Model error | dimmed | dimmed, not editable | dimmed; the error card above is where to act |
-| Listening | listening strip (dot, m:ss, Cancel) | focus border, partials stream in, "Speak now…" | done ✓ (ember) |
+| Listening | listening strip (dot, m:ss, Cancel) | focus border, partials stream in, "Speak now…", read-only (a typed edit would be overwritten) | done ✓ (ember) |
 | Transcribing end | strip "Transcribing…" | last partial | done, busy, until the final text arrives (≤ 4 s grace) |
 | Generating | mode chip | editable (write the next question) | stop (ember ring); no mic |
 | Stopping | mode chip | editable | stop, busy |
