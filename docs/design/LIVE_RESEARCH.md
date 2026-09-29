@@ -1,117 +1,152 @@
 # Live research
 
-TL;DR: while BOAR answers, the steps card shows which articles it found, under the searching step. You get one
-quiet row per article, up to 3, then "+N". Rows grow in as `sources` events arrive, and they never reorder or
-leave. When the first words stream, the card gives way to the text as before (SEND-MOTION D3), and the articles
-stay visible as one line under the text: the strip that replaced "Found N passages". When the answer is done, the
-strip crossfades into the sources card, so each list shows in one place at a time. Deep Research names the part
-it is on, and the sub-question when the engine sends it.
+TL;DR: while BOAR researches, the answer shows a timeline card. This is direction A, "linha do tempo", which
+r4to picked from three animated mockups.
 
-Code: `src/ui/chat/liveResearch.ts` (pure: articles, marks, strip rules, spoken label), `AssistantMessage.tsx`
-(`ArticleRows`, `StepsCard`, `LiveSourcesStrip`), `presentation.ts` (`generatingSteps`, `stageLine`,
-`phaseAnnouncement`). Locale keys: `chat.research.*`, `chat.stage.partQuestion`, `chat.announce.answeringFrom`.
+- **Status line.** A soft shimmer reads "Dividindo a pergunta…", then "Pesquisando parte 2 de 3", then
+  "Lendo 4 artigos…". The article counter sits on the right, and a 3 pt ember bar underneath advances per part.
+- **Parts.** Each part of the question is a node on a vertical line. The part's text is the sub-question when
+  the engine sends it, otherwise "Parte 2 de 3". The articles sit under the part that found them. Each row has a
+  badge, the title and one line of the passage, and it pops in when it arrives.
+- **Single pass.** A normal answer uses the same card with one step and no numbering.
+- **Collapse.** When the text starts, the card folds into a pill: "3 partes · 4 artigos ›" with stacked badges,
+  or "4 artigos ›" for a single pass. Tapping the pill opens the finished timeline again. At done, the sources
+  card below takes over as before.
+
+Code: `src/ui/chat/liveResearch.ts` (pure: timeline fold, view, summary, badge tones),
+`src/ui/chat/ResearchCard.tsx` (`ResearchPanel`, `TimelineCard`, `SummaryPill`), `AssistantMessage.tsx`
+(`useTimeline`, where the panel goes). Locale keys: `chat.research.*`, `chat.announce.answeringFrom`.
 
 ```sh
-npx vitest run src/ui/chat/liveResearch.test.ts src/ui/chat/presentation.test.ts src/ui/chat/chatPerf.test.ts
+npx vitest run src/ui/chat/liveResearch.test.ts src/ui/chat/chatPerf.test.ts src/ui/theme/motionSpec.test.ts
 ```
 
-## Audit (before this change)
+## History
 
-| # | Where | Problem |
-|---|---|---|
-| 1 | `presentation.ts:259-264` (`generatingSteps`), `:21-24` (`stageLine`) | "Reading N sources" counted chunks. Three passages of one article read "Reading 3 sources". |
-| 2 | `AssistantMessage.tsx:118-145` (`StepsCard`) | No article names anywhere while the answer runs. The only feedback was a count and a spinner, so you could not see what BOAR was researching. |
-| 3 | `AssistantMessage.tsx:1181-1192` + `:1122` | Two counts of the same thing, with two nouns: the card said "Reading 4 sources…" and the block below it said "Found 6 passages". |
-| 4 | `presentation.ts:423` (`stepsCardShown`) + `AssistantMessage.tsx:1186` | Once text streamed, the card left and only "Found N passages" was left. You could not see the sources until done. |
-| 5 | `presentation.ts:27-31`, `routing/answer.ts:1069` | "Researching part n of m" was dead copy. The part arrives on `retrieving` (which maps to searching) and never on `synthesizing`, which carries no detail, so Deep Research said "Searching sources…" for every sub-question. |
-| 6 | `presentation.ts:55-56` | VoiceOver heard "Answering" with nothing about what the answer rests on. The card is hidden from readers (correct: it is visual), so a reader had no way to learn the articles before done. |
-| 7 | `AssistantMessage.tsx:1028` (pill) | A Deepen has no running clock. The header shows the first answer's receipt (hidden from readers while active). Kept as is: the deep section has its own steps card. Noted for the owner. |
-| 8 | `StepsCard` memo (`:145`) | The memo compared only steps and ring. Any new prop needs an explicit comparison, or the card re-renders on every token. |
+- v1 (a4d3415..d731401) had article names under a 3-step checklist and a strip under the streaming text. On the
+  iPhone, r4to found it "feia, simples demais": only a title line and "Pesquisando 1/3: …" were added.
+- v2 (this spec) is the reference mockup's direction A (`research-directions.html`, object `A`,
+  `.tl/.part/.node/.art/.summary/.stack`).
+- The v1 audit still applies: "Reading N" counts articles, not passages; "part n of m" is read from the
+  `retrieving` stage; one announcement per answer. Two v1 items are gone: the 3-step checklist and its "Lendo 1
+  fonte" pending row, which confused the owner. `StepsSlot` and `stepsSlotHold` are removed as well; the card now
+  folds into the pill instead of holding the slot.
 
-## Layout
+## Layout (dark, 343 pt column)
 
 ```
- BOAR                               [⟳ Reading… · 4 s]   ← pill, unchanged (step · seconds → receipt)
- ╭──────────────────────────────────────────╮
- │ 🔍 Searching sources…                   ✓ │   ← step label: 1 line (a sub-question changes it in place)
- │    [W] Greenhouse effect                  │   ← article rows: mark + title, footnote, secondary, 1 line
- │    [W] Climate change                     │
- │    [W] Carbon dioxide                     │
- │    +2 more                                │   ← caption, only when more than 3
- │ 📖 Reading 5 sources…                  ⟳ │   ← counts articles
- │ ⚡ Writing the answer…                  · │
- ╰──────────────────────────────────────────╯
-
- …first words stream…
- The greenhouse effect is the process by which…▍
- ╭──────────────────────────────────────────╮
- │ 📖 Greenhouse effect · Climate change · C… +2 │ ← strip: names shrink first, "+N" never truncates
- ╰──────────────────────────────────────────╯
- …done → the strip crossfades (Swap) into the sources card (cited list, relevance bars).
+ BOAR                                   [⟳ Searching… · 6 s]
+ ╭────────────────────────────────────────────────╮  Card compact, radius card, surface
+ │ Pesquisando parte 2 de 3  ✦shimmer   4 artigos │  caption semibold secondary · counter numeric
+ │ ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░░░░░░░░░               │  3 pt bar: hairline track, ember fill
+ │ (✓) Como o efeito estufa retém o calor?         │  node 18: done = ember fill + check
+ │  │  ┌──────────────────────────────────────┐    │  row: raised, radius 10, pad 6/8
+ │  │  │ [E] Efeito estufa                    │    │  badge 22, radius 6, stable soft tone
+ │  │  │     O efeito estufa é o processo pe… │    │  passage: caption secondary, 1 line
+ │  │  └──────────────────────────────────────┘    │
+ │ (◎) Quais gases causam o efeito estufa?         │  active: ember ring + pulse
+ │  │  [D] Dióxido de carbono …                    │
+ │ ( ) Parte 3 de 3                                │  pending: hairline ring, secondary text
+ ╰────────────────────────────────────────────────╯
+ …first words → ( [E][R][D] 3 partes · 4 artigos › )   pill: surface, full radius, 36 tall
+ O efeito estufa acontece porque…▍
 ```
 
-- The rows sit in the label column of the searching step, so the check and ring stay on the label's first line,
-  and the first row never opens a card-level gap.
-- The mark is the source's initial in a `bg.raised` square the size of the icon, with `radius.xs`. User
-  documents get `file-text`. There is no network favicon (offline app).
-- One row per article (docId), first found first. `researchArticles` caps at `MAX_ARTICLES = 3`. There is no
-  "+1 → 4th row" rule: a row that later made way for "+2" would leave, and that is a jump.
-- A Deepen's card lists only what its own search appended (`sources` from the count at deep start). The first
-  answer's articles are already in its sources card.
+- Node: `iconSm + xxs` (18) with a `focusRing` (2) border. The connector is 2 pt `line.hairline`, running from
+  the node to the next node through the part's bottom padding (`sm + xxs`).
+- Part text: footnote, up to **2 lines** (not cut to one). Secondary when pending, primary when active or done.
+- Articles: max 3 per part, then "+N more" (caption). Rows are only ever appended, deduped by docId.
+- Badge: the title's initial on a DS soft tone (`accent`, `field`, `success`, `info`, via `toneColors`), picked
+  by a stable hash of the docId (`badgeTone`).
+- Single pass: one node labelled "Buscando no acervo deste celular", then "Busca no acervo deste celular" once
+  done. There is no reading row; "Lendo N artigos…" only shows in the status line after the search.
 
 ## States
 
-| State | Card (search step) | Under the text | Pill | Announced |
-|---|---|---|---|---|
-| Searching, nothing yet | label + ring, no rows | nothing | Searching… · s | "Searching sources" |
-| Articles arriving (1 or many `sources` events) | rows grow in, then "+N" | nothing (the card lists them) | Searching… | nothing |
-| Reading (prefill / loading model) | search ✓, rows stay, "Reading N sources" ring | nothing | Reading… / Loading… | nothing |
-| Deep sub-question | "Researching 2/3: <sub-question>" (or "part 2 of 3"), one line; rows = new articles | first answer + its sources card | receipt of the first answer | nothing |
-| Writing / streaming | card gives way to text (D3) | strip: names · "+N" | Writing… · s | "Answering from N sources" (once) |
-| Done | none | Swap → sources card (cited / related) | receipt | "Answer ready, N sources" |
-| No sources / weak | search ✓ + "No article on this" (once flagged) | nothing (no sources) → weak note at end | as usual | "Answer ready, without a source…" |
-| Instant snippet (`o que é monção?`) | usually never seen (done at once); if the model runs, as above | snippet card above; strip while writing | Searching… → receipt | ready |
-| Health extract | card leaves at first extract words | strip | as usual | as usual |
-| Places | no rows (its sources are places) | places card | as usual | "Answering" without a count |
-| Stopped | card leaves (steps null while stopping) | sources card, all sources (no `cited`) | receipt | "Stopped" |
-| Error / timeout | card leaves | banner, sources card if any | receipt | error (assertive) |
-| Waiting library | library card, no steps | nothing | Preparing… | unchanged |
+| State | Status line | Timeline | Pill / below |
+|---|---|---|---|
+| Searching, nothing yet (single) | Pesquisando no acervo… | 1 active node | – |
+| Splitting (deep, empty detail) | Dividindo a pergunta… | parts not known yet: 1 node | bar at 0 |
+| Part i of n | Pesquisando parte i de n | nodes done / active / pending; sub-question or "Parte i de n" | bar (i + ½)/n |
+| Articles arriving (1 or many `sources` events) | counter grows | rows pop in under the part searching | – |
+| Loading model / reading | Carregando o modelo… / Lendo N artigos… | every node done | bar full |
+| Synthesizing / checking | Juntando tudo… / Conferindo… | every node done | – |
+| Writing (first words) | – | card folds (fade, then its space closes) | pill grows in; text below |
+| Pill tapped | – | read-only timeline (done state, readable by VoiceOver) | chevron › → ⌄ |
+| Done | – | pill stays, collapsed | sources card (cited) below, as before |
+| No sources / weak | Lendo… / Pensando… | step done + "Nenhum artigo sobre isso" | no pill (nothing to open) |
+| Instant snippet only (`o que é monção?`) | usually never seen | – | no pill (no model answered) |
+| Places | no card (its sources are places) | – | places card |
+| Stopped / error | card folds | – | pill (if articles) + banner + sources card |
+| Deepen | its own card in the "Resposta aprofundada" section, with only its new articles | | its own pill |
 
-## Motion
+No list shows twice. While the card or the pill carries the articles, the "Found N passages" count card is not
+shown. At done the sources card lists the cited ones, and the timeline stays folded unless you open it.
 
-- Rows: `Reveal` with `appear`. The height grows on the UI thread and the content fades in with the DS `enter`
-  role. Under reduce motion, layout is instant and the fade is 90 ms (motionSpec). No hand-written timings, no
-  stagger, no loop. The ring is still the chat's only loop, and it stops once text streams (chatPerf guard).
-- Rows already present when the card mounts (a Deepen's, a recycled row) show in place (`rowGrows`).
-- Rows are only appended. Titles never reorder, so an incremental engine reads as a list filling up.
-- The handoff reuses SEND-MOTION: the card leaves with the crossfade's short half and the slot holds its height
-  (`slotHold`). The strip's block grows below. At done, `Swap` crossfades the strip into the sources card.
-- Search label: `numberOfLines={1}`, so a sub-question swapping in never changes the card's height.
+## "Resposta aprofundada" label
+
+The engine sends a question the router puts on the deep tier as `tier: "deep"` from its first stage
+(`routing/answer.ts:662` `genTier = gen?.tier`, `:791` `stage("retrieving", genTier)`). The UI rendered the deep
+section, with its "Resposta aprofundada" overline and divider, whenever `answer.deep` existed
+(`AssistantMessage.tsx`, the old `<Block shown={!!answer.deep}>`). A normal answer got the label from its first
+second.
+
+Now `deepSectionLabeled` makes that section a Deepen only: deep after fast. A deep-only answer renders as the
+answer itself, with its research card and pill, its text, and its receipt by the name. It also gets the running
+clock, which it never had before, because the pill showed the elapsed time only while `!answer.deep`.
+
+## Motion (DS only)
+
+- **Heights.** Every block that appears or leaves uses `Reveal`: rows, "+N", the card, the pill and the opened
+  timeline. Heights move on the UI thread; a hidden block fades with its height kept, then closes under
+  `animateNextLayout`. This is how the card folds while the pill grows above it and the text below slides.
+- **Rows.** `entering({ pop: true })` is new in `theme/motion.ts`: the DS `enter` plus a scale from `POP_SCALE`
+  (0.9, `motionSpec.ts`). Under reduce motion it is a fade only. Rows already present when a card mounts show in
+  place (`rowGrows`).
+- **Bar.** `layoutProps(["width"])`. Nodes: `colorTransition(["borderColor", "backgroundColor"])`.
+- **Shimmer and pulse.** One `Animated.loop` over `tokens.motion.loop.sweep` (`useAmbient`) drives both. The
+  shimmer is a brighter copy of the status text seen through a sweeping window: two texts and opposite
+  transforms, no mask library. The pulse is a ring scaling up and fading behind the active node. The loop runs
+  only while the live card is on screen (`useAmbient(live && !reduceMotion)`), stops when the card folds at the
+  first words, and never runs under reduce motion. The chatPerf guard pins this.
+- There are no hand-written timings (`motionGuard.test.ts`).
 
 ## Accessibility
 
-- The card stays hidden from readers (visual, as before). Nothing new is announced per article.
-- One announcement per answer carries the articles: "Answering from N sources" (`generating` phase), once, never
-  per event.
-- The strip is one focus with `accessibilityRole="text"`: "Sources: A, B, C and 2 more". It is read when
-  reached and never announced.
-- Large text: rows and strip are one line each. The mark's letter is capped at 1.5×.
+- The live card is visual only (`accessibilityElementsHidden`). One announcement per answer carries the research:
+  "Respondendo com N fontes" (`phaseAnnouncement`, generating). Nothing is announced per row or per part.
+- The pill is a button: "Pesquisa: 3 partes · 4 artigos", with a hint and `expanded` state. The opened timeline is
+  readable text.
+- Large text: part text wraps to 2 lines, rows are 1 + 1 lines, and badge letters are capped at 1.2×.
 
-## Engine contract (final, feat/retrieval-progress; the UI works on today's base too)
+## Engine contract (final, feat/retrieval-progress; works on today's base too)
 
-- Single pass: one `sources` event after grounding, before loading_model/prefill/generating. The rows show as
-  soon as it lands.
-- Deep: one `sources` event per sub-question that found new ones, with the full list so far and new items at the
-  end. `mergeSources` dedupes by chunkId and keeps order, so rows never move.
-- `StageDetail.subQuestion?: string` on deep `retrieving` stages with index/count: read defensively (string,
-  whitespace collapsed, blank ignored) → `chat.stage.partQuestion`. Without it: `chat.stage.part`.
-- Partial sources stay after a stop or error. The sources card shows them (all, no `cited`).
+- Single pass: one `sources` event before loading_model/prefill. The rows show as soon as it lands, under the one
+  step.
+- Deep: one `sources` event per sub-question that found new ones, sent after its search and before its
+  sub-answer, with the full list so far and new items at the end. Each new article goes to the part being
+  searched when it arrives.
+- On today's base, the multipass sends one `sources` event before synthesis, so every article lands under the
+  last part.
+- `StageDetail.subQuestion?: string` is read defensively (`partSignal`: string only, whitespace collapsed, blank
+  ignored). The decompose stage is `retrieving` with an empty detail, which shows "Dividindo a pergunta…".
+- Partial sources stay after a stop or error. The pill and the sources card show them.
+
+## Not matched from the mockup (and why)
+
+- **Shimmer gradient.** The mockup uses CSS `background-clip: text` with a muted → ink → ember → ink → muted
+  gradient. RN has no text clip without a mask library (not a dependency here), so the shimmer is a hard-edged
+  window of brighter text (primary over secondary), with no ember in the band.
+- **Pop overshoot.** The mockup's pop uses `cubic-bezier(.2,.9,.3,1.2)`, which overshoots. The DS has no overshoot
+  curve, so rows use the DS enter curve plus the 0.9 → 1 scale.
+- **Pulse period.** The pulse shares the sweep loop (1.2 s) instead of the mockup's 1.4 s, so a single loop drives
+  both.
+- **Part text in Portuguese.** The engine writes sub-questions in English today. That is an engine item.
+- **History.** Restored answers (another session) have no pill: which part found which article is not stored.
+  Only answers asked in this mount keep their timeline. A row the list remounts mid-answer restarts its fold with
+  what is on screen then.
 
 ## Proposals (not depended on)
 
-- `sources` events already carry `tier`, but the reducer drops it. If it kept the index where a Deepen's sources
-  start, the UI would not need `deepSourcesFrom`. A row remounted mid-deep currently lists fewer new articles
-  (never wrong ones).
-- "No article on this" relies on the `weak_sources` warning that a sourceless answer gets before generation
-  (`routing/answer.ts:976-978`, `fromMemory`). The uncited-at-finish warning (`:729`) arrives at done, when the
-  card is gone. That is fine: those answers have sources.
+- The `sources` events carry `tier` and the stages carry the part, but the reducer keeps neither. If it stored
+  `{partIndex, chunkIds}` per sources event, the timeline could survive remounts and history.
