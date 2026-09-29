@@ -1,262 +1,171 @@
-<img src="./assets/boar.png" width="96" alt="BOAR mascot" align="left" />
+<p align="center">
+  <img src="./assets/boar.png" width="112" alt="BOAR mascot" />
+</p>
 
-# BOAR — Adaptive Local Intelligence (Android)
+<h1 align="center">BOAR</h1>
 
-<br clear="left" />
+<p align="center">
+  <b>AI that works when the internet doesn't.</b><br />
+  An open-source research assistant that runs entirely on your phone, and shows where every answer came from.
+</p>
 
-An open-source AI that runs, learns, and adapts locally on your device.
+<p align="center">
+  <a href="https://github.com/rferrari/boar-app/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/rferrari/boar-app?color=FF7A3D" /></a>
+  <img alt="Android + iOS" src="https://img.shields.io/badge/platform-Android%20%2B%20iOS-FFB547" />
+  <img alt="Works offline" src="https://img.shields.io/badge/works-offline-17110D" />
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/rferrari/boar-app" /></a>
+</p>
 
-BOAR is an offline-first mobile AI system exploring adaptive model routing,
-local retrieval, selective verification, and resource-aware inference. It
-chooses how to spend limited device compute based on the task, rather than
-relying on a fixed model or an always-on multi-model pipeline — built on
-local LLM inference (`llama.cpp` via `llama.rn`) and local hybrid retrieval
-(SQLite FTS5 + on-device embeddings). First launch does a one-time model
-download (the app's only required network use); after that it works
-completely offline. Originally built for the "Best Offline AI Research App"
-community bounty.
+<p align="center">
+  <img src="./docs/readme/hero.gif" width="640" alt="BOAR in 10 seconds: set up once, ask anything in airplane mode, get answers with sources" />
+</p>
 
-**Demo**: videos and screenshots from a real phone in airplane mode:
-[docs/demo](docs/demo/README.md).
+<p align="center">
+  <a href="#get-it">Get it</a> ·
+  <a href="#how-it-answers">How it answers</a> ·
+  <a href="#measured-on-a-real-phone">Benchmarks</a> ·
+  <a href="#bounty-requirements">Requirements</a> ·
+  <a href="#docs">Docs</a> ·
+  <a href="./MANIFESTO.md">Manifesto</a>
+</p>
 
-**Why and how**: [MANIFESTO.md](MANIFESTO.md). Requirement-by-requirement status,
-with the raw benchmark files: [docs/COMPLIANCE.md](docs/COMPLIANCE.md) and
-[docs/evidence](docs/evidence/).
+## Why
 
-**Bounty**: [poidh.xyz/mainnet/bounty/31](https://poidh.xyz/mainnet/bounty/31)
-— submission wallet: `0x32d1C8A4d133241a710d780f1198992A015Ea5Ed`
+Search and chat assistants stop working the moment you lose signal: on a plane, a
+trail, a border crossing, a blackout. BOAR downloads a small language model and
+the knowledge you pick **once**, then answers in airplane mode, with no account,
+no server and no Google Play Services.
 
-- ≤ 12GB peak RAM
-- ≤ 50GB total on-disk footprint (app + model weights + indexes)
-- Works completely offline after a one-time first-run model setup
-- Runs on GrapheneOS / no GMS dependency
-- Real Android device, not just emulator
-- Import your own documents (.txt/.md/.csv/.json/.pdf) into the local knowledge
-  base, toggle or delete them per-collection, and export/share a collection
-  as a portable JSON pack — see [Custom knowledge base](#custom-knowledge-base) below
-- Search Hugging Face for additional GGUF models beyond the curated default
-  list, and download them the same way — see
-  [Finding more models](#finding-more-models) below
-- UI localized in English and Portuguese, switchable in Settings or the
-  first-run setup wizard (`src/i18n/`) — manual selection only, no device-locale
-  auto-detection, same as every other preference in this app
+It started from Vitalik's call for an offline research tool that is "more than
+half as good" as search plus a frontier model, running an extreme mixture of
+experts that mostly sits on disk. That model doesn't exist yet, so BOAR is two
+things: a useful offline companion today, and a workbench that measures how close
+a phone can get. Full reasoning: [MANIFESTO.md](MANIFESTO.md).
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design (including exactly how
-first-run model setup works and why network permission is present but unused
-during chat/inference) and [docs/MODELS.md](./docs/MODELS.md) for the exact
-models/datasets/indexes used.
+<table>
+<tr>
+<td width="33%"><img src="docs/readme/answers-sources.jpg" alt="An answer with its sources on the phone"></td>
+<td width="33%"><img src="docs/readme/places.jpg" alt="Vegan restaurants in Berlin from OpenStreetMap, offline"></td>
+<td width="33%"><img src="docs/readme/knowledge.jpg" alt="Knowledge packs stored on the phone"></td>
+</tr>
+<tr>
+<td><b>Answers with sources.</b> Tap a citation to read the exact passage.</td>
+<td><b>Places near you.</b> Distance and opening hours from OpenStreetMap, in airplane mode.</td>
+<td><b>Knowledge you choose.</b> Topic packs, Wikipedia, or your own files.</td>
+</tr>
+</table>
 
-## Status
+## Online once, offline from then on
 
-🚧 Core app, RAG pipeline, and model selection are done and verified. EAS
-Build is configured and the project is linked for cloud builds without a
-local Android SDK. Not yet verified with an actual compile + install on real
-hardware — see open items below.
+<img src="docs/readme/offline.png" alt="First launch downloads the models once; after that chat, search and sources work in airplane mode" />
 
-## Download the app
+First launch downloads an answer model plus a small embedding model: Qwen3-4B
+(about 2.5 GB) by default, or the compact Qwen2.5-1.5B (about 1 GB) for phones
+with less RAM. That is the only network use the app needs. The network
+permission stays for two things you start yourself: downloading more models or
+packs, and searching Hugging Face for other GGUF models. Why the permission is
+present but unused during chat: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-No building needed: get `boar-v1.0.0-arm64.apk` from the
-[latest release](https://github.com/rferrari/boar-app/releases/latest) (any
-64-bit ARM Android phone, 122 MB). Check it against the published checksum:
+## How it answers
 
-```bash
-sha256sum -c boar-v1.0.0-arm64.apk.sha256   # prints "boar-v1.0.0-arm64.apk: OK"
-```
+<img src="docs/readme/how.png" alt="Question is classified, then answered at instant, fast or deep depth from a local index, with numbered sources" />
 
-Install it (open it on the phone, or `adb install boar-v1.0.0-arm64.apk`), open
-BOAR once with an internet connection to download the default model (about
-1 GB), then it works fully offline. `make setup` → "Install BOAR on my phone"
-does the download, checksum and USB install for you.
+Routing picks **how deep** to answer, never which model writes a normal answer:
+an **instant** source sentence (no LLM, under 1 s), a **fast** answer from your
+model over compressed sources, or a **deep** answer from a large MoE or several
+passes ("Go deeper"), checked by a second model. Retrieval is local and hybrid: SQLite FTS5
+keyword search plus on-device embeddings. Inference is `llama.cpp` via `llama.rn`.
+Every answer records the model, load time, time to first token, tokens/sec,
+memory and what it retrieved. Details: [docs/ADAPTIVE_ROUTING.md](docs/ADAPTIVE_ROUTING.md).
 
-## Quickstart
+## What it can cite
 
-```bash
-git clone https://github.com/rferrari/boar-app.git
-cd boar-app
-npm install
+<img src="docs/readme/knowledge.png" alt="Built-in Wikipedia, topic packs, OpenStreetMap places packs and your own files feed one local hybrid index" />
 
-# Build via EAS (no local Android SDK needed) — see eas.json
-npx eas-cli build --platform android --profile preview
+- **Built in:** Wikipedia articles, plus the Standard (+1,000 topics) and Full (+4,000) libraries. The Encyclopedia setup adds 50,000 Wikipedia Vital Articles.
+- **Knowledge packs:** pre-indexed files such as Wikipedia Vital Articles, Emergency & preparedness, Ethereum & cryptography ([KNOWLEDGE_PACKS](docs/KNOWLEDGE_PACKS.md)).
+- **Places packs:** OpenStreetMap restaurants and cafés with diet tags and hours, plus Wikivoyage listings. Download a city in setup or in Knowledge (Berlin is 3.3 MB for 15,278 places) ([POI_PACKS](docs/POI_PACKS.md)).
+- **Your files:** `.txt`, `.md`, `.csv`, `.json`, `.pdf` (selectable text, no OCR), chunked and embedded on the phone. Toggle, delete, or export a collection as a JSON pack to share over Bluetooth or Nearby Share ([USING](docs/USING.md)).
 
-# OR build locally if you have the Android SDK set up:
-npx expo prebuild -p android --clean
-npx expo run:android
-```
+## Measured on a real phone
 
-### Guided setup
+<img src="docs/readme/bench.png" alt="LFM2.5-8B-A1B 14.8 tok/s, Qwen2.5-1.5B 11.4, Phi-3.5-mini 4.0, Qwen2.5-7B 2.7" />
 
-The easiest way: clone the repo and run the setup wizard, which asks what you
-want and walks you through it.
-
-```bash
-git clone https://github.com/rferrari/boar-app.git
-cd boar-app
-make setup         # or: node scripts/setup.mjs
-```
-
-It offers:
-
-1. **Install BOAR on my phone:** downloads the latest release APK (checksum
-   verified) and installs it over a USB cable, or tells you how to copy it over.
-2. **Build the app from source:** checks Node, JDK and the Android SDK and tells
-   you exactly what's missing, then builds in the cloud with EAS (no Android SDK
-   needed) or locally, and can install the APK over USB.
-3. **Developer mode (advanced):** a live-reloading development build over USB.
-4. **Build a bigger offline knowledge pack** (optional, see
-   [docs/KNOWLEDGE_PACKS.md](docs/KNOWLEDGE_PACKS.md)).
-
-The individual steps are also `make` targets (`make help` lists them):
-`make install` (npm dependencies), `make run-android` (local build, needs the
-Android SDK), `make build-eas` (cloud build).
-
-On first launch, the app shows a one-time setup screen that downloads the
-default model, Qwen2.5-1.5B, plus a small embedding model (about 1 GB total, see
-`docs/MODELS.md`) — the only time it needs network access. From
-then on it works fully offline, airplane mode included.
-An in-app "Models" screen lets you optionally download additional/alternate
-models later when you do have connectivity — see
-`src/ui/ModelSetupScreen.tsx`, the only place in the app that touches the
-network.
-
-## Mixture of experts on a phone, measured
-
-Vitalik's suggestion for phones is extreme mixture of experts: a large model
-whose parameters mostly sit on disk, with only a small part active for each
-token. BOAR runs that kind of model today, at a smaller scale, and measures it
-on a real phone rather than quoting model cards.
-
-[LFM2.5-8B-A1B](https://huggingface.co/LiquidAI/LFM2.5-8B-A1B-GGUF) has 8B
-parameters in total, 32 experts with 4 active, so about 1.5B parameters work on
-each token. On a Xiaomi 2311DRK48G (MediaTek Dimensity 8300, 11.6 GB RAM), over
-the 17-question evaluation set:
-
-| Model | Architecture | Median tokens/sec | Peak memory |
+| Model | Architecture | Median tok/s | Peak memory |
 |---|---|---|---|
 | **LFM2.5-8B-A1B** | MoE, 8B total, ~1.5B active | **14.8** | 5.2 GB |
-| Qwen2.5-1.5B | dense, 1.5B | 11.4 | 3.1 GB |
+| Qwen2.5-1.5B (compact) | dense, 1.5B | 11.4 | 3.1 GB |
 | Phi-3.5-mini | dense, 3.8B | 4.0 | 4.8 GB |
 | Qwen2.5-7B | dense, 7B | 2.7 | 5.1 GB |
 
-The mixture-of-experts model generated as fast as the 1.5B dense model while
-carrying 8B parameters of knowledge (speeds vary with phone temperature: Qwen2.5-1.5B
-reached 16-20 tok/s when the phone was cool). It was also the only model to get the
-multi-step RAM-budget question right. Its weak spot is that it
-reasons before answering, and with a 512-token answer budget 4 of 17 answers ran
-out before the final answer, so it needs a larger budget.
+Xiaomi 2311DRK48G, Dimensity 8300, 11.6 GB RAM, 17-question evaluation set.
 
-Not every MoE model runs yet: Instella-MoE-16B-A3B failed to load because this
-llama.cpp build doesn't support its architecture, and the evaluation records that
-as a result rather than skipping it. Anyone can repeat or extend these runs on
-their own phone with one command, see
-[docs/DEVICE_EVALUATION.md](docs/DEVICE_EVALUATION.md).
+- The MoE model is as fast as the 1.5B dense model while carrying 8B parameters, and it was the only one to get the multi-step RAM-budget question right.
+- Its weak spot: it reasons before answering, and with a 512-token budget 4 of 17 answers ran out before the final answer.
+- Not every MoE loads yet: Instella-MoE-16B-A3B fails on this llama.cpp build, and the evaluation records that instead of skipping it.
 
-## Custom knowledge base
+Repeat or extend the runs on your own phone with one command:
+[docs/DEVICE_EVALUATION.md](docs/DEVICE_EVALUATION.md). Raw files:
+[docs/evidence](docs/evidence/).
 
-Settings > Knowledge Base has an "Import" card alongside the built-in
-downloadable corpus packs. It lets you index your own notes into the same
-local FTS5 + vector search used everywhere else in the app:
+## Bounty requirements
 
-- **Supported formats:** `.txt`, `.md`, `.csv` (naive comma-split, no quoted-field
-  escaping), `.json` (either the app's own `{title, source, body}[]` corpus-pack
-  shape, or any other JSON — imported as raw text otherwise), and `.pdf`
-  (embedded/selectable text only, via [`expo-pdf-text-extract`](https://www.npmjs.com/package/expo-pdf-text-extract) —
-  Apache PDFBox-Android on-device, no network, no OCR — so a scanned/image-only
-  PDF extracts to empty text, and password-protected PDFs are rejected with a
-  clear error rather than attempted).
-- Each import is chunked (~500 tokens, 50-token overlap, heuristic
-  char-based split) and embedded on-device with the same embedding model used
-  for the rest of the knowledge base, then saved as a named, toggleable
-  collection — turn one off without deleting it, or delete it outright.
-- **Export** re-serializes a collection as `{title, source, body}[]` JSON (the
-  same shape as the bundled corpus packs) and hands it to the Android share
-  sheet — send it over Bluetooth, Nearby Share, a file manager, whatever the
-  recipient's device offers. This is deliberately *not* a raw `.sqlite`
-  export: that would bake in this device's specific embedding vectors, which
-  are meaningless (or the wrong dimension) on a phone running a different
-  embedding model. A recipient re-embeds the JSON locally by importing it the
-  same way.
-- Everything happens on-device; nothing is uploaded anywhere.
+<img src="docs/readme/limits.png" alt="Peak RAM at most 12 GB, disk at most 50 GB, offline after setup, no Google Play Services, real device" />
 
-## Finding more models
+Built for the [poidh bounty #31](https://poidh.xyz/mainnet/bounty/31), "Best Offline
+AI Research App". Status of each requirement, with the benchmark files:
+[docs/COMPLIANCE.md](docs/COMPLIANCE.md). Submission wallet:
+`0x32d1C8A4d133241a710d780f1198992A015Ea5Ed`.
 
-Settings > Tone & Model has a "Find more models" search box (below the
-curated model list) that searches Hugging Face for other GGUF models —
-`src/services/modelBrowser.ts` calls Hugging Face's public API, this is the
-app's only other network access besides the model-setup downloads, and only
-happens when you explicitly search. Tapping a result's file adds it to the
-model list above, where you download it through the normal flow (same
-progress tracking and post-download size check as every built-in model).
+## Get it
 
-This is deliberately separate from the curated `MODEL_CATALOG` in
-`src/models/manifest.ts`: nobody has run these models to confirm they fit
-typical phone RAM or work cleanly in `llama.rn`, so check a model's Hugging
-Face page yourself (size, license, quantization) before downloading. When
-Hugging Face's metadata includes a git-lfs checksum it's kept on the
-resulting catalog entry, but — like the rest of the app — only file size is
-verified automatically after download, not a full sha256 (reading a
-multi-gigabyte file into memory for a hash isn't worth doing on every
-download; see `ModelManager.verifyChecksum`'s doc comment).
+<table>
+<tr>
+<td width="25%"><img src="docs/readme/setup.jpg" alt="Setup: language and this phone's memory"></td>
+<td width="25%"><img src="docs/readme/model.jpg" alt="Choose the answer model: Qwen3-4B recommended, or Qwen2.5-1.5B"></td>
+<td width="25%"><img src="docs/readme/setup-knowledge.jpg" alt="Choose your knowledge: Essential or Encyclopedia, plus places for your city"></td>
+<td width="25%"><img src="docs/readme/ready.jpg" alt="Ready: everything runs offline from now on"></td>
+</tr>
+<tr>
+<td><b>Start.</b> English or Portuguese, and what this phone has.</td>
+<td><b>Pick a model.</b> Qwen3-4B, or the lighter Qwen2.5-1.5B.</td>
+<td><b>Pick knowledge.</b> Essential or Encyclopedia, plus your city's places.</td>
+<td><b>Ready.</b> Download and index once, then offline.</td>
+</tr>
+</table>
 
-## Recovering from a bad model load, or starting over
-
-If a model fails to load (corrupted/truncated download, the file went
-missing, etc.) the chat screen shows a readable diagnosis instead of a raw
-error, with shortcuts to Settings or straight back into the setup wizard —
-see `src/ui/ModelLoadErrorCard.tsx`.
-
-Settings > App also has:
-
-- **Re-run Setup Wizard** — jump back into first-run setup any time to
-  switch model tiers or re-download the defaults, without losing anything
-  else.
-- **Danger Zone > Clear All Data & Reset App** — a double-confirmed full
-  wipe (`src/services/appReset.ts`): deletes every downloaded model, the
-  whole local knowledge base (bundled + downloaded corpus packs + your own
-  imported collections), and all chat history/settings, then sends you back
-  to the setup wizard. This app doesn't use MMKV/AsyncStorage — persisted
-  state is either the SQLite knowledge base or small JSON files under the
-  app's document directory, and this is what actually gets cleared.
-
-## iOS
-
-The same app builds for iOS (simulator needs Xcode only; a device needs an Apple ID). Full guide, native module mapping, Apple account needs and the Android/iOS parity table: [docs/IOS.md](docs/IOS.md).
+**Android APK:** download `boar-v1.0.0-arm64.apk` from the
+[latest release](https://github.com/rferrari/boar-app/releases/latest) (122 MB, any
+64-bit ARM phone), check it and install it:
 
 ```bash
-npx expo prebuild -p ios --no-install && (cd ios && pod install)
-npx expo run:ios                                   # simulator, Debug + Metro
-scripts/ios-remote-build.sh sim-run                # build + run on a remote Mac with the newer Xcode
-eas build -p ios --profile preview-simulator       # cloud simulator build, no Apple credentials
+sha256sum -c boar-v1.0.0-arm64.apk.sha256   # prints "boar-v1.0.0-arm64.apk: OK"
+adb install boar-v1.0.0-arm64.apk           # or open the file on the phone
 ```
 
-Toolchain: with Xcode 26.1 (Swift 6.2.1) the `expo-modules-jsi` pod of Expo SDK 57 does not compile (`weak let`); use the newer Xcode Expo SDK 57 is built with (the package changelog targets Xcode 27; exact minimum `UNKNOWN`). See docs/IOS.md.
+The v1.0.0 APK (Sep 26) downloads Qwen2.5-1.5B (about 1 GB) on first launch.
+Builds from `main` default to Qwen3-4B (about 2.5 GB) and have the newer UI.
 
-## Development
+**Guided setup:** the wizard downloads and installs the APK over USB, builds from
+source (cloud via EAS, no Android SDK needed, or local), starts a live-reload dev
+build, or builds a bigger knowledge pack.
 
 ```bash
-npm install
-npx expo prebuild -p android --clean   # regenerates ./android (gitignored) from app.json
-npx expo run:android                   # build + launch on a connected device
+git clone https://github.com/rferrari/boar-app.git && cd boar-app
+make setup    # or: node scripts/setup.mjs · `make help` lists the single steps
 ```
 
-`--clean` matters any time `app.json`/assets change (app name, icon, plugins): without it,
-prebuild can leave a stale `android/` project around with the old values baked in — that's
-what a plain `npm install` alone will never fix, since it never touches `android/` at all.
+**iOS:** builds from the same code; see [docs/IOS.md](docs/IOS.md).
 
-### Blank/white screen or "Failed to connect to \<LAN IP\>" after `make start`
+## Docs
 
-This is a Wi-Fi network problem, not a build problem: some routers (and most phone
-hotspots) enable **client/AP isolation**, which silently blocks the phone and this
-computer from reaching each other even on the same Wi-Fi network and subnet. The dev
-client keeps retrying your computer's LAN IP and timing out. USB debugging isn't
-affected — fix it by forcing Metro onto the USB `adb reverse` tunnel instead of Wi-Fi:
+| | |
+|---|---|
+| [docs/demo](docs/demo/README.md) | Videos and screenshots from a phone in airplane mode |
+| [docs/USING.md](docs/USING.md) | Import documents, find more models, recover from a bad model load, reset the app |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Build commands, dev mode, Wi‑Fi troubleshooting |
+| [docs/IOS.md](docs/IOS.md) | iOS build, native modules, Android/iOS parity |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Design, first-run setup, network permission |
+| [docs/MODELS.md](docs/MODELS.md) | Exact models, datasets and indexes |
 
-```bash
-npx expo start --localhost
-```
-
-Then reopen the app; if it still shows the old server list, use its "Enter URL
-manually" field with `http://127.0.0.1:8081`.
-
-## License
-
-See [LICENSE](./LICENSE).
+License: [LICENSE](LICENSE).
