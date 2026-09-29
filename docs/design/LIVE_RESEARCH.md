@@ -66,8 +66,10 @@ npx vitest run src/ui/chat/liveResearch.test.ts src/ui/chat/chatPerf.test.ts src
 | State | Status line | Timeline | Pill / below |
 |---|---|---|---|
 | Searching, nothing yet (single) | Pesquisando no acervo… | 1 active node | – |
-| Splitting (deep, empty detail) | Dividindo a pergunta… | parts not known yet: 1 node | bar at 0 |
-| Part i of n | Pesquisando parte i de n | nodes done / active / pending; sub-question or "Parte i de n" | bar (i + ½)/n |
+| Splitting (deep, empty detail) | Dividindo a pergunta… | 3 still placeholder lines (pending node + bar), never a single-pass step | bar at 0 |
+| Part i of n, searching | Pesquisando parte i de n | nodes done / active (pulse) / pending; sub-question or "Parte i de n" | bar (i + ⅓)/n; pill "Buscando…" |
+| Part i of n, its sources arrived (sub-answer being written) | Lendo a parte i de n… | active node calm (ring, no pulse) | bar (i + ⅔)/n; pill "Lendo…" |
+| Part done with nothing new | – | one caption line "Nenhum artigo novo" (no row card) | – |
 | Articles arriving (1 or many `sources` events) | counter grows | rows pop in under the part searching | – |
 | Loading model / reading | Carregando o modelo… / Lendo N artigos… | every node done | bar full |
 | Synthesizing / checking | Juntando tudo… / Conferindo… | every node done | – |
@@ -131,6 +133,16 @@ clock, which it never had before, because the pill showed the elapsed time only 
 - `StageDetail.subQuestion?: string` is read defensively (`partSignal`: string only, whitespace collapsed, blank
   ignored). The decompose stage is `retrieving` with an empty detail, which shows "Dividindo a pergunta…".
 - Partial sources stay after a stop or error. The pill and the sources card show them.
+- **Retrieval vs sub-answer.** The engine sends no event when a part's sub-answer starts. The orchestrator runs
+  `onProgress("researching", i)`, then retrieve, then `onPartialSources` only if new sources were found, then the
+  ~300-token sub-answer. The stage stays `retrieving` for the whole part (about 10 s on the iPhone), so the UI
+  infers "reading part i" from that part's sources arriving (`TimelinePart.read`). A part that found nothing new
+  sends nothing, and reads as searching until the next part starts. Proposal for the engine: a `generating` stage
+  with the part's detail when a sub-answer starts, or `onPartialSources` even when nothing is new.
+- **Pill.** The pill beside the name follows the same inference (`timelinePillStep`): "Lendo…" for a part past its
+  search, "Escrevendo…" from synthesizing on (generatingSteps).
+- **Splitting.** Before the split, the multipass does a first search (`retrieving`, no detail). That moment still
+  shows the single-pass step briefly, because nothing tells the two apart yet.
 
 ## Not matched from the mockup (and why)
 
