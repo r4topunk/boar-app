@@ -177,3 +177,27 @@ describe("runDeepResearch partial sources (retrieval progress)", () => {
     expect(partials.flat().map((c) => c.title)).not.toContain("Dean Lee");
   });
 });
+
+describe("runDeepResearch answer language", () => {
+  const Q = "Compare as causas das duas revoluções";
+  const LINE = "Responda em português do Brasil, mesmo que as fontes estejam em inglês, e cite cada afirmação com o número da fonte, como [1].";
+  const synthesis = () => calls.map(text).find((t) => t.includes("synthesizing multiple research perspectives"))!;
+
+  it("puts the language line after the synthesis input, and only there", async () => {
+    const without = await runDeepResearch(Q, undefined, undefined, 256);
+    const before = calls.map(text);
+    calls.length = 0;
+    const withLine = await runDeepResearch(Q, undefined, undefined, 256, undefined, undefined, undefined, { answerLanguage: LINE });
+    expect(synthesis().endsWith(`(${LINE})`)).toBe(true);
+    // Decomposition and sub-answers: the same prompts, so the same sub-questions and the same retrieval.
+    const after = calls.map(text);
+    expect(after.slice(0, -1)).toEqual(before.slice(0, -1));
+    expect(withLine.subQuestions).toEqual(without.subQuestions);
+    expect(withLine.citations).toEqual(without.citations);
+  });
+
+  it("no line, no change", async () => {
+    await runDeepResearch(Q, undefined, undefined, 256);
+    expect(synthesis()).not.toContain("Responda");
+  });
+});

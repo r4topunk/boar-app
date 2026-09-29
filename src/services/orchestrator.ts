@@ -60,6 +60,12 @@ export interface ResearchOptions {
    * numbered list so far, only when it grew. Each list extends the previous one (mergeSources keeps
    * first-seen order), so a source's number never changes; the last one equals what onSources gets.
    */
+  /**
+   * The answer's language line (src/routing/context.ts PT_ANSWER_LANGUAGE for a Portuguese question), after the
+   * synthesis input as the single-pass prompt puts it after the question. Only the synthesis gets it: the
+   * sub-questions stay as the decomposition writes them (usually English, which matches the English sources).
+   */
+  answerLanguage?: string;
   onPartialSources?: (sources: RetrievedChunk[], progress: { subQuestionIndex: number; subQuestionCount: number }) => void;
 }
 
@@ -129,7 +135,8 @@ async function synthesize(
   systemPrompt: string | undefined,
   maxTokens: number,
   onToken: (piece: string) => void,
-  onTimeout: () => void
+  onTimeout: () => void,
+  answerLanguage?: string
 ): Promise<string> {
   const perspectives = subResults
     .map((r, i) => `Perspective ${i + 1} (${r.subQuestion}):\n${r.answer}`)
@@ -138,7 +145,8 @@ async function synthesize(
     `${instructionOf(systemPrompt)} You are synthesizing multiple research perspectives into one answer. ` +
     `Compare them, reconcile any conflicts, and write one unified, well-reasoned answer. ` +
     `Keep the source numbers exactly as the perspectives cite them, like [3]; do not renumber or invent sources.`;
-  return generateStage(system, `Original question: ${originalQuery}\n\n${perspectives}`, {
+  const language = answerLanguage?.trim() ? `\n\n(${answerLanguage.trim()})` : "";
+  return generateStage(system, `Original question: ${originalQuery}\n\n${perspectives}${language}`, {
     nPredict: maxTokens,
     temperature: 0.6,
     onToken,
@@ -208,7 +216,8 @@ export async function runDeepResearch(
     systemPrompt,
     maxTokens,
     onToken ?? (() => {}),
-    markTimedOut
+    markTimedOut,
+    options.answerLanguage
   );
 
   return { answer, subQuestions, citations: allChunks, timedOut };

@@ -5,7 +5,7 @@ import { AnswerDeps, createAnswerer, InstalledLlm } from "./answer";
 import type { AnswerEvent } from "./events";
 import type { AnswerSettings } from "../models/settings";
 import type { GenerateOptions } from "../inference/LlamaEngine";
-import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION } from "./context";
+import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION, PT_ANSWER_LANGUAGE } from "./context";
 import { ModelLoadError } from "../inference/loadError";
 import { answerReducer, initialAnswer } from "../ui/chat/answerReducer";
 
@@ -1825,5 +1825,20 @@ describe("answer(): multi-pass retrieval progress", () => {
     expect(events.filter((e) => e.type === "sources")).toHaveLength(1);
     const kinds = types(events);
     expect(kinds.indexOf("stage:retrieving")).toBeLessThan(kinds.indexOf("sources"));
+  });
+});
+
+describe("answer(): multi-pass answer language", () => {
+  it("a Portuguese question asks the synthesis for Portuguese; an English one doesn't", async () => {
+    const seen: (string | undefined)[] = [];
+    const base = f.deps.runMultipass;
+    f.deps.runMultipass = (q, s, h, m, p, t, st, options) => {
+      seen.push(options.answerLanguage);
+      return base(q, s, h, m, p, t, st, options);
+    };
+    const { deepen } = createAnswerer(f.deps);
+    await deepen("Compare Canberra e Sydney: qual é a capital da Austrália?", [CANBERRA], () => {}, ctx).done;
+    await deepen("Compare Canberra and Sydney", [CANBERRA], () => {}, ctx).done;
+    expect(seen).toEqual([PT_ANSWER_LANGUAGE, undefined]);
   });
 });

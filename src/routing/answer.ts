@@ -1082,6 +1082,9 @@ export function createAnswerer(deps: AnswerDeps) {
             () => stopRequested,
             {
               retrieveK: gen.retrieveK,
+              // A Portuguese question gets a Portuguese answer here too: every multi-pass prompt was English
+              // and none said which language to answer in, so the synthesis followed the English sources.
+              ...(pt ? { answerLanguage: PT_ANSWER_LANGUAGE } : {}),
               // Each sub-question's sources as soon as they are known (a prefix of the final list, same
               // numbers), instead of only after every sub-answer is written. The answer's sources are
               // still the final list below.
