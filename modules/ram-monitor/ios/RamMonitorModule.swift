@@ -46,6 +46,32 @@ public class RamMonitorModule: Module {
     Function("getAvailableRamBytes") { () -> Double in
       return Double(os_proc_available_memory())
     }
+
+    // Same shape as Android's getHardwareInfo, for shared results. iOS exposes no chipset
+    // name, core frequencies or CPU feature flags (i8mm, dotprod), so those stay empty:
+    // the model identifier (e.g. "iPhone16,2") stands in for the chipset in `hardware`, and
+    // coreMaxFreqKHz holds one 0 ("unknown") per core so the core count still travels.
+    Function("getHardwareInfo") { () -> [String: Any] in
+      return [
+        "socModel": "",
+        "socManufacturer": "Apple",
+        "hardware": Self.modelIdentifier(),
+        "apiLevel": 0,
+        "cpuFeatures": "",
+        "coreMaxFreqKHz": [Int](repeating: 0, count: ProcessInfo.processInfo.processorCount),
+      ]
+    }
+  }
+
+  /// "iPhone16,2" on a device; the simulator reports the host's identifier through
+  /// SIMULATOR_MODEL_IDENTIFIER because utsname gives "arm64" there.
+  private static func modelIdentifier() -> String {
+    if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return simulated }
+    var system = utsname()
+    uname(&system)
+    return withUnsafePointer(to: &system.machine) {
+      $0.withMemoryRebound(to: CChar.self, capacity: Int(_SYS_NAMELEN)) { String(cString: $0) }
+    }
   }
 
   private func logThrottled(_ info: task_vm_info_data_t?) {
