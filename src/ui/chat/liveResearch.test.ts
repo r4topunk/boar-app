@@ -18,8 +18,10 @@ import {
   researchPhase,
   researchView,
   rowGrows,
+  SPLIT_PLACEHOLDERS,
   stackArticles,
   summaryItems,
+  timelinePillStep,
   type Timeline,
 } from "./liveResearch";
 import { phaseAnnouncement } from "./presentation";
@@ -121,7 +123,9 @@ describe("researchView", () => {
     const v = researchView(deep, "searching");
     expect(v.header).toEqual({ key: "chat.research.headerPart", opts: { index: 2, count: 3 } });
     expect(v.total).toBe(5);
-    expect(v.progress).toBeCloseTo(1.5 / 3);
+    // Part 2 searching (no new article yet): a third into its share of the bar.
+    expect(v.progress).toBeCloseTo((1 + 1 / 3) / 3);
+    expect(v.parts[1].reading).toBe(false);
     expect(v.parts.map((p) => p.status)).toEqual(["done", "active", "pending"]);
     expect(v.parts[2]).toMatchObject({ labelKey: "chat.research.part", labelOpts: { index: 3, count: 3 } });
   });
@@ -160,6 +164,63 @@ describe("researchView", () => {
     expect(researchView(none, "loading_model").header.key).toBe("chat.stage.loadingModel");
     expect(researchView(none, "synthesizing").header.key).toBe("chat.stage.synthesizing");
     expect(researchView(none, null).parts[0].status).toBe("done");
+  });
+});
+
+describe("iPhone d0a9c66: a part past its search, empty parts, splitting", () => {
+  // The device run: 3 parts, part 1 found 2 articles, parts 2 and 3 found nothing new.
+  const s2 = [chunk("Greenhouse effect"), chunk("Infrared")];
+  const upTo = (n: number) =>
+    replay(
+      [
+        { sources: [], detail: {} },
+        { sources: [], detail: part(0, 3) },
+        { sources: s2, detail: part(0, 3) }, // part 1's sources event: its sub-answer is being written now
+        { sources: s2, detail: part(1, 3) }, // part 2: searches, nothing new, no sources event
+        { sources: s2, detail: part(2, 3) },
+        { sources: s2, detail: undefined, searching: false }, // synthesizing
+      ].slice(0, n)
+    );
+
+  it("infers 'reading part i' from the part's sources arriving: header, calm node, bar, pill step", () => {
+    const tl = upTo(3);
+    const v = researchView(tl, "searching");
+    expect(v.header).toEqual({ key: "chat.research.headerReadingPart", opts: { index: 1, count: 3 } });
+    expect(v.parts[0]).toMatchObject({ status: "active", reading: true });
+    expect(v.progress).toBeCloseTo(2 / 3 / 3);
+    expect(timelinePillStep(tl, "searching")).toBe("chat.stepShort.read");
+  });
+
+  it("a part that found nothing new reads as searching (no engine signal) and, once done, says 'No new articles'", () => {
+    const tl = upTo(4);
+    const v = researchView(tl, "searching");
+    expect(v.header).toEqual({ key: "chat.research.headerPart", opts: { index: 2, count: 3 } });
+    expect(v.parts.map((p) => [p.status, p.reading, p.empty])).toEqual([
+      ["done", false, false],
+      ["active", false, false],
+      ["pending", false, false],
+    ]);
+    expect(timelinePillStep(tl, "searching")).toBeNull();
+    const done = researchView(upTo(6), "synthesizing");
+    expect(done.parts.map((p) => p.empty)).toEqual([false, true, true]);
+    // A single pass never says "no new articles" (it has its own "No article on this").
+    expect(researchView(replay([{ sources: [] }]), "reading").parts[0].empty).toBe(false);
+  });
+
+  it("while splitting: placeholders, not a single-pass step; then the parts in their place", () => {
+    const split = researchView(upTo(1), "searching");
+    expect(split).toMatchObject({ splitting: true, parts: [] });
+    expect(SPLIT_PLACEHOLDERS).toBe(3);
+    const parts = researchView(upTo(2), "searching");
+    expect(parts.splitting).toBe(false);
+    expect(parts.parts).toHaveLength(3);
+    expect(researchView(replay([{ sources: [] }]), "searching").splitting).toBe(false);
+  });
+
+  it("the pill keeps the stage's step outside a Deep Research part", () => {
+    expect(timelinePillStep(null, "searching")).toBeNull();
+    expect(timelinePillStep(replay([{ sources: [chunk("A")] }]), "searching")).toBeNull();
+    expect(timelinePillStep(upTo(3), "synthesizing")).toBeNull();
   });
 });
 
@@ -247,5 +308,9 @@ describe("live research copy (en/pt in sync)", () => {
     expect(pt.chat.research.headerSplitting).toBe("Dividindo a pergunta…");
     expect(pt.chat.research.headerPart).toBe("Pesquisando parte {{index}} de {{count}}");
     expect(pt.chat.research.headerReading_other).toBe("Lendo {{count}} artigos…");
+    expect(pt.chat.research.headerReadingPart).toBe("Lendo a parte {{index}} de {{count}}…");
+    expect(en.chat.research.headerReadingPart).toBe("Reading part {{index}} of {{count}}…");
+    expect(pt.chat.research.noneNew).toBe("Nenhum artigo novo");
+    expect(en.chat.research.noneNew).toBe("No new articles");
   });
 });

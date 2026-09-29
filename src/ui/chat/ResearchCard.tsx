@@ -9,6 +9,7 @@ import { useMotion } from "../theme/motion";
 import { Reveal } from "./Reveal";
 import {
   MAX_ARTICLES,
+  SPLIT_PLACEHOLDERS,
   researchView,
   rowGrows,
   stackArticles,
@@ -219,7 +220,8 @@ function PartRow({
       {/* The node on the label's first line; the connector runs from it to the next node. */}
       <View style={{ width: side, alignItems: "center" }}>
         <LineSlot line={line}>
-          <Node status={part.status} phase={part.status === "active" ? phase : null} />
+          {/* Pulses while its part searches; calm (the ring alone) while its sub-answer is written. */}
+          <Node status={part.status} phase={part.status === "active" && !part.reading ? phase : null} />
         </LineSlot>
         {!last && <View style={{ flex: 1, width: t.size.focusRing, backgroundColor: t.color.line.hairline }} />}
       </View>
@@ -236,11 +238,40 @@ function PartRow({
             {tr("chat.research.more", { count: part.more })}
           </Text>
         </Reveal>
-        <Reveal shown={none && part.status === "done" && part.shown.length === 0} appear spaceBefore={t.space.xs}>
-          <Text variant="footnote" color="secondary">
-            {tr("chat.research.none")}
+        {/* One quiet line, not a row card: a part done with nothing new, or a search with nothing at all. */}
+        <Reveal shown={part.empty || (none && part.status === "done" && part.shown.length === 0)} appear={!atMount.has(`empty:${part.index}`)} spaceBefore={t.space.xs}>
+          <Text variant="caption" color="secondary">
+            {tr(part.empty ? "chat.research.noneNew" : "chat.research.none")}
           </Text>
         </Reveal>
+      </View>
+    </View>
+  );
+}
+
+/** Widths of the placeholder lines while the question is split (fractions of the text column). */
+const PLACEHOLDER_WIDTHS = ["82%", "64%", "74%"] as const;
+
+/**
+ * A part not known yet (splitting the question): a pending node and a still bar where its text will be,
+ * with the connector, so the card grows into the parts instead of changing shape. Static: no second loop.
+ */
+function PlaceholderRow({ index, last }: { index: number; last: boolean }) {
+  const t = useTokens();
+  const line = useOpticalLine("footnote");
+  const side = t.size.iconSm + t.space.xxs;
+  return (
+    <View style={{ flexDirection: "row", gap: t.space.sm + t.space.xxs }}>
+      <View style={{ width: side, alignItems: "center" }}>
+        <LineSlot line={line}>
+          <Node status="pending" phase={null} />
+        </LineSlot>
+        {!last && <View style={{ flex: 1, width: t.size.focusRing, backgroundColor: t.color.line.hairline }} />}
+      </View>
+      <View style={{ flex: 1, paddingBottom: last ? 0 : t.space.sm + t.space.xxs }}>
+        <LineSlot line={line}>
+          <View style={{ width: PLACEHOLDER_WIDTHS[index % PLACEHOLDER_WIDTHS.length], height: t.space.sm, borderRadius: t.radius.full, backgroundColor: t.color.bg.sunken }} />
+        </LineSlot>
       </View>
     </View>
   );
@@ -249,7 +280,10 @@ function PartRow({
 /** Keys on screen when a card mounts: those rows show in place, later ones pop in. */
 function mountKeys(tl: Timeline): ReadonlySet<string> {
   const keys = new Set<string>(tl.order);
-  tl.parts.forEach((p) => p.articles.length > MAX_ARTICLES && keys.add(`more:${p.index}`));
+  tl.parts.forEach((p) => {
+    if (p.articles.length > MAX_ARTICLES) keys.add(`more:${p.index}`);
+    if (tl.multi && p.articles.length === 0) keys.add(`empty:${p.index}`);
+  });
   return keys;
 }
 
@@ -288,6 +322,8 @@ function TimelineCard({ timeline, phase, none }: { timeline: Timeline; phase: Re
         </>
       )}
       <View>
+        {view.splitting &&
+          Array.from({ length: SPLIT_PLACEHOLDERS }, (_, i) => <PlaceholderRow key={i} index={i} last={i === SPLIT_PLACEHOLDERS - 1} />)}
         {view.parts.map((p, i) => (
           <PartRow key={p.index} part={p} last={i === view.parts.length - 1} phase={reduceMotion ? null : ambient} atMount={atMount} none={none} />
         ))}

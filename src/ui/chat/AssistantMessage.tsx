@@ -25,7 +25,7 @@ import { useSmoothText } from "./useSmoothText";
 import { answerStillShowing, isDraining } from "./streamReveal";
 import { Swap } from "./Swap";
 import { useMotion } from "../theme/motion";
-import { deepSectionLabeled, deepSourcesFrom, emptyTimeline, foldTimeline, researchPhase, summaryItems, type Timeline } from "./liveResearch";
+import { deepSectionLabeled, deepSourcesFrom, emptyTimeline, foldTimeline, researchPhase, summaryItems, timelinePillStep, type Timeline } from "./liveResearch";
 import { ResearchPanel } from "./ResearchCard";
 
 export interface AssistantMessageProps {
@@ -978,11 +978,6 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
     showsAnswerBody(answer) && !!(answer.fast?.text || answer.deep?.text || answer.instant || answer.extract || answer.places?.places.length);
   const done = !active && (lastTier?.outcome || instantOnly);
   const steps = running && !stopping ? generatingSteps(answer, tr) : null;
-  // The pill keeps its last step until it becomes the receipt (one swap, not two).
-  const currentStep = steps?.find((x) => x.status === "active")?.short;
-  const lastStep = useRef<string | undefined>(undefined);
-  if (currentStep) lastStep.current = currentStep;
-  const shownStep = pillStep(currentStep, lastStep.current);
   // D3: the live research card stays until the answer's own text starts, then folds into its pill.
   const stepsShown = stepsCardShown(answer, steps);
   // The answer's own tier: the fast one, or the deep one for a question the router sent straight to the deep
@@ -1007,6 +1002,13 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   const deepFrom = useRef<number | null>(null);
   deepFrom.current = deepSourcesFrom(deepFrom.current, isDeepen && !answer.deep?.outcome, answer.sources.length);
   const deepTl = useTimeline(running && !stopping && isDeepen && !answer.deep?.outcome, answer.sources, deepFrom.current ?? 0, answer.deep?.detail, rPhase === "searching");
+  // The pill keeps its last step until it becomes the receipt (one swap, not two). It follows the card: a Deep
+  // Research part past its search reads "Reading…", not "Searching…" for the whole research (iPhone, r4to).
+  const tlStep = timelinePillStep(isDeepen ? deepTl : fastTl, rPhase);
+  const currentStep = tlStep && steps ? tr(tlStep) : steps?.find((x) => x.status === "active")?.short;
+  const lastStep = useRef<string | undefined>(undefined);
+  if (currentStep) lastStep.current = currentStep;
+  const shownStep = pillStep(currentStep, lastStep.current);
   // The pill only where a model answered: an extractive-only answer shows its passage, not "1 article".
   const fastPill = !!fastTl && !fastSteps && !!firstTier && summaryItems(fastTl) != null;
   const deepPill = !!deepTl && !deepLive && summaryItems(deepTl) != null;

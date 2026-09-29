@@ -807,6 +807,7 @@
       "headerSearching": "Searching the library…",
       "headerSplitting": "Splitting the question…",
       "headerPart": "Researching part {{index}} of {{count}}",
+      "headerReadingPart": "Reading part {{index}} of {{count}}…",
       "headerReading_one": "Reading {{count}} article…",
       "headerReading_other": "Reading {{count}} articles…",
       "headerDone": "Research",
@@ -820,6 +821,7 @@
       "more_one": "+{{count}} more",
       "more_other": "+{{count}} more",
       "none": "No article on this",
+      "noneNew": "No new articles",
       "summarySpoken": "Research: {{summary}}",
       "summaryHint": "Shows the parts and the articles found"
     },

@@ -34,6 +34,13 @@ export interface TimelinePart {
   question?: string;
   /** Article keys, in the order they arrived. */
   articles: string[];
+  /**
+   * Its search is over and the engine is writing its sub-answer. Inferred: the engine sends no stage for a
+   * sub-answer (orchestrator: onProgress "researching" → retrieve → onPartialSources when new sources →
+   * sub-answer), so a part counts as read once new sources arrive while it is current. A part whose search
+   * found nothing new sends no event: it reads as searching until the next part starts.
+   */
+  read?: boolean;
 }
 
 export interface Timeline {
@@ -126,6 +133,7 @@ export function foldTimeline(prev: Timeline, input: { sources: readonly Chunk[];
     n.order.push(g.key);
     const at = Math.max(0, Math.min(n.current, n.parts.length - 1));
     n.parts[at].articles.push(g.key);
+    if (n.multi && input.searching && n.current === at) n.parts[at].read = true;
   }
   return next;
 }
@@ -141,6 +149,10 @@ export interface PartView {
   labelOpts?: Record<string, unknown>;
   shown: ResearchArticle[];
   more: number;
+  /** Active and past its search: the engine writes this part's sub-answer (calm node, no pulse). */
+  reading: boolean;
+  /** A Deep Research part done without a new article: one quiet line ("No new articles"). */
+  empty: boolean;
 }
 
 /** What the answer is doing, as the card's header says it. */
@@ -152,8 +164,13 @@ export interface ResearchView {
   total: number;
   /** 0..1, the thin bar under the header. */
   progress: number;
+  /** Splitting the question: no parts known yet; the card shows neutral placeholder lines, not a step. */
+  splitting: boolean;
   parts: PartView[];
 }
+
+/** Placeholder lines while the question is split: the usual part count, so the card grows into the parts. */
+export const SPLIT_PLACEHOLDERS = 3;
 
 /**
  * The card for a timeline. `phase`: the tier's phase while it runs; null = finished (the read-only
@@ -170,15 +187,27 @@ export function researchView(tl: Timeline, phase: ResearchPhase | null): Researc
         ? { labelKey: "", question: p.question }
         : { labelKey: "chat.research.part", labelOpts: { index: p.index + 1, count } }
       : { labelKey: searching ? "chat.research.searchLibrary" : "chat.research.searchedLibrary" };
-    return { index: p.index, status, ...label, shown: p.articles.slice(0, MAX_ARTICLES).map((k) => tl.articles[k]), more: Math.max(0, p.articles.length - MAX_ARTICLES) };
+    return {
+      index: p.index,
+      status,
+      ...label,
+      shown: p.articles.slice(0, MAX_ARTICLES).map((k) => tl.articles[k]),
+      more: Math.max(0, p.articles.length - MAX_ARTICLES),
+      reading: status === "active" && !!p.read,
+      empty: tl.multi && status === "done" && p.articles.length === 0,
+    };
   });
-  return { header: headerOf(tl, phase, total), total, progress: progressOf(tl, phase), parts };
+  const splitting = searching && !tl.multi && tl.current === -1;
+  return { header: headerOf(tl, phase, total), total, progress: progressOf(tl, phase), splitting, parts: splitting ? [] : parts };
 }
 
 function headerOf(tl: Timeline, phase: ResearchPhase | null, total: number): { key: string; opts?: Record<string, unknown> } {
   switch (phase) {
     case "searching":
-      if (tl.multi) return { key: "chat.research.headerPart", opts: { index: tl.current + 1, count: tl.parts.length } };
+      if (tl.multi) {
+        const opts = { index: tl.current + 1, count: tl.parts.length };
+        return tl.parts[tl.current]?.read ? { key: "chat.research.headerReadingPart", opts } : { key: "chat.research.headerPart", opts };
+      }
       return tl.current === -1 ? { key: "chat.research.headerSplitting" } : { key: "chat.research.headerSearching" };
     case "loading_model":
       return { key: "chat.stage.loadingModel" };
@@ -195,11 +224,24 @@ function headerOf(tl: Timeline, phase: ResearchPhase | null, total: number): { k
   }
 }
 
-/** The bar: per part while splitting and searching ((i + ½) / n), one half for the single search, full after. */
+/**
+ * The bar: per part, a third in while it searches and two thirds while its sub-answer is written
+ * ((i + ⅓) / n, (i + ⅔) / n); one half for the single search; full after.
+ */
 export function progressOf(tl: Timeline, phase: ResearchPhase | null): number {
   if (phase !== "searching") return 1;
   if (!tl.multi) return tl.current === -1 ? 0 : 0.5;
-  return (tl.current + 0.5) / tl.parts.length;
+  return (tl.current + (tl.parts[tl.current]?.read ? 2 : 1) / 3) / tl.parts.length;
+}
+
+/**
+ * The step the name's pill shows, when the timeline knows better than the stage: a Deep Research part
+ * past its search is read, not searched (the stage stays `retrieving` for the whole part). Null: the
+ * pill keeps the stage's own step (generatingSteps).
+ */
+export function timelinePillStep(tl: Timeline | null, phase: ResearchPhase | null): "chat.stepShort.read" | null {
+  if (!tl || phase !== "searching" || !tl.multi) return null;
+  return tl.parts[tl.current]?.read ? "chat.stepShort.read" : null;
 }
 
 /** The collapsed summary: "3 parts · 4 articles" (single: "4 articles"); null when there is nothing to open. */

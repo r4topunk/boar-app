@@ -807,6 +807,7 @@
       "headerSearching": "Pesquisando no acervo…",
       "headerSplitting": "Dividindo a pergunta…",
       "headerPart": "Pesquisando parte {{index}} de {{count}}",
+      "headerReadingPart": "Lendo a parte {{index}} de {{count}}…",
       "headerReading_one": "Lendo {{count}} artigo…",
       "headerReading_other": "Lendo {{count}} artigos…",
       "headerDone": "Pesquisa",
@@ -820,6 +821,7 @@
       "more_one": "+{{count}} outro",
       "more_other": "+{{count}} outros",
       "none": "Nenhum artigo sobre isso",
+      "noneNew": "Nenhum artigo novo",
       "summarySpoken": "Pesquisa: {{summary}}",
       "summaryHint": "Mostra as partes e os artigos encontrados"
     },
