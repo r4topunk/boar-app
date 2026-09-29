@@ -114,7 +114,12 @@ export async function startListening(onEvent?: (event: VoiceEvent) => void): Pro
       })
     );
 
-    native.startListening(support.requireOnDevice).catch(() => finish(null));
+    // A start that fails (permission denied, no recognizer) is reported like any recognizer error,
+    // so the UI can say why instead of going quiet.
+    native.startListening(support.requireOnDevice).catch((e: { code?: string; message?: string }) => {
+      if (!resolved) onEvent?.({ type: "error", code: String(e?.code ?? "E_START_FAILED"), message: String(e?.message ?? "") });
+      finish(null);
+    });
   });
 }
 
