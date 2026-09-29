@@ -780,7 +780,14 @@
       "placeholderLoading": "Type while the model loads",
       "placeholderIndexing": "Type while the library is indexed",
       "indexing": "Sending starts once the offline library is indexed",
-      "focusHint": "Type a question first"
+      "focusHint": "Type a question first",
+      "mode": {
+        "quickModel": "Quick answer",
+        "quickComplete": "Quick + full",
+        "directComplete": "Full answer",
+        "directModel": "Direct answer"
+      },
+      "modeHint": "Choose how answers are written"
     },
     "stage": {
       "searching": "Searching sources…",
@@ -988,7 +995,18 @@
       "unavailable": "Voice input is not available on this device.",
       "caveatTitle": "About voice input",
       "caveatBody": "Voice uses the system speech recognizer, which may send audio to its provider and may not work offline.",
-      "caveatOk": "Got it"
+      "caveatOk": "Got it",
+      "listening": "Listening",
+      "transcribing": "Transcribing…",
+      "speakNow": "Speak now…",
+      "stopHint": "Keeps what was heard",
+      "cancel": "Cancel",
+      "cancelHint": "Discards what was heard",
+      "error": {
+        "permission": "Allow the microphone in the phone’s settings to use voice.",
+        "noSpeech": "Didn’t hear anything. Tap the mic and try again.",
+        "other": "Voice input stopped. Try again."
+      }
     },
     "places": {
       "cuisine": {
