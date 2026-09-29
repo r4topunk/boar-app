@@ -31,8 +31,10 @@ vi.mock("../inference/LlamaEngine", () => ({
 
 const OFF = chunk("off", "Dean Lee", "Dean Lee is an American nuclear theorist who works on quantum computing algorithms.");
 let withOffTopic = false;
+/** When set, every sub-question retrieves these (a sub-question that adds no new source). */
+let sameForAll: RetrievedChunk[] | null = null;
 vi.mock("../rag/retrieve", () => ({
-  retrieve: async (q: string) => [...(q.includes("French") ? [FR, EU] : [EU, IR]), ...(withOffTopic ? [OFF] : [])],
+  retrieve: async (q: string) => sameForAll ?? [...(q.includes("French") ? [FR, EU] : [EU, IR]), ...(withOffTopic ? [OFF] : [])],
 }));
 
 import { runDeepResearch } from "./orchestrator";
@@ -41,6 +43,7 @@ beforeEach(() => {
   calls.length = 0;
   hasTemplate = true;
   withOffTopic = false;
+  sameForAll = null;
 });
 
 const text = (c: (typeof calls)[number]) => c.messages?.map((m) => m.content).join("\n") ?? c.prompt ?? "";
@@ -98,5 +101,79 @@ describe("runDeepResearch citations", () => {
     let n = 0;
     const r = await runDeepResearch("q", undefined, undefined, 256, undefined, undefined, () => ++n > 1);
     expect(r.answer).toBe("");
+  });
+});
+
+describe("runDeepResearch partial sources (retrieval progress)", () => {
+  const Q = "Compare the causes of both revolutions";
+  const ids = (s: RetrievedChunk[]) => s.map((c) => c.chunkId);
+
+  it("sends each sub-question's sources before its sub-answer is generated, as growing prefixes of the final list", async () => {
+    const log: string[] = [];
+    const partials: RetrievedChunk[][] = [];
+    let final: RetrievedChunk[] = [];
+    const r = await runDeepResearch(
+      Q,
+      undefined,
+      undefined,
+      256,
+      (p) => log.push(p.stage === "researching" ? `researching:${p.subQuestionIndex}:${p.subQuestion}` : p.stage),
+      undefined,
+      undefined,
+      {
+        onPartialSources: (s, p) => {
+          partials.push(s);
+          // Generations so far: the decomposition, then one sub-answer per earlier sub-question.
+          log.push(`partial:${p.subQuestionIndex}/${p.subQuestionCount}:${ids(s).join(",")}:gen${calls.length}`);
+        },
+        onSources: (s) => {
+          final = s;
+          log.push(`final:${ids(s).join(",")}:gen${calls.length}`);
+        },
+      }
+    );
+    const f = ids(r.citations).join(",");
+    expect(log).toEqual([
+      "decomposing",
+      "researching:0:What caused the French Revolution?",
+      `partial:0/2:${ids(partials[0]).join(",")}:gen1`,
+      "researching:1:What caused the Industrial Revolution?",
+      `partial:1/2:${f}:gen2`,
+      `final:${f}:gen3`,
+      "synthesizing",
+    ]);
+    // Numbers never move: every partial list is a prefix of the next and of the final one.
+    expect(partials[0].length).toBeGreaterThan(0);
+    for (let i = 0; i < partials.length; i++) {
+      const next = i + 1 < partials.length ? partials[i + 1] : r.citations;
+      expect(ids(next).slice(0, partials[i].length)).toEqual(ids(partials[i]));
+    }
+    expect(partials[partials.length - 1]).toEqual(r.citations);
+    expect(final).toEqual(r.citations);
+  });
+
+  it("does not change the sources, their numbers or the prompts", async () => {
+    const without = await runDeepResearch(Q, undefined, undefined, 256);
+    const promptsWithout = calls.map(text);
+    calls.length = 0;
+    const withPartial = await runDeepResearch(Q, undefined, undefined, 256, undefined, undefined, undefined, { onPartialSources: () => {} });
+    expect(withPartial.citations).toEqual(without.citations);
+    expect(withPartial.answer).toBe(without.answer);
+    expect(calls.map(text)).toEqual(promptsWithout);
+  });
+
+  it("sends nothing for a sub-question that found no new source", async () => {
+    sameForAll = [EU];
+    const partials: RetrievedChunk[][] = [];
+    const r = await runDeepResearch(Q, undefined, undefined, 256, undefined, undefined, undefined, { onPartialSources: (s) => partials.push(s) });
+    expect(partials.map(ids)).toEqual([["eu"]]);
+    expect(ids(r.citations)).toEqual(["eu"]);
+  });
+
+  it("an off-topic source is never in a partial list either", async () => {
+    withOffTopic = true;
+    const partials: RetrievedChunk[][] = [];
+    await runDeepResearch(Q, undefined, undefined, 256, undefined, undefined, undefined, { onPartialSources: (s) => partials.push(s) });
+    expect(partials.flat().map((c) => c.title)).not.toContain("Dean Lee");
   });
 });
