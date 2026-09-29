@@ -804,12 +804,24 @@
       "waitingLibrary": "Preparing this phone’s library; your answer starts when it’s ready"
     },
     "research": {
+      "headerSearching": "Searching the library…",
+      "headerSplitting": "Splitting the question…",
+      "headerPart": "Researching part {{index}} of {{count}}",
+      "headerReading_one": "Reading {{count}} article…",
+      "headerReading_other": "Reading {{count}} articles…",
+      "headerDone": "Research",
+      "part": "Part {{index}} of {{count}}",
+      "searchLibrary": "Searching this phone’s library",
+      "searchedLibrary": "Searched this phone’s library",
+      "articles_one": "{{count}} article",
+      "articles_other": "{{count}} articles",
+      "parts_one": "{{count}} part",
+      "parts_other": "{{count}} parts",
       "more_one": "+{{count}} more",
       "more_other": "+{{count}} more",
       "none": "No article on this",
-      "spoken": "Sources: {{names}}",
-      "spokenMore_one": "Sources: {{names}} and {{count}} more",
-      "spokenMore_other": "Sources: {{names}} and {{count}} more"
+      "summarySpoken": "Research: {{summary}}",
+      "summaryHint": "Shows the parts and the articles found"
     },
     "announce": {
       "searching": "Searching sources",

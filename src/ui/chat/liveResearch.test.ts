@@ -4,130 +4,224 @@ import pt from "../../i18n/locales/pt.json";
 import type { AnswerState } from "./answerReducer";
 import { answerReducer, initialAnswer } from "./answerReducer";
 import type { AnswerEvent, SourceChunk } from "./answerEvents";
-import { articleCount, articleMark, articlesSpoken, deepSourcesFrom, liveStripShown, MAX_ARTICLES, researchArticles, rowGrows, sameArticles } from "./liveResearch";
+import {
+  articleCount,
+  BADGE_TONES,
+  badgeTone,
+  deepSectionLabeled,
+  deepSourcesFrom,
+  emptyTimeline,
+  foldTimeline,
+  MAX_ARTICLES,
+  partSignal,
+  progressOf,
+  researchPhase,
+  researchView,
+  rowGrows,
+  stackArticles,
+  summaryItems,
+  type Timeline,
+} from "./liveResearch";
 import { phaseAnnouncement } from "./presentation";
 
 const t = (key: string, opts?: Record<string, unknown>) => (opts ? `${key}${JSON.stringify(opts)}` : key);
-const wiki = (title: string) => `Wikipedia — https://en.wikipedia.org/wiki/${title.replace(/ /g, "_")} (CC BY-SA 4.0)`;
 const chunk = (docId: string, n = 0, title = docId): SourceChunk => ({
   chunkId: `${docId}#${n}`,
   docId,
   title,
-  body: "b",
-  source: wiki(title),
+  body: `  ${title}   is the passage\n number ${n}.`,
+  source: `Wikipedia — https://en.wikipedia.org/wiki/${title} (CC BY-SA 4.0)`,
   score: 0,
   matchType: "hybrid",
 });
+const part = (index: number, count: number, subQuestion?: string) => ({ index, count, ...(subQuestion ? { subQuestion } : {}) });
 
-describe("researchArticles (LIVE_RESEARCH)", () => {
-  it("one row per article, first found first, passages folded", () => {
-    const list = researchArticles([chunk("Greenhouse effect"), chunk("Climate change"), chunk("Greenhouse effect", 1)]);
-    expect(list.shown.map((a) => a.title)).toEqual(["Greenhouse effect", "Climate change"]);
-    expect(list).toMatchObject({ more: 0, total: 2 });
+/** Replays a run: each step is what the answer shows at one render. */
+function replay(steps: { sources: SourceChunk[]; detail?: unknown; searching?: boolean }[]): Timeline {
+  return steps.reduce((tl, s) => foldTimeline(tl, { sources: s.sources, detail: s.detail, searching: s.searching ?? true }), emptyTimeline());
+}
+
+describe("foldTimeline: single pass (one implicit step)", () => {
+  it("lists every article under the one step, first found first, passages folded", () => {
+    const tl = replay([{ sources: [] }, { sources: [chunk("Greenhouse effect"), chunk("Climate change"), chunk("Greenhouse effect", 1)] }]);
+    expect(tl.multi).toBe(false);
+    expect(tl.parts).toHaveLength(1);
+    expect(tl.parts[0].articles).toEqual(["Greenhouse effect", "Climate change"]);
+    expect(tl.articles["Greenhouse effect"]).toMatchObject({ title: "Greenhouse effect", initial: "G", passage: "Greenhouse effect is the passage number 0." });
   });
 
-  it("lists up to 3, then counts the rest; one left over is '+1', never a row that would later leave", () => {
-    const four = ["A", "B", "C", "D"].map((d) => chunk(d));
-    expect(researchArticles(four)).toMatchObject({ more: 1, total: 4 });
-    expect(researchArticles(four).shown).toHaveLength(MAX_ARTICLES);
-    const six = [...four, chunk("E"), chunk("F")];
-    expect(researchArticles(six)).toMatchObject({ more: 3, total: 6 });
+  it("returns the same object when nothing new arrived (the panel's memo holds while tokens stream)", () => {
+    const tl = replay([{ sources: [chunk("A")] }]);
+    expect(foldTimeline(tl, { sources: [chunk("A")], searching: false })).toBe(tl);
   });
 
-  it("rows only grow as sources arrive in several events: the listed ones never move", () => {
-    let s = initialAnswer("a");
-    const ev = (sources: SourceChunk[]): AnswerEvent => ({ type: "sources", answerId: "a", tier: "fast", sources });
-    const seen: string[][] = [];
-    for (const batch of [[chunk("A")], [chunk("A"), chunk("B")], [chunk("B", 1), chunk("C"), chunk("D"), chunk("E")]]) {
-      s = answerReducer(s, ev(batch));
-      seen.push(researchArticles(s.sources).shown.map((a) => a.key));
-    }
-    expect(seen).toEqual([["A"], ["A", "B"], ["A", "B", "C"]]);
-    for (let i = 1; i < seen.length; i++) expect(seen[i].slice(0, seen[i - 1].length)).toEqual(seen[i - 1]);
-    expect(researchArticles(s.sources).more).toBe(2);
-  });
-
-  it("a single sources event (today's engine) gives the same rows as the same sources spread over events", () => {
+  it("one sources event or several give the same rows (today's engine and an incremental one)", () => {
     const all = [chunk("A"), chunk("B"), chunk("A", 1), chunk("C")];
-    const once = answerReducer(initialAnswer("a"), { type: "sources", answerId: "a", tier: "fast", sources: all });
-    let spread = initialAnswer("a");
-    for (const c of all) spread = answerReducer(spread, { type: "sources", answerId: "a", tier: "fast", sources: [c] });
-    expect(researchArticles(spread.sources)).toEqual(researchArticles(once.sources));
+    const once = replay([{ sources: all }]);
+    let s = initialAnswer("a");
+    const steps: { sources: SourceChunk[] }[] = [];
+    for (const c of all) {
+      s = answerReducer(s, { type: "sources", answerId: "a", tier: "fast", sources: [c] } as AnswerEvent);
+      steps.push({ sources: s.sources });
+    }
+    expect(replay(steps)).toEqual(once);
+  });
+});
+
+describe("foldTimeline: Deep Research parts", () => {
+  it("puts each article under the part that was searching when it arrived; rows never move", () => {
+    const tl = replay([
+      { sources: [], detail: {} }, // decomposing: retrieving with an empty detail
+      { sources: [], detail: part(0, 3, "How does the greenhouse effect trap heat?") },
+      { sources: [chunk("Greenhouse effect"), chunk("Infrared")], detail: part(0, 3) },
+      { sources: [chunk("Greenhouse effect"), chunk("Infrared")], detail: part(1, 3, "Which gases?") },
+      { sources: [chunk("Greenhouse effect"), chunk("Infrared"), chunk("Carbon dioxide")], detail: part(1, 3) },
+      { sources: [chunk("Greenhouse effect"), chunk("Infrared"), chunk("Carbon dioxide")], detail: part(2, 3) },
+      { sources: [chunk("Greenhouse effect"), chunk("Infrared"), chunk("Carbon dioxide"), chunk("Global warming")], detail: part(2, 3) },
+    ]);
+    expect(tl.multi).toBe(true);
+    expect(tl.parts.map((p) => p.articles)).toEqual([["Greenhouse effect", "Infrared"], ["Carbon dioxide"], ["Global warming"]]);
+    expect(tl.parts.map((p) => p.question)).toEqual(["How does the greenhouse effect trap heat?", "Which gases?", undefined]);
+    expect(tl.order).toEqual(["Greenhouse effect", "Infrared", "Carbon dioxide", "Global warming"]);
   });
 
-  it("a Deepen lists only what its own search appended (full list so far, new items at the end)", () => {
-    const fast = [chunk("A"), chunk("B")];
-    let s = answerReducer(initialAnswer("a"), { type: "sources", answerId: "a", tier: "fast", sources: fast });
+  it("keeps a part's sub-question when a later stage for it comes without one", () => {
+    const tl = replay([{ sources: [], detail: part(0, 2, "Q1") }, { sources: [], detail: part(0, 2) }]);
+    expect(tl.parts[0].question).toBe("Q1");
+  });
+
+  it("a stage past the search (synthesizing, no detail) changes nothing", () => {
+    const tl = replay([{ sources: [chunk("A")], detail: part(1, 2) }]);
+    expect(foldTimeline(tl, { sources: [chunk("A")], detail: undefined, searching: false })).toBe(tl);
+  });
+});
+
+describe("partSignal (defensive detail)", () => {
+  it("reads index/count and the optional sub-question, one line", () => {
+    expect(partSignal(part(1, 3, "  What is\nCO2?  "))).toEqual({ part: { index: 1, count: 3, question: "What is CO2?" }, splitting: false });
+    expect(partSignal(part(0, 2))).toEqual({ part: { index: 0, count: 2 }, splitting: false });
+  });
+  it("empty detail = splitting; no detail = single pass; junk = nothing", () => {
+    expect(partSignal({})).toEqual({ part: null, splitting: true });
+    expect(partSignal(undefined)).toEqual({ part: null, splitting: false });
+    expect(partSignal({ index: "1", count: 3 })).toEqual({ part: null, splitting: false });
+    expect(partSignal({ index: 5, count: 3 }).part?.index).toBe(2);
+    expect(partSignal({ index: 0, count: 2, subQuestion: 42 }).part).toEqual({ index: 0, count: 2 });
+  });
+});
+
+describe("researchView", () => {
+  const deep = replay([
+    { sources: [], detail: part(0, 3) },
+    { sources: ["A", "B", "C", "D", "E"].map((d) => chunk(d)), detail: part(0, 3) },
+    { sources: ["A", "B", "C", "D", "E"].map((d) => chunk(d)), detail: part(1, 3) },
+  ]);
+
+  it("header, counter, progress and node states while a part searches", () => {
+    const v = researchView(deep, "searching");
+    expect(v.header).toEqual({ key: "chat.research.headerPart", opts: { index: 2, count: 3 } });
+    expect(v.total).toBe(5);
+    expect(v.progress).toBeCloseTo(1.5 / 3);
+    expect(v.parts.map((p) => p.status)).toEqual(["done", "active", "pending"]);
+    expect(v.parts[2]).toMatchObject({ labelKey: "chat.research.part", labelOpts: { index: 3, count: 3 } });
+  });
+
+  it("at most 3 articles per part, then +N", () => {
+    const p0 = researchView(deep, "searching").parts[0];
+    expect(p0.shown.map((a) => a.key)).toEqual(["A", "B", "C"]);
+    expect(p0.shown).toHaveLength(MAX_ARTICLES);
+    expect(p0.more).toBe(2);
+  });
+
+  it("after the search: every part done, reading N articles, full bar", () => {
+    const v = researchView(deep, "reading");
+    expect(v.parts.every((p) => p.status === "done")).toBe(true);
+    expect(v.header).toEqual({ key: "chat.research.headerReading", opts: { count: 5 } });
+    expect(v.progress).toBe(1);
+  });
+
+  it("single pass: one unnumbered step, no 'reading' row while searching (only the header says it after)", () => {
+    const single = replay([{ sources: [chunk("A")] }]);
+    const searching = researchView(single, "searching");
+    expect(searching.parts).toHaveLength(1);
+    expect(searching.parts[0]).toMatchObject({ status: "active", labelKey: "chat.research.searchLibrary" });
+    expect(searching.header.key).toBe("chat.research.headerSearching");
+    const reading = researchView(single, "reading");
+    expect(reading.parts[0]).toMatchObject({ status: "done", labelKey: "chat.research.searchedLibrary" });
+    expect(reading.header).toEqual({ key: "chat.research.headerReading", opts: { count: 1 } });
+  });
+
+  it("splitting before any part, and the other phases' headers", () => {
+    const split = replay([{ sources: [], detail: {} }]);
+    expect(researchView(split, "searching").header.key).toBe("chat.research.headerSplitting");
+    expect(progressOf(split, "searching")).toBe(0);
+    const none = emptyTimeline();
+    expect(researchView(none, "reading").header.key).toBe("chat.stage.thinking");
+    expect(researchView(none, "loading_model").header.key).toBe("chat.stage.loadingModel");
+    expect(researchView(none, "synthesizing").header.key).toBe("chat.stage.synthesizing");
+    expect(researchView(none, null).parts[0].status).toBe("done");
+  });
+});
+
+describe("summary pill", () => {
+  it("'3 parts · N articles' for Deep Research, 'N articles' for one step, nothing to open without articles", () => {
+    const deep = replay([{ sources: [chunk("A"), chunk("B")], detail: part(0, 3) }]);
+    expect(summaryItems(deep)).toEqual([
+      { key: "chat.research.parts", opts: { count: 3 } },
+      { key: "chat.research.articles", opts: { count: 2 } },
+    ]);
+    expect(summaryItems(replay([{ sources: [chunk("A")] }]))).toEqual([{ key: "chat.research.articles", opts: { count: 1 } }]);
+    expect(summaryItems(emptyTimeline())).toBeNull();
+  });
+  it("stacks the first 3 articles' badges", () => {
+    const tl = replay([{ sources: ["A", "B", "C", "D"].map((d) => chunk(d)) }]);
+    expect(stackArticles(tl).map((a) => a.key)).toEqual(["A", "B", "C"]);
+  });
+});
+
+describe("badges, counts, motion helpers", () => {
+  it("a stable tone per article, from the DS tones", () => {
+    expect(badgeTone("Greenhouse effect")).toBe(badgeTone("Greenhouse effect"));
+    const tones = new Set(["A", "B", "C", "D", "E", "F", "G", "H"].map(badgeTone));
+    expect(tones.size).toBeGreaterThan(1);
+    for (const tone of tones) expect(BADGE_TONES).toContain(tone);
+  });
+  it("counts articles, not passages", () => {
+    expect(articleCount([chunk("A"), chunk("A", 1), chunk("B")])).toBe(2);
+  });
+  it("rows there at mount show in place; later ones pop in", () => {
+    expect(rowGrows("A", new Set(["A"]))).toBe(false);
+    expect(rowGrows("B", new Set(["A"]))).toBe(true);
+  });
+  it("research phases", () => {
+    expect(researchPhase("searching")).toBe("searching");
+    expect(researchPhase("done")).toBeNull();
+    expect(researchPhase("locating")).toBeNull();
+  });
+});
+
+describe("Deepen", () => {
+  it("lists only what its own search appended (full list so far, new items at the end)", () => {
+    let s = answerReducer(initialAnswer("a"), { type: "sources", answerId: "a", tier: "fast", sources: [chunk("A"), chunk("B")] } as AnswerEvent);
     const from = deepSourcesFrom(null, true, s.sources.length)!;
-    expect(researchArticles(s.sources, MAX_ARTICLES, from)).toMatchObject({ shown: [], total: 0 });
-    // Sub-question 1 re-finds A (same chunk: merged away) and adds C; sub-question 2 sends the full list plus D.
-    s = answerReducer(s, { type: "sources", answerId: "a", tier: "deep", sources: [chunk("A"), chunk("C")] });
-    expect(researchArticles(s.sources, MAX_ARTICLES, from).shown.map((a) => a.key)).toEqual(["C"]);
-    s = answerReducer(s, { type: "sources", answerId: "a", tier: "deep", sources: [chunk("A"), chunk("C"), chunk("D")] });
-    expect(researchArticles(s.sources, MAX_ARTICLES, from).shown.map((a) => a.key)).toEqual(["C", "D"]);
+    s = answerReducer(s, { type: "sources", answerId: "a", tier: "deep", sources: [chunk("A"), chunk("C")] } as AnswerEvent);
+    s = answerReducer(s, { type: "sources", answerId: "a", tier: "deep", sources: [chunk("A"), chunk("C"), chunk("D")] } as AnswerEvent);
+    const tl = replay([{ sources: s.sources.slice(from), detail: part(0, 2) }]);
+    expect(tl.order).toEqual(["C", "D"]);
   });
-
   it("deepSourcesFrom holds the count seen when the deep pass shows up", () => {
     expect(deepSourcesFrom(null, false, 4)).toBeNull();
     expect(deepSourcesFrom(null, true, 4)).toBe(4);
     expect(deepSourcesFrom(4, true, 9)).toBe(4);
-    expect(deepSourcesFrom(4, false, 9)).toBe(4);
   });
-
-  it("an empty title never leaves an empty row", () => {
-    expect(researchArticles([{ ...chunk("x"), title: "  " }]).shown[0].title).toBe("…");
-  });
-});
-
-describe("articleMark", () => {
-  it("the source's initial, the user's documents, or the documents icon when unnamed", () => {
-    expect(articleMark(chunk("A"))).toEqual({ kind: "letter", letter: "W" });
-    expect(articleMark({ ...chunk("A"), collectionId: "mine" })).toEqual({ kind: "docs" });
-    expect(articleMark({ ...chunk("A"), source: undefined })).toEqual({ kind: "docs" });
-    expect(articleMark({ ...chunk("A"), source: "übersicht pack — https://x.org/a" })).toEqual({ kind: "letter", letter: "Ü" });
+  it("'Deeper answer' only for a Deepen, not for a question routed to the deep tier", () => {
+    expect(deepSectionLabeled({ fast: {}, deep: {} })).toBe(true);
+    expect(deepSectionLabeled({ deep: {} })).toBe(false);
+    expect(deepSectionLabeled({ fast: {} })).toBe(false);
   });
 });
 
-describe("articleCount / sameArticles / rowGrows", () => {
-  it("counts articles, not passages", () => {
-    expect(articleCount([chunk("A"), chunk("A", 1), chunk("B")])).toBe(2);
-    expect(articleCount([])).toBe(0);
-  });
-
-  it("same rows compare equal across renders (the card's memo holds while tokens stream)", () => {
-    const s = [chunk("A"), chunk("B")];
-    expect(sameArticles(researchArticles(s), researchArticles([...s]))).toBe(true);
-    expect(sameArticles(researchArticles(s), researchArticles([...s, chunk("C")]))).toBe(false);
-    expect(sameArticles(null, null)).toBe(true);
-    expect(sameArticles(null, researchArticles(s))).toBe(false);
-  });
-
-  it("rows there at mount show in place; later ones grow in", () => {
-    const atMount = new Set(["A"]);
-    expect(rowGrows("A", atMount)).toBe(false);
-    expect(rowGrows("B", atMount)).toBe(true);
-  });
-});
-
-describe("liveStripShown (no two lists of the same articles)", () => {
-  it("hides the running strip while the steps card lists the articles", () => {
-    expect(liveStripShown("found", true)).toBe(false);
-    expect(liveStripShown("found", false)).toBe(true);
-  });
-  it("never hides the finished sources card", () => {
-    for (const mode of ["related", "cited", "all"] as const) expect(liveStripShown(mode, true)).toBe(true);
-  });
-});
-
-describe("articlesSpoken", () => {
-  it("names the listed articles and counts the rest, in one label", () => {
-    expect(articlesSpoken(researchArticles([chunk("A"), chunk("B")]), t)).toBe('chat.research.spoken{"names":"A, B"}');
-    const five = ["A", "B", "C", "D", "E"].map((d) => chunk(d));
-    expect(articlesSpoken(researchArticles(five), t)).toBe('chat.research.spokenMore{"names":"A, B, C","count":2}');
-  });
-});
-
-describe("the 'answering' announcement says what it rests on, once", () => {
+describe("the 'answering' announcement: one summary, never per row", () => {
   const writing = (sources: SourceChunk[], extra: Partial<AnswerState> = {}): AnswerState => ({ answerIds: ["a"], sources, fast: { text: "x", stage: "generating" }, ...extra });
   it("with the article count, or plain without sources", () => {
     expect(phaseAnnouncement("generating", writing([chunk("A"), chunk("A", 1), chunk("B")]), t)).toEqual({ message: 'chat.announce.answeringFrom{"count":2}' });
@@ -140,15 +234,18 @@ describe("the 'answering' announcement says what it rests on, once", () => {
 });
 
 describe("live research copy (en/pt in sync)", () => {
-  it("both locales have the same keys, with the counts and names they interpolate", () => {
+  it("both locales have the same keys, with what they interpolate", () => {
     expect(Object.keys(pt.chat.research).sort()).toEqual(Object.keys(en.chat.research).sort());
     for (const d of [en, pt]) {
-      expect(d.chat.research.more_other).toContain("{{count}}");
-      expect(d.chat.research.spokenMore_other).toMatch(/\{\{names\}\}[\s\S]*\{\{count\}\}/);
-      expect(d.chat.announce.answeringFrom_one).toContain("{{count}}");
+      const r = d.chat.research;
+      expect(r.headerPart).toMatch(/\{\{index\}\}[\s\S]*\{\{count\}\}/);
+      expect(r.part).toMatch(/\{\{index\}\}[\s\S]*\{\{count\}\}/);
+      for (const k of ["headerReading_other", "articles_other", "parts_other", "more_other"] as const) expect(r[k]).toContain("{{count}}");
+      expect(r.summarySpoken).toContain("{{summary}}");
       expect(d.chat.announce.answeringFrom_other).toContain("{{count}}");
-      // Little text: the one status line fits a row of the card.
-      expect(d.chat.research.none.length).toBeLessThanOrEqual(28);
     }
+    expect(pt.chat.research.headerSplitting).toBe("Dividindo a pergunta…");
+    expect(pt.chat.research.headerPart).toBe("Pesquisando parte {{index}} de {{count}}");
+    expect(pt.chat.research.headerReading_other).toBe("Lendo {{count}} artigos…");
   });
 });

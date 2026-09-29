@@ -804,12 +804,24 @@
       "waitingLibrary": "Preparando o acervo deste celular; sua resposta começa quando ele estiver pronto"
     },
     "research": {
+      "headerSearching": "Pesquisando no acervo…",
+      "headerSplitting": "Dividindo a pergunta…",
+      "headerPart": "Pesquisando parte {{index}} de {{count}}",
+      "headerReading_one": "Lendo {{count}} artigo…",
+      "headerReading_other": "Lendo {{count}} artigos…",
+      "headerDone": "Pesquisa",
+      "part": "Parte {{index}} de {{count}}",
+      "searchLibrary": "Buscando no acervo deste celular",
+      "searchedLibrary": "Busca no acervo deste celular",
+      "articles_one": "{{count}} artigo",
+      "articles_other": "{{count}} artigos",
+      "parts_one": "{{count}} parte",
+      "parts_other": "{{count}} partes",
       "more_one": "+{{count}} outro",
       "more_other": "+{{count}} outros",
       "none": "Nenhum artigo sobre isso",
-      "spoken": "Fontes: {{names}}",
-      "spokenMore_one": "Fontes: {{names}} e mais {{count}}",
-      "spokenMore_other": "Fontes: {{names}} e mais {{count}}"
+      "summarySpoken": "Pesquisa: {{summary}}",
+      "summaryHint": "Mostra as partes e os artigos encontrados"
     },
     "announce": {
       "searching": "Buscando nas fontes",
