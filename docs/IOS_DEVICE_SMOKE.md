@@ -22,7 +22,7 @@ IOS_DEVICE=3498052E-FE1D-5F23-A4F0-F2ABB29B8221 scripts/ios-device-seed-models.s
 
 # Memory trace: relaunch attached to the console, keep it running during the test
 xcrun devicectl device process launch --console --terminate-existing \
-  --device 3498052E-FE1D-5F23-A4F0-F2ABB29B8221 team.sopa.aoair | tee smoke-mem.log
+  --device 3498052E-FE1D-5F23-A4F0-F2ABB29B8221 team.sopa.boar | tee smoke-mem.log
 ```
 
 The team id is in Xcode > Settings > Accounts on the build Mac. It stays in the environment and is never committed. The first install of a free-team build needs "trust developer" on the phone (Settings > General > VPN & Device Management).

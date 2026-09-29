@@ -14,7 +14,7 @@ xcodebuild -workspace ios/BOAR.xcworkspace -scheme BOAR -configuration Release \
   -derivedDataPath ios/build ARCHS=arm64
 xcrun simctl boot "iPhone 17 Pro" 2>/dev/null; open -a Simulator
 xcrun simctl install booted ios/build/Build/Products/Release-iphonesimulator/BOAR.app
-xcrun simctl launch booted team.sopa.aoair
+xcrun simctl launch booted team.sopa.boar
 
 # Build on a remote Mac with the newer Xcode (default host r4toMacMini), fetch the
 # .app to /Users/r4to/Script/boar/builds/ios/<sdk>/, then boot a simulator ON THAT MAC,
@@ -79,7 +79,7 @@ New JS API: `excludeFromBackup()` in `bundled-assets`.
 
 ## app.json (ios)
 
-- `bundleIdentifier`: `team.sopa.aoair` (same as the Android package).
+- `bundleIdentifier`: `team.sopa.boar`. The Android package stays `team.sopa.aoair`, the id v1.0.0 shipped with: changing it would stop v1.0.0 from updating.
 - `icon`: `assets/icon-ios.png`, the Android icon flattened on the adaptive background color (iOS icons must be opaque). Splash comes from the shared `expo-splash-screen` config.
 - Info.plist: mic + speech usage strings (voice input), `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` (copy GGUF files into the app via Finder over USB or the Files app, the iOS analog of `adb push`), `ITSAppUsesNonExemptEncryption: false`.
 - Entitlements: `com.apple.developer.kernel.increased-memory-limit` and `com.apple.developer.kernel.extended-virtual-addressing` (needed to mmap multi-GB GGUFs).

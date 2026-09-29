@@ -19,12 +19,12 @@ import os
  *   minus RSS, is the real headroom.
  *
  * getMemoryInfo also logs all three figures (at most every 5s, as the UI
- * polls it) to stderr and os_log, subsystem team.sopa.aoair, category
+ * polls it) to stderr and os_log, subsystem team.sopa.boar, category
  * memory, so a device smoke test can record memory without Instruments:
  * `xcrun devicectl device process launch --console ...` shows the lines.
  */
 public class RamMonitorModule: Module {
-  private static let log = OSLog(subsystem: "team.sopa.aoair", category: "memory")
+  private static let log = OSLog(subsystem: "team.sopa.boar", category: "memory")
   private var lastLog = Date.distantPast
 
   public func definition() -> ModuleDefinition {
