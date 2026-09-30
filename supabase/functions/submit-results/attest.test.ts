@@ -72,6 +72,8 @@ Deno.test("the signature must cover exactly the challenge and payload", async ()
     assert(!(await verifyAndroidSignature(spki, sig, message + " ")));
   }
   assert(!(await verifyAndroidSignature(spki, "AAAA", message)));
+  // Truncated DER: the length bytes promise more than there is.
+  assert(!(await verifyAndroidSignature(spki, b64encode(new Uint8Array([0x30, 0x44, 0x02, 0x20, 1, 2, 3])), message)));
 });
 
 Deno.test("the payload's platform must be the attested one", () => {

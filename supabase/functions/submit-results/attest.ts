@@ -143,13 +143,14 @@ export async function verifyAndroid(chainB64: string[], challenge: string, expec
 
 /** ECDSA signatures arrive DER-encoded; WebCrypto wants r || s. */
 function derToRaw(der: Uint8Array, size = 32): Uint8Array {
-  if (der[0] !== 0x30) throw new AttestError("bad signature");
+  if (der.length < 8 || der[0] !== 0x30) throw new AttestError("bad signature");
   let i = der[1] & 0x80 ? 2 + (der[1] & 0x7f) : 2;
   const out = new Uint8Array(size * 2);
   for (let part = 0; part < 2; part++) {
-    if (der[i] !== 0x02) throw new AttestError("bad signature");
+    if (i + 2 > der.length || der[i] !== 0x02) throw new AttestError("bad signature");
     let len = der[i + 1];
     let start = i + 2;
+    if (len === 0 || start + len > der.length) throw new AttestError("bad signature");
     i = start + len;
     while (len > size && der[start] === 0) {
       start++;
