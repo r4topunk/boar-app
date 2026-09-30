@@ -785,7 +785,14 @@
       "placeholderLoading": "Digite enquanto o modelo carrega",
       "placeholderIndexing": "Digite enquanto o acervo é indexado",
       "indexing": "O envio libera quando o acervo offline terminar de indexar",
-      "focusHint": "Digite uma pergunta primeiro"
+      "focusHint": "Digite uma pergunta primeiro",
+      "mode": {
+        "quickModel": "Resposta rápida",
+        "quickComplete": "Rápida + completa",
+        "directComplete": "Resposta completa",
+        "directModel": "Resposta direta"
+      },
+      "modeHint": "Escolha como as respostas são escritas"
     },
     "stage": {
       "searching": "Buscando nas fontes…",
@@ -993,7 +1000,18 @@
       "unavailable": "Entrada por voz indisponível neste aparelho.",
       "caveatTitle": "Sobre a entrada por voz",
       "caveatBody": "A voz usa o reconhecedor de fala do sistema, que pode enviar o áudio ao provedor e pode não funcionar offline.",
-      "caveatOk": "Entendi"
+      "caveatOk": "Entendi",
+      "listening": "Ouvindo",
+      "transcribing": "Transcrevendo…",
+      "speakNow": "Pode falar…",
+      "stopHint": "Mantém o que foi ouvido",
+      "cancel": "Cancelar",
+      "cancelHint": "Descarta o que foi ouvido",
+      "error": {
+        "permission": "Permita o microfone nos ajustes do celular para usar a voz.",
+        "noSpeech": "Não ouvi nada. Toque no microfone e tente de novo.",
+        "other": "A entrada por voz parou. Tente de novo."
+      }
     },
     "places": {
       "cuisine": {

@@ -2,6 +2,7 @@ import { requireOptionalNativeModule, EventSubscription } from "expo-modules-cor
 import * as FileSystem from "expo-file-system/legacy";
 import { APP_VARIANT, voiceInBuild } from "../config/variant";
 import { RecognitionMode, VoiceSupport, voicePolicy } from "./voicePolicy";
+import { VoiceSession, VoiceSessions } from "./voiceSession";
 
 export type VoiceEvent =
   | { type: "start" }
@@ -80,12 +81,17 @@ export async function isVoiceInputAvailable(): Promise<boolean> {
  */
 export async function startListening(onEvent?: (event: VoiceEvent) => void): Promise<string | null> {
   if (!VoiceInputNative) return null;
+  const native = VoiceInputNative;
+  // The session exists from the tap, so a cancel during the support check or the native start counts.
+  const { session, superseded } = sessions.begin();
+  if (superseded) releases.get(superseded)?.();
   const support = await getVoiceSupport();
+  if (session.ended) return null;
   if (!support.usable) {
+    sessions.end(session);
     onEvent?.({ type: "error", code: support.reason, message: `Voice input unavailable: ${support.reason}` });
     return null;
   }
-  const native = VoiceInputNative;
 
   return new Promise((resolve) => {
     const subscriptions: EventSubscription[] = [];
@@ -95,30 +101,65 @@ export async function startListening(onEvent?: (event: VoiceEvent) => void): Pro
       if (resolved) return;
       resolved = true;
       subscriptions.forEach((s) => s.remove());
+      releases.delete(session);
+      sessions.end(session);
       resolve(text);
+    };
+    // Superseded or cancelled: drop the listeners and resolve with nothing.
+    releases.set(session, () => finish(null));
+
+    // Native events carry no session: only the current, started session hears them (voiceSession.ts).
+    const deliver = (event: VoiceEvent, then?: () => void) => {
+      if (resolved || !sessions.accepts(session, event)) return;
+      onEvent?.(event);
+      then?.();
     };
 
     subscriptions.push(
-      native.addListener("onSpeechStart", () => onEvent?.({ type: "start" })),
-      native.addListener("onSpeechEnd", () => onEvent?.({ type: "end" })),
-      native.addListener("onPartialResults", (e: { text: string }) =>
-        onEvent?.({ type: "partial", text: e.text })
-      ),
-      native.addListener("onResults", (e: { text: string }) => {
-        onEvent?.({ type: "result", text: e.text });
-        finish(e.text);
-      }),
-      native.addListener("onError", (e: { code: string; message: string }) => {
-        onEvent?.({ type: "error", code: e.code, message: e.message });
-        finish(null);
-      })
+      native.addListener("onSpeechStart", () => deliver({ type: "start" })),
+      native.addListener("onSpeechEnd", () => deliver({ type: "end" })),
+      native.addListener("onPartialResults", (e: { text: string }) => deliver({ type: "partial", text: e.text })),
+      native.addListener("onResults", (e: { text: string }) => deliver({ type: "result", text: e.text }, () => finish(e.text))),
+      native.addListener("onError", (e: { code: string; message: string }) =>
+        deliver({ type: "error", code: e.code, message: e.message }, () => finish(null))
+      )
     );
 
-    native.startListening(support.requireOnDevice).catch(() => finish(null));
+    native
+      .startListening(support.requireOnDevice)
+      .then(() => {
+        // A stop or cancel asked while starting (permission prompt, engine start): send it now.
+        if (sessions.started(session)) native.stopListening().catch(() => {});
+      })
+      // A start that fails (permission denied, no recognizer) is reported like any recognizer error,
+      // so the UI can say why instead of going quiet.
+      .catch((e: { code?: string; message?: string }) => {
+        if (!resolved && !session.ended) onEvent?.({ type: "error", code: String(e?.code ?? "E_START_FAILED"), message: String(e?.message ?? "") });
+        finish(null);
+      });
   });
 }
 
+const sessions = new VoiceSessions();
+const releases = new Map<VoiceSession, () => void>();
+
+/** Stop and keep what was heard: the recognizer sends its final text. Deferred if the start is still pending. */
 export async function stopListening(): Promise<void> {
   if (!VoiceInputNative) return;
+  if (!sessions.requestStop()) return;
   await VoiceInputNative.stopListening().catch(() => {});
+}
+
+/**
+ * Stop and drop the session: startListening resolves with null at once and none of its late events are
+ * delivered. If the native start is still pending, the native session is stopped as soon as it starts.
+ */
+export async function cancelListening(): Promise<void> {
+  if (!VoiceInputNative) return;
+  const s = sessions.current;
+  if (!s) return;
+  const now = sessions.requestStop();
+  releases.get(s)?.();
+  sessions.end(s);
+  if (now) await VoiceInputNative.stopListening().catch(() => {});
 }
