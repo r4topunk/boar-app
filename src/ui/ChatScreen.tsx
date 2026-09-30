@@ -435,9 +435,11 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
     });
   }, [t, toast]);
 
-  // Development builds only: an evaluation request written over adb by scripts/eval-device.mjs.
+  // An evaluation request written into the app's private storage by a development machine:
+  // scripts/eval-device.mjs over adb (development builds only), or scripts/eval-iphone.mjs over devicectl.
+  // On iOS only devicectl can write there, and only for a developer-signed install, so no __DEV__ gate.
   useEffect(() => {
-    if (!__DEV__ || !ready || deviceEvalRequest) return;
+    if ((!__DEV__ && Platform.OS !== "ios") || !ready || deviceEvalRequest) return;
     let cancelled = false;
     const check = async () => {
       if (cancelled || activeRef.current) return;

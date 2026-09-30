@@ -7,6 +7,7 @@
 import type { CatalogModel } from "../models/manifest";
 import type { EvalConfig } from "./evalHarness.pure";
 import type { EvalQuery } from "./evalSet";
+import { EvalQuestion, parseQuestions } from "./answerEval.pure";
 
 export interface EvalRequest {
   requestId: string;
@@ -16,6 +17,17 @@ export interface EvalRequest {
   adaptive?: boolean;
   /** Restrict to these query ids or categories. All queries when absent. */
   queries?: string[];
+  /**
+   * "legacy" (default): evalHarness.ts, the older executor path, over EVAL_SET.
+   * "answer": answerEval.ts, the live answer() the chat uses (routing, places, multi-pass, the device's answer settings).
+   */
+  pipeline?: "legacy" | "answer";
+  /** Pipeline "answer" only: the questions to ask (any dataset). EVAL_SET when absent. */
+  questions?: EvalQuestion[];
+  /** Pipeline "answer" only: re-ask a declined answer with answerAnyway ("Answer anyway"). */
+  answerAnyway?: boolean;
+  /** Pipeline "answer" only: dataset label recorded on every row (e.g. "dataset-v2"). */
+  evalSetVersion?: string;
 }
 
 export type EvalRequestState = "accepted" | "running" | "done" | "failed";
@@ -53,11 +65,24 @@ export function parseEvalRequest(json: string): EvalRequest {
     throw new Error("requestId must be 1-64 lowercase letters, digits or dashes");
   }
   if (raw.adaptive !== undefined && typeof raw.adaptive !== "boolean") throw new Error('"adaptive" must be a boolean');
+  if (raw.pipeline !== undefined && raw.pipeline !== "legacy" && raw.pipeline !== "answer") {
+    throw new Error('"pipeline" must be "legacy" or "answer"');
+  }
+  const answerOnly = ["questions", "answerAnyway", "evalSetVersion"].filter((k) => raw[k] !== undefined);
+  if (raw.pipeline !== "answer" && answerOnly.length) throw new Error(`${answerOnly.join(", ")} need "pipeline": "answer"`);
+  if (raw.answerAnyway !== undefined && typeof raw.answerAnyway !== "boolean") throw new Error('"answerAnyway" must be a boolean');
+  if (raw.evalSetVersion !== undefined && (typeof raw.evalSetVersion !== "string" || !/^[\w.-]{1,64}$/.test(raw.evalSetVersion))) {
+    throw new Error('"evalSetVersion" must be 1-64 letters, digits, dots, dashes or underscores');
+  }
   return {
     requestId: raw.requestId,
     models: stringList(raw.models, "models"),
     adaptive: raw.adaptive,
     queries: stringList(raw.queries, "queries"),
+    pipeline: raw.pipeline,
+    questions: parseQuestions(raw.questions),
+    answerAnyway: raw.answerAnyway,
+    evalSetVersion: raw.evalSetVersion,
   };
 }
 
@@ -110,4 +135,32 @@ export function resolveEvalRequest(
     queries = evalSet.filter((q) => request.queries!.includes(q.id) || request.queries!.includes(q.category));
   }
   return { ok: true, configs, queries };
+}
+
+export type ResolvedAnswerRequest =
+  | { ok: true; models: { id: string; label: string }[]; questions: EvalQuestion[] }
+  | { ok: false; error: string };
+
+/**
+ * Pipeline "answer": no models = the model the chat would use now. Every
+ * selector must match exactly one installed model, as for the legacy path.
+ * "queries" filters the questions (from the request, or EVAL_SET) by id or category.
+ */
+export function resolveAnswerRequest(request: EvalRequest, installed: CatalogModel[], evalSet: EvalQuery[]): ResolvedAnswerRequest {
+  const models: { id: string; label: string }[] = [];
+  for (const selector of request.models ?? []) {
+    const matches = matchModels(selector, installed);
+    if (matches.length !== 1) {
+      const detail = matches.length === 0 ? "matches no installed model" : `is ambiguous (${matches.map((m) => m.id).join(", ")})`;
+      return { ok: false, error: `model "${selector}" ${detail}` };
+    }
+    if (!models.some((m) => m.id === matches[0].id)) models.push({ id: matches[0].id, label: matches[0].label });
+  }
+  let questions: EvalQuestion[] = request.questions ?? evalSet.map((q) => ({ id: q.id, query: q.query, category: q.category }));
+  if (request.queries?.length) {
+    const unknown = request.queries.filter((s) => !questions.some((q) => q.id === s || q.category === s));
+    if (unknown.length) return { ok: false, error: `unknown query id or category: ${unknown.join(", ")}` };
+    questions = questions.filter((q) => request.queries!.includes(q.id) || (q.category !== undefined && request.queries!.includes(q.category)));
+  }
+  return { ok: true, models, questions };
 }

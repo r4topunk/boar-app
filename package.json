@@ -64,6 +64,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "eval:device": "node scripts/eval-device.mjs",
+    "eval:iphone": "node scripts/eval-iphone.mjs",
     "eval:summary": "node scripts/eval-summary.mjs",
     "pack:build": "node scripts/build-knowledge-pack.mjs",
     "pack:push": "node scripts/push-knowledge-pack.mjs",

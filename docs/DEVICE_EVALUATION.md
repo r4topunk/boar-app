@@ -111,6 +111,33 @@ pull files/eval/<runId>.jsonl ◀──────────── saves the 
 print the report
 ```
 
+## iPhone: the live answer pipeline
+
+`npm run eval:iphone` runs any question file through the same `answer()` the chat
+calls (`src/eval/answerEval.ts`): routing, places, instant snippets, the
+multi-part research answer and the device's answer settings. The Android CLI
+and the Evaluation screen still replay the older `executor.ts` path over the
+17-question set, so their times are not the chat's.
+
+```bash
+npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyway \
+  --runs-file eval/results/runs/v2/qwen2.5-1.5b-instruct-q4km__iphone-<sha>.jsonl
+```
+
+- Transport is a request file copied into the app container with `devicectl`
+  (`Documents/eval/requests/pending.json`). The app picks it up in the
+  foreground and writes `<requestId>.status.json` and `eval/<runId>.answer.jsonl`.
+  No Appium or WDA: keep the phone unlocked (auto-lock off) with BOAR open.
+- On iOS the pickup works in any developer-signed build (only `devicectl` can
+  write the container), not only `__DEV__` builds.
+- One row per answer, in the eval/ judge format, plus: `stages` (every stage
+  event with ms since `answer()`), `firstSourcesMs`, `instantMs`, `firstTokenMs`,
+  `placesMs`, `places` (count, coverage), `declined`, `answeredAnyway`,
+  `citedTitles` and the receipt. With `--answer-anyway` a declined answer is
+  asked again, as if "Answer anyway" was tapped; `--runs-file` keeps the re-ask.
+- The prompt is fixed (default personality, no history, 512 tokens); the answer
+  settings in effect are recorded on every row.
+
 ## Tips
 
 - **Keep the screen on and the app open.** Locking the phone moves BOAR to the

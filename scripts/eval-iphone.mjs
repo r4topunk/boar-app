@@ -1,0 +1,208 @@
+#!/usr/bin/env node
+// Runs questions through BOAR's live answer pipeline on a USB-connected iPhone and pulls the rows back.
+// Transport only: the evaluation runs inside the app (src/eval/answerEval.ts), triggered by a request file
+// copied into the app container with devicectl (the iOS twin of scripts/eval-device.mjs). No UI automation,
+// no WDA: the phone only has to stay unlocked with BOAR in the foreground.
+//
+//   node scripts/eval-iphone.mjs --questions eval/dataset/questions.v2.jsonl [options]
+//
+//   --questions <jsonl>     one {id, query, category?} per line (required)
+//   --only <ids|categories> comma list, filters the questions
+//   --limit <n>             first n questions (after --only)
+//   --models <selectors>    comma list of installed model ids/fragments; default: the model the chat uses
+//   --answer-anyway         re-ask a declined answer with "Answer anyway"
+//   --dataset <name>        recorded on rows as dataset-<name> (default: from the file name, questions.<name>.jsonl)
+//   --out <dir>             where to save the raw rows + report (default: eval-results/iphone/<date>)
+//   --runs-file <path>      also write one row per question (the re-ask wins) in the eval/ judge format
+//   --bundle <id>           app bundle (default team.sopa.aoair)   --udid <id>   device (default: the only iPhone)
+//   --no-launch             don't (re)launch the app; it must already be in the foreground
+//   --timeout-min <n>       give up after n minutes (default 180)
+import { execFileSync, spawn } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { basename, join } from "node:path";
+import { tmpdir } from "node:os";
+
+const POLL_MS = 10_000;
+const PICKUP_TIMEOUT_MS = 5 * 60_000;
+const DEVICECTL = ["xcrun", "devicectl"];
+
+function parseArgs(argv) {
+  const o = { launch: true, answerAnyway: false, bundle: "team.sopa.aoair", timeoutMin: 180 };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    const next = () => {
+      if (i + 1 >= argv.length) throw new Error(`${a} needs a value`);
+      return argv[++i];
+    };
+    if (a === "--questions") o.questions = next();
+    else if (a === "--only") o.only = next().split(",").map((s) => s.trim()).filter(Boolean);
+    else if (a === "--limit") o.limit = Number(next());
+    else if (a === "--models") o.models = next().split(",").map((s) => s.trim()).filter(Boolean);
+    else if (a === "--answer-anyway") o.answerAnyway = true;
+    else if (a === "--dataset") o.dataset = next();
+    else if (a === "--out") o.out = next();
+    else if (a === "--runs-file") o.runsFile = next();
+    else if (a === "--bundle") o.bundle = next();
+    else if (a === "--udid") o.udid = next();
+    else if (a === "--no-launch") o.launch = false;
+    else if (a === "--timeout-min") o.timeoutMin = Number(next());
+    else if (a === "--help" || a === "-h") o.help = true;
+    else throw new Error(`unknown option ${a}`);
+  }
+  return o;
+}
+
+const fail = (msg) => {
+  console.error(`\n✗ ${msg}`);
+  process.exit(1);
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const devicectl = (args, { allowFail = false } = {}) => {
+  try {
+    return execFileSync(DEVICECTL[0], [...DEVICECTL.slice(1), ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  } catch (e) {
+    if (allowFail) return null;
+    throw new Error(`devicectl ${args.slice(0, 3).join(" ")} failed: ${(e.stderr || e.message || "").toString().trim().slice(0, 400)}`);
+  }
+};
+
+function findIphone() {
+  const tmp = join(tmpdir(), `devicectl-${process.pid}.json`);
+  devicectl(["list", "devices", "--json-output", tmp]);
+  const devices = JSON.parse(readFileSync(tmp, "utf8")).result?.devices ?? [];
+  rmSync(tmp, { force: true });
+  const phones = devices.filter(
+    (d) => d.hardwareProperties?.platform === "iOS" && d.hardwareProperties?.reality === "physical" && d.connectionProperties?.tunnelState === "connected"
+  );
+  if (phones.length !== 1) throw new Error(`expected exactly one connected physical iPhone, found ${phones.length} (pass --udid)`);
+  return phones[0].hardwareProperties.udid;
+}
+
+const copyTo = (o, src, dst) =>
+  devicectl(["device", "copy", "to", "--device", o.udid, "--domain-type", "appDataContainer", "--domain-identifier", o.bundle, "--source", src, "--destination", dst]);
+const copyFrom = (o, src, dst) =>
+  devicectl(
+    ["device", "copy", "from", "--device", o.udid, "--domain-type", "appDataContainer", "--domain-identifier", o.bundle, "--source", src, "--destination", dst],
+    { allowFail: true }
+  ) !== null && existsSync(dst);
+
+const median = (xs) => {
+  const v = xs.filter((x) => typeof x === "number").sort((a, b) => a - b);
+  return v.length ? v[Math.floor((v.length - 1) / 2)] : null;
+};
+const s1 = (ms) => (ms == null ? "-" : (ms / 1000).toFixed(1));
+
+function report(rows) {
+  const final = new Map();
+  for (const r of rows) if (!final.has(r.queryId) || r.answeredAnyway) final.set(r.queryId, r);
+  const by = new Map();
+  for (const r of final.values()) by.set(r.category, [...(by.get(r.category) ?? []), r]);
+  const lines = [
+    "| category | n | ok | declined | ttft p50 s | first source p50 s | total p50 s | tok/s p50 | tiers |",
+    "|---|---|---|---|---|---|---|---|---|",
+  ];
+  for (const [cat, v] of [...by.entries()].sort()) {
+    const tiers = {};
+    for (const r of v) tiers[r.tier] = (tiers[r.tier] ?? 0) + 1;
+    const declined = rows.filter((r) => r.category === cat && r.declined && !r.answeredAnyway).length;
+    lines.push(
+      `| ${cat} | ${v.length} | ${v.filter((r) => r.outcome === "success" && r.answer).length} | ${declined} | ${s1(median(v.map((r) => r.ttftMs)))} | ${s1(
+        median(v.map((r) => r.firstSourcesMs))
+      )} | ${s1(median(v.map((r) => r.totalLatencyMs)))} | ${median(v.map((r) => r.tokPerSec))?.toFixed(1) ?? "-"} | ${Object.entries(tiers)
+        .map(([k, n]) => `${k} ${n}`)
+        .join(", ")} |`
+    );
+  }
+  return { lines, final: [...final.values()] };
+}
+
+async function main() {
+  let o;
+  try {
+    o = parseArgs(process.argv.slice(2));
+  } catch (e) {
+    fail(e.message);
+  }
+  if (o.help || !o.questions) {
+    console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 21).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+    process.exit(o.help ? 0 : 1);
+  }
+  let questions = readFileSync(o.questions, "utf8")
+    .split("\n")
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l))
+    .map((q) => ({ id: q.id, query: q.query, category: q.category }));
+  if (o.only) questions = questions.filter((q) => o.only.includes(q.id) || o.only.includes(q.category));
+  if (o.limit) questions = questions.slice(0, o.limit);
+  if (!questions.length) fail("no questions left after --only/--limit");
+  const dataset = o.dataset ?? (basename(o.questions).match(/^questions\.(.+)\.jsonl$/)?.[1] ?? "custom");
+
+  o.udid ??= findIphone();
+  console.log(`✓ iPhone ${o.udid}, app ${o.bundle}, ${questions.length} questions (dataset ${dataset})`);
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const requestId = `req-${stamp.toLowerCase().replace(/[^a-z0-9-]/g, "")}`.slice(0, 64);
+  const out = o.out ?? join("eval-results", "iphone", stamp.slice(0, 10), requestId);
+  mkdirSync(out, { recursive: true });
+  const request = {
+    requestId,
+    pipeline: "answer",
+    questions,
+    evalSetVersion: `dataset-${dataset}`,
+    ...(o.models ? { models: o.models } : {}),
+    ...(o.answerAnyway ? { answerAnyway: true } : {}),
+  };
+  const reqFile = join(out, "request.json");
+  writeFileSync(reqFile, JSON.stringify(request));
+
+  if (o.launch) {
+    // Fresh process in the foreground; the console (llama.cpp + [javascript] logs) goes to console.log.
+    const log = join(out, "console.log");
+    const child = spawn(
+      DEVICECTL[0],
+      [...DEVICECTL.slice(1), "device", "process", "launch", "--device", o.udid, "--terminate-existing", "--console", "-e", '{"GGML_METAL_DEVICES":"0","OS_ACTIVITY_DT_MODE":"YES"}', o.bundle],
+      { stdio: ["ignore", "pipe", "pipe"], detached: true }
+    );
+    const sink = (await import("node:fs")).createWriteStream(log);
+    child.stdout.pipe(sink);
+    child.stderr.pipe(sink);
+    child.unref();
+    console.log(`✓ launched ${o.bundle} (console → ${log})`);
+    await sleep(8000);
+  }
+  copyTo(o, reqFile, "Documents/eval/requests/pending.json");
+  console.log(`✓ request ${requestId} copied; waiting for the app to pick it up (BOAR must stay in the foreground, phone unlocked)`);
+
+  const statusLocal = join(out, "status.json");
+  const t0 = Date.now();
+  let last = "";
+  let status = null;
+  while (Date.now() - t0 < o.timeoutMin * 60_000) {
+    await sleep(POLL_MS);
+    if (!copyFrom(o, `Documents/eval/requests/${requestId}.status.json`, statusLocal)) {
+      if (Date.now() - t0 > PICKUP_TIMEOUT_MS) fail("the app never picked the request up (is BOAR in the foreground and is the build new enough?)");
+      continue;
+    }
+    status = JSON.parse(readFileSync(statusLocal, "utf8"));
+    const line = `${status.state} ${status.completed ?? 0}/${status.total ?? "?"} ${status.current ?? ""}`;
+    if (line !== last) console.log(`  [${Math.round((Date.now() - t0) / 1000)}s] ${line}`);
+    last = line;
+    if (status.state === "done" || status.state === "failed") break;
+  }
+  if (!status || status.state !== "done") fail(`run did not finish: ${status ? `${status.state} ${status.error ?? ""}` : "no status"}`);
+
+  const rowsLocal = join(out, "rows.jsonl");
+  const src = status.resultPath.replace(/^files\//, "Documents/");
+  if (!copyFrom(o, src, rowsLocal)) fail(`could not copy ${src}`);
+  const rows = readFileSync(rowsLocal, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const { lines, final } = report(rows);
+  const md = [`# iPhone answer-pipeline eval ${requestId}`, "", `${rows.length} rows, ${final.length} questions, dataset ${dataset}${status.stopped ? " (STOPPED)" : ""}.`, "", ...lines, ""].join("\n");
+  writeFileSync(join(out, "report.md"), md);
+  if (o.runsFile) {
+    writeFileSync(o.runsFile, final.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    console.log(`✓ judge rows → ${o.runsFile}`);
+  }
+  console.log(`\n${md}\nRaw rows: ${rowsLocal}`);
+}
+
+main().catch((e) => fail(e.message));

@@ -11,7 +11,8 @@ import { getRoutingPreset } from "../models/settings";
 import { EVAL_SET } from "./evalSet";
 import { EVAL_RESULTS_DIR, listInstalledEvalModels, runEvaluation, RunEvaluationOptions, EvaluationRun } from "./evalHarness";
 import { evalConfigId } from "./evalHarness.pure";
-import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveEvalRequest } from "./deviceEvalRequest.pure";
+import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest } from "./deviceEvalRequest.pure";
+import { runAnswerEvaluation } from "./answerEval";
 
 export const EVAL_REQUESTS_DIR = `${EVAL_RESULTS_DIR}requests/`;
 const PENDING_PATH = `${EVAL_REQUESTS_DIR}pending.json`;
@@ -36,6 +37,8 @@ function toRunAsPath(uri: string): string {
  * being silently dropped.
  */
 export async function takePendingEvalRequest(): Promise<EvalRequest | null> {
+  // The folder exists from the first check on, so a devicectl copy into it (iOS) has a destination.
+  await FileSystem.makeDirectoryAsync(EVAL_REQUESTS_DIR, { intermediates: true }).catch(() => {});
   const info = await FileSystem.getInfoAsync(PENDING_PATH);
   if (!info.exists) return null;
   const text = await FileSystem.readAsStringAsync(PENDING_PATH);
@@ -67,6 +70,7 @@ export async function runDeviceEvalRequest(
   const { requestId } = request;
   const [installed, preset] = await Promise.all([listInstalledEvalModels(), getRoutingPreset()]);
   const installedModels = installed.map((m) => m.id);
+  if (request.pipeline === "answer") return runAnswerRequest(request, installed, installedModels, callbacks);
   const resolved = resolveEvalRequest(request, installed, EVAL_SET, adaptiveLabel(preset));
   if (!resolved.ok) {
     await writeStatus({ requestId, state: "failed", error: resolved.error, installedModels });
@@ -108,6 +112,67 @@ export async function runDeviceEvalRequest(
       configs,
       total,
       completed: run.rows.length,
+      runId: run.runId,
+      resultPath: toRunAsPath(run.savedPath),
+      stopped: run.stopped,
+      installedModels,
+    });
+    return run;
+  } catch (e: any) {
+    await queueStatus({ requestId, state: "failed", configs, total, completed, error: e?.message ?? String(e), installedModels });
+    throw e;
+  }
+}
+
+/** Pipeline "answer": the live answer() over the request's questions (answerEval.ts), same status protocol. */
+async function runAnswerRequest(
+  request: EvalRequest,
+  installed: Awaited<ReturnType<typeof listInstalledEvalModels>>,
+  installedModels: string[],
+  callbacks: Pick<RunEvaluationOptions, "onProgress" | "onRow" | "shouldStop">
+): Promise<EvaluationRun | null> {
+  const { requestId } = request;
+  const resolved = resolveAnswerRequest(request, installed, EVAL_SET);
+  if (!resolved.ok) {
+    await writeStatus({ requestId, state: "failed", error: resolved.error, installedModels });
+    return null;
+  }
+  const configs = resolved.models.length ? resolved.models.map((m) => `answer:${m.id}`) : ["answer:current"];
+  const total = configs.length * resolved.questions.length;
+  let completed = 0;
+  let current: string | undefined;
+  let writes = Promise.resolve();
+  const queueStatus = (status: Omit<EvalRequestStatus, "updatedAt">) => {
+    writes = writes.then(() => writeStatus(status)).catch(() => {});
+    return writes;
+  };
+  await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels });
+  console.log(`[EVAL] device request ${requestId} (answer pipeline): ${configs.join(", ")} x ${resolved.questions.length} questions`);
+  try {
+    const run = await runAnswerEvaluation({
+      questions: resolved.questions,
+      models: resolved.models,
+      answerAnyway: request.answerAnyway,
+      evalSetVersion: request.evalSetVersion,
+      shouldStop: callbacks.shouldStop,
+      onProgress: (p) => {
+        current = `${configs[p.configIndex]} / ${p.query.id}`;
+        queueStatus({ requestId, state: "running", configs, total, completed, current, installedModels });
+        callbacks.onProgress?.(p);
+      },
+      onRow: (row) => {
+        // A declined answer plus its "Answer anyway" re-ask is one question.
+        if (!row.answeredAnyway) completed += 1;
+        queueStatus({ requestId, state: "running", configs, total, completed, current, installedModels });
+        callbacks.onRow?.(row);
+      },
+    });
+    await queueStatus({
+      requestId,
+      state: "done",
+      configs,
+      total,
+      completed,
       runId: run.runId,
       resultPath: toRunAsPath(run.savedPath),
       stopped: run.stopped,
