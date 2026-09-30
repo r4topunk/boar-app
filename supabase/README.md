@@ -61,12 +61,17 @@ set. Try it locally with `npm run scores:mirror -- --dry-run` (writes the files 
 
 ## Deletion requests
 
-A person asks by email with the sharing id the app shows (`eval_devices.id`). As the owner:
+A person asks by email with the run's id (the app shows it in the Evaluation screen's "Saved to"
+line, `eval-<date and time>`), the phone's model and roughly when they shared it. As the owner, find
+the run, then delete it and everything else from that phone:
 
 ```sql
+select id, device, received_at, device_model from eval_runs
+where run_id = '<run id>' and device_model = '<phone model>';
+
 begin;
-delete from eval_runs where device = '<id>';   -- cascades to eval_rows and eval_scores
-delete from eval_devices where id = '<id>';
+delete from eval_runs where device = '<device from above>';   -- cascades to eval_rows and eval_scores
+delete from eval_devices where id = '<device from above>';
 commit;
 ```
 
