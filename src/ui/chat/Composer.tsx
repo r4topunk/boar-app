@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LayoutChangeEvent, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useKeyboardState } from "react-native-keyboard-controller";
 import { useTranslation } from "react-i18next";
 import { Chip, IconButton, ListRow, Section, Sheet, Text, TextAction, useAnnounce } from "../components";
 import { getAnswerSettings, setAnswerSettings } from "../../models/settings";
@@ -57,10 +56,12 @@ const ComposerView = forwardRef<TextInput, Props>(function Composer(
   const insets = useSafeAreaInsets();
   // The mockup ends the composer 30 pt above the screen's bottom (into the home-indicator inset by 4);
   // the screen leaves the bottom edge to the composer. Small insets (Android gestures) keep at least sm.
-  // With the keyboard up there is no home indicator under the composer: keep the usual small gap.
-  const keyboardUp = useKeyboardState((k) => k.isVisible);
   // iOS: 4 pt into the home-indicator inset, as the mockup; Android: fully above the navigation bar (Iris AN-1).
-  const bottom = keyboardUp ? t.space.sm : footerBottom(insets.bottom, t.space.xs, t.space.sm);
+  // The same with the keyboard up: the chat's KeyboardAvoidingView takes this gap back (keyboardVerticalOffset),
+  // so the composer ends sm above the keyboard and follows it frame by frame. Switching the padding on the keyboard
+  // state jumped: the state turns visible when the keyboard starts opening but hidden only once it has closed, so
+  // the composer rode the closing keyboard down onto the home indicator or the navigation bar, then popped up.
+  const bottom = footerBottom(insets.bottom, t.space.xs, t.space.sm);
   // Model error: the composer is dimmed and not editable; the card above is where to act (E-5, Prism).
   const blocked = status === "error";
   const keys = composerNotice(status);
