@@ -13,6 +13,7 @@ import { EVAL_RESULTS_DIR, listInstalledEvalModels, runEvaluation, RunEvaluation
 import { evalConfigId } from "./evalHarness.pure";
 import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest, UNDERSTOOD_FIELDS } from "./deviceEvalRequest.pure";
 import { installForEval, runAnswerEvaluation } from "./answerEval";
+import { DEVICE_EVAL_ON } from "./deviceEvalGate";
 
 export const EVAL_REQUESTS_DIR = `${EVAL_RESULTS_DIR}requests/`;
 const PENDING_PATH = `${EVAL_REQUESTS_DIR}pending.json`;
@@ -37,6 +38,8 @@ function toRunAsPath(uri: string): string {
  * being silently dropped.
  */
 export async function takePendingEvalRequest(): Promise<EvalRequest | null> {
+  // A shipped build neither reads requests nor creates their folder (src/eval/deviceEvalGate.ts).
+  if (!DEVICE_EVAL_ON) return null;
   // The folder exists from the first check on, so a devicectl copy into it (iOS) has a destination.
   await FileSystem.makeDirectoryAsync(EVAL_REQUESTS_DIR, { intermediates: true }).catch(() => {});
   const info = await FileSystem.getInfoAsync(PENDING_PATH);

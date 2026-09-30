@@ -3,6 +3,8 @@
 // Transport only: the evaluation runs inside the app (src/eval/answerEval.ts), triggered by a request file
 // copied into the app container with devicectl (the iOS twin of scripts/eval-device.mjs). No UI automation,
 // no WDA: the phone only has to stay unlocked with BOAR in the foreground.
+// The build must answer requests: a development build, or one built with EXPO_PUBLIC_DEVICE_EVAL=1
+// (src/eval/deviceEvalGate.ts); a shipped build ignores them.
 //
 //   node scripts/eval-iphone.mjs --questions eval/dataset/questions.v2.jsonl [options]
 //
@@ -215,7 +217,7 @@ async function main() {
   while (Date.now() - t0 < o.timeoutMin * 60_000) {
     await sleep(POLL_MS);
     if (!copyFrom(o, `Documents/eval/requests/${requestId}.status.json`, statusLocal)) {
-      if (Date.now() - t0 > PICKUP_TIMEOUT_MS) fail("the app never picked the request up (is BOAR in the foreground and is the build new enough?)");
+      if (Date.now() - t0 > PICKUP_TIMEOUT_MS) fail("the app never picked the request up: is BOAR in the foreground, and was it built with EXPO_PUBLIC_DEVICE_EVAL=1 (or a development build)?");
       continue;
     }
     status = JSON.parse(readFileSync(statusLocal, "utf8"));

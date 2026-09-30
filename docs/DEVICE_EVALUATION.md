@@ -124,12 +124,20 @@ npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyw
   --runs-file eval/results/runs/v2/qwen2.5-1.5b-instruct-q4km__iphone-<sha>.jsonl
 ```
 
-- Transport is a request file copied into the app container with `devicectl`
+- **Benchmark build:** request pickup is on only in development builds and in
+  builds made with `EXPO_PUBLIC_DEVICE_EVAL=1` (`src/eval/deviceEvalGate.ts`, read
+  once at load). A shipped build never polls for requests or creates
+  `eval/requests`. For a Release iPhone build:
+  `EXPO_PUBLIC_DEVICE_EVAL=1 scripts/ios-remote-build.sh device`, which forwards the flag.
+- **Transport:** a request file copied into the app container with `devicectl`
   (`Documents/eval/requests/pending.json`). The app picks it up in the
   foreground and writes `<requestId>.status.json` and `eval/<runId>.answer.jsonl`.
   No Appium or WDA: keep the phone unlocked (auto-lock off) with BOAR open.
-- On iOS the pickup works in any developer-signed build (only `devicectl` can
-  write the container), not only `__DEV__` builds.
+- **Android:** the same request goes in over `adb shell run-as <pkg>`, which
+  needs a debuggable app, so use the development client. For timings like a
+  release build, serve production-mode JS with the flag:
+  `EXPO_PUBLIC_DEVICE_EVAL=1 npx expo start --localhost --no-dev --minify`.
+  `__DEV__` is then off and the flag keeps pickup on.
 - One row per answer, in the eval/ judge format, plus: `stages` (every stage
   event with ms since `answer()`), `firstSourcesMs`, `instantMs`, `firstTokenMs`,
   `placesMs`, `places` (count, coverage), `declined`, `answeredAnyway`,
