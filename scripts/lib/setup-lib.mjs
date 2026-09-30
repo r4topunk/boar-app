@@ -13,10 +13,15 @@ export function nodeMajor(version) {
   return m ? Number(m[1]) : null;
 }
 
-/** The APK asset and its optional .sha256 companion from a GitHub release JSON. */
+/**
+ * The APK asset and its optional .sha256 companion from a GitHub release JSON: the downloader build, i.e. an
+ * .apk whose name doesn't say "offline" (the API lists assets alphabetically, so boar-offline-… comes first),
+ * else the first .apk.
+ */
 export function pickReleaseApk(release) {
   const assets = release?.assets ?? [];
-  const apk = assets.find((a) => a.name.endsWith(".apk"));
+  const apks = assets.filter((a) => a.name.endsWith(".apk"));
+  const apk = apks.find((a) => !/offline/i.test(a.name)) ?? apks[0];
   if (!apk) return null;
   const sha = assets.find((a) => a.name === `${apk.name}.sha256`);
   return { name: apk.name, url: apk.browser_download_url, size: apk.size, shaUrl: sha?.browser_download_url ?? null, tag: release.tag_name };

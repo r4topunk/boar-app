@@ -23,6 +23,23 @@ describe("setup helpers", () => {
     expect(pickReleaseApk(null)).toBeNull();
   });
 
+  it("prefers the downloader APK over the offline one, whatever the asset order", () => {
+    // v1.1.0's assets as the GitHub API lists them (alphabetically: the offline APK first).
+    const url = (n) => `https://github.com/rferrari/boar-app/releases/download/v1.1.0/${n}`;
+    const names = ["boar-offline-v1.1.0-arm64.apk", "boar-offline-v1.1.0-arm64.apk.sha256", "boar-v1.1.0-arm64.apk", "boar-v1.1.0-arm64.apk.sha256"];
+    const release = { tag_name: "v1.1.0", assets: names.map((name) => ({ name, browser_download_url: url(name), size: 1 })) };
+    expect(pickReleaseApk(release)).toEqual({
+      name: "boar-v1.1.0-arm64.apk",
+      url: url("boar-v1.1.0-arm64.apk"),
+      size: 1,
+      shaUrl: url("boar-v1.1.0-arm64.apk.sha256"),
+      tag: "v1.1.0",
+    });
+    // Only an offline APK: still returned rather than nothing.
+    const offlineOnly = { tag_name: "v1.1.0", assets: release.assets.slice(0, 2) };
+    expect(pickReleaseApk(offlineOnly)?.name).toBe("boar-offline-v1.1.0-arm64.apk");
+  });
+
   it("parses sha256sum output", () => {
     const h = "a".repeat(64);
     expect(parseSha256File(`${h}  boar.apk\n`)).toBe(h);
