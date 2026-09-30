@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Share, TextInput, View } from "react-native";
+import { AppState, FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, Share, TextInput, View } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1091,7 +1091,8 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
               renderItem={renderItem}
               extraData={renderItem}
               contentContainerStyle={listContentStyle}
-              keyboardDismissMode="interactive"
+              // "interactive" is iOS only: on Android the list ignored it and a drag never closed the keyboard.
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
               keyboardShouldPersistTaps="handled"
               // With a conversation on screen, a model error comes in as the next message, above the composer: it
               // never covers an earlier answer or reads as that answer failing (Iris/Prism ER-1).
