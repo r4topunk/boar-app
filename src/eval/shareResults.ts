@@ -9,6 +9,7 @@ import { networkAllowed } from "../config/variant";
 import type { EvalResultRow } from "./evalHarness.pure";
 import {
   buildSubmission,
+  deviceIdentity,
   parseCpuFeatures,
   shareOutcome,
   signedMessage,
@@ -33,20 +34,17 @@ export const resultsSharingAvailable = ENDPOINT !== null && networkAllowed() && 
 export function shareDevice(): ShareDevice {
   const c = Platform.constants as { Brand?: string; Model?: string; Release?: string; osVersion?: string };
   const hw = getHardwareInfo();
-  const cores = hw?.coreMaxFreqKHz ?? [];
+  const platform = Platform.OS === "ios" ? "ios" : "android";
   return {
-    platform: Platform.OS === "ios" ? "ios" : "android",
+    platform,
     osVersion: c.Release ?? c.osVersion ?? String(Platform.Version),
     apiLevel: hw?.apiLevel,
-    brand: c.Brand,
-    model: c.Model,
+    ...deviceIdentity(platform, c, hw),
     soc: hw?.socModel,
     socManufacturer: hw?.socManufacturer,
     hardware: hw?.hardware,
     ramBytes: getDeviceTotalRamBytes(),
-    cpuCores: cores.length > 0 ? cores.length : undefined,
     cpuFeatures: hw ? parseCpuFeatures(hw.cpuFeatures) : undefined,
-    coreMaxFreqKHz: cores.length > 0 ? cores : undefined,
   };
 }
 
