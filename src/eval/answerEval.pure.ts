@@ -185,9 +185,10 @@ export function parseQuestions(value: unknown): EvalQuestion[] | undefined {
     throw new Error('"questions" must be a non-empty list of { id, query, category? }');
   }
   if (value.length > MAX_REQUEST_QUESTIONS) throw new Error(`"questions" holds at most ${MAX_REQUEST_QUESTIONS} items`);
-  const ids = new Set(value.map((q) => q.id));
-  if (ids.size !== value.length) throw new Error('"questions" ids must be unique');
-  return value.map((q) => ({ id: q.id.trim(), query: q.query.trim(), category: q.category }));
+  const questions = value.map((q) => ({ id: q.id.trim(), query: q.query.trim(), category: q.category }));
+  // Unique after trimming: "a" and "a " would otherwise share one result key on resume and in the report.
+  if (new Set(questions.map((q) => q.id)).size !== questions.length) throw new Error('"questions" ids must be unique');
+  return questions;
 }
 
 /** One (config, question) pair of a run: what a resumed request skips when it's already answered. */

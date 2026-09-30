@@ -92,6 +92,9 @@ describe("answer pipeline requests", () => {
   it("rejects answer-only fields on the legacy pipeline, duplicate ids and a bad pipeline", () => {
     expect(() => parseEvalRequest(JSON.stringify({ requestId: "req-1", questions: [q] }))).toThrow(/pipeline/);
     expect(() => parseQuestions([q, q])).toThrow(/unique/);
+    // Ids that only differ by surrounding spaces are the same id once trimmed (CodeRabbit, #36).
+    expect(() => parseQuestions([{ ...q, id: "a" }, { ...q, id: "a " }])).toThrow(/unique/);
+    expect(parseQuestions([{ ...q, id: " b " }])?.[0].id).toBe("b");
     expect(() => parseEvalRequest(JSON.stringify({ requestId: "req-1", pipeline: "fast" }))).toThrow(/pipeline/);
   });
 
