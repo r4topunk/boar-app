@@ -5,8 +5,9 @@ import { AnswerDeps, createAnswerer, InstalledLlm } from "./answer";
 import type { AnswerEvent } from "./events";
 import type { AnswerSettings } from "../models/settings";
 import type { GenerateOptions } from "../inference/LlamaEngine";
-import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION } from "./context";
+import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION, PT_ANSWER_LANGUAGE } from "./context";
 import { ModelLoadError } from "../inference/loadError";
+import { answerReducer, initialAnswer } from "../ui/chat/answerReducer";
 
 const chunk = (chunkId: string, title: string, body: string): RetrievedChunk => ({
   chunkId,
@@ -1765,5 +1766,79 @@ describe("answer(): the model's own reference list (CT-A)", () => {
     expect(done.finalText).toBe(result.text);
     expect(done.cited).toEqual([1]);
     expect(result.receipt.reasonCodes).toContain("grounding:model-references-stripped");
+  });
+});
+
+describe("answer(): multi-pass retrieval progress", () => {
+  const SYDNEY = chunk("c4", "Sydney", "Sydney is the capital city of New South Wales and the most populous city in Australia.");
+  const withRelevance = (c: RetrievedChunk, relevance: number) => ({ ...c, relevance });
+
+  it("sends each sub-question's sources as found, with the sub-question in the stage; the final list and numbers are unchanged", async () => {
+    f.deps.runMultipass = async (_q, _s, _h, _m, onProgress, onToken, _stop, options) => {
+      onProgress({ stage: "decomposing" });
+      onProgress({ stage: "researching", subQuestionIndex: 0, subQuestionCount: 2, subQuestion: "Why was Canberra chosen?" });
+      options.onPartialSources?.([withRelevance(CANBERRA, 0.9)], { subQuestionIndex: 0, subQuestionCount: 2 });
+      onProgress({ stage: "researching", subQuestionIndex: 1, subQuestionCount: 2, subQuestion: "What is Sydney?" });
+      options.onPartialSources?.([withRelevance(CANBERRA, 0.9), withRelevance(SYDNEY, 0.4)], { subQuestionIndex: 1, subQuestionCount: 2 });
+      options.onSources?.([CANBERRA, SYDNEY]);
+      onProgress({ stage: "synthesizing" });
+      onToken("Canberra [1], Sydney [2].");
+      return { answer: "Canberra [1], Sydney [2].", subQuestions: ["a", "b"], citations: [CANBERRA, SYDNEY] };
+    };
+    const events: AnswerEvent[] = [];
+    const { deepen } = createAnswerer(f.deps);
+    const result = await deepen("Compare Canberra and Sydney", [CANBERRA], (e) => events.push(e), ctx).done;
+
+    const seq = events
+      .filter((e) => e.type !== "stage" || e.stage === "retrieving" || e.stage === "synthesizing")
+      .map((e) =>
+        e.type === "stage"
+          ? `stage:${e.stage}${e.detail?.subQuestion ? `:${e.detail.index}:${e.detail.subQuestion}` : ""}`
+          : e.type === "sources"
+            ? `sources:${e.sources.map((c) => c.chunkId).join(",")}`
+            : e.type
+      );
+    expect(seq).toEqual([
+      "stage:retrieving",
+      "stage:retrieving:0:Why was Canberra chosen?",
+      "sources:c1",
+      "stage:retrieving:1:What is Sydney?",
+      "sources:c1,c4",
+      "sources:c1,c4",
+      "stage:synthesizing",
+      "token",
+      "done",
+    ]);
+    // No comparable relevance across sub-questions, in partial lists too.
+    for (const e of events) if (e.type === "sources") expect(e.sources.every((c) => c.relevance === undefined)).toBe(true);
+    expect(result.sources.map((c) => c.chunkId)).toEqual(["c1", "c4"]);
+    expect(result.cited).toEqual([1, 2]);
+
+    // The chat's reducer (it merges sources events) ends with the same list, in the same order: [n] = sources[n-1].
+    let state = initialAnswer(result.answerId);
+    for (const e of events) state = answerReducer(state, e);
+    expect(state.sources.map((c) => c.chunkId)).toEqual(result.sources.map((c) => c.chunkId));
+  });
+
+  it("a single-pass answer still sends one sources event, after grounding", async () => {
+    const { events } = await collect("Why was Canberra chosen as the capital?");
+    expect(events.filter((e) => e.type === "sources")).toHaveLength(1);
+    const kinds = types(events);
+    expect(kinds.indexOf("stage:retrieving")).toBeLessThan(kinds.indexOf("sources"));
+  });
+});
+
+describe("answer(): multi-pass answer language", () => {
+  it("a Portuguese question asks the synthesis for Portuguese; an English one doesn't", async () => {
+    const seen: (string | undefined)[] = [];
+    const base = f.deps.runMultipass;
+    f.deps.runMultipass = (q, s, h, m, p, t, st, options) => {
+      seen.push(options.answerLanguage);
+      return base(q, s, h, m, p, t, st, options);
+    };
+    const { deepen } = createAnswerer(f.deps);
+    await deepen("Compare Canberra e Sydney: qual é a capital da Austrália?", [CANBERRA], () => {}, ctx).done;
+    await deepen("Compare Canberra and Sydney", [CANBERRA], () => {}, ctx).done;
+    expect(seen).toEqual([PT_ANSWER_LANGUAGE, undefined]);
   });
 });

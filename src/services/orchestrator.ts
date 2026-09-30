@@ -23,6 +23,10 @@ export interface ResearchProgress {
   stage: ResearchStage;
   subQuestionIndex?: number;
   subQuestionCount?: number;
+  /** "researching" only: the sub-question being researched, as the decomposition wrote it. */
+  subQuestion?: string;
+  /** "researching" only: its search is done and its sub-answer is being written. */
+  answering?: boolean;
 }
 
 export interface ResearchResult {
@@ -53,6 +57,18 @@ export interface ResearchOptions {
   retrieveK?: number;
   /** Called once all sources are known (before synthesis), with the final numbered list. */
   onSources?: (sources: RetrievedChunk[]) => void;
+  /**
+   * The answer's language line (src/routing/context.ts PT_ANSWER_LANGUAGE for a Portuguese question), after the
+   * synthesis input as the single-pass prompt puts it after the question. Only the synthesis gets it: the
+   * sub-questions stay as the decomposition writes them (usually English, which matches the English sources).
+   */
+  answerLanguage?: string;
+  /**
+   * Called after each sub-question's retrieval and topic filter, before its generation, with the
+   * numbered list so far, only when it grew. Each list extends the previous one (mergeSources keeps
+   * first-seen order), so a source's number never changes; the last one equals what onSources gets.
+   */
+  onPartialSources?: (sources: RetrievedChunk[], progress: { subQuestionIndex: number; subQuestionCount: number }) => void;
 }
 
 /**
@@ -121,7 +137,8 @@ async function synthesize(
   systemPrompt: string | undefined,
   maxTokens: number,
   onToken: (piece: string) => void,
-  onTimeout: () => void
+  onTimeout: () => void,
+  answerLanguage?: string
 ): Promise<string> {
   const perspectives = subResults
     .map((r, i) => `Perspective ${i + 1} (${r.subQuestion}):\n${r.answer}`)
@@ -130,7 +147,8 @@ async function synthesize(
     `${instructionOf(systemPrompt)} You are synthesizing multiple research perspectives into one answer. ` +
     `Compare them, reconcile any conflicts, and write one unified, well-reasoned answer. ` +
     `Keep the source numbers exactly as the perspectives cite them, like [3]; do not renumber or invent sources.`;
-  return generateStage(system, `Original question: ${originalQuery}\n\n${perspectives}`, {
+  const language = answerLanguage?.trim() ? `\n\n(${answerLanguage.trim()})` : "";
+  return generateStage(system, `Original question: ${originalQuery}\n\n${perspectives}${language}`, {
     nPredict: maxTokens,
     temperature: 0.6,
     onToken,
@@ -167,7 +185,7 @@ export async function runDeepResearch(
     // own check between stages or the pipeline just carries on to the next
     // one regardless of the user having asked it to stop.
     if (shouldStop?.()) return { answer: "", subQuestions, citations: allChunks, timedOut };
-    onProgress?.({ stage: "researching", subQuestionIndex: i, subQuestionCount: subQuestions.length });
+    onProgress?.({ stage: "researching", subQuestionIndex: i, subQuestionCount: subQuestions.length, subQuestion: subQuestions[i] });
     const retrieved = await retrieve(subQuestions[i], options.retrieveK ?? 6);
     const compressed = compressContext(subQuestions[i], retrieved, { tokenBudget: SUB_QUESTION_CONTEXT_TOKENS }).chunks;
     // CT-2 / RT-1 here too: a source off the topic of this sub-question (or of the whole
@@ -178,7 +196,11 @@ export async function runDeepResearch(
     perQuestion.push(chunks);
     // Number against every source seen so far, so the same chunk keeps one number across sub-questions.
     const merged = mergeSources(perQuestion);
+    const grew = merged.sources.length > allChunks.length;
     allChunks = merged.sources;
+    // The chat can show this sub-question's sources now, not after every sub-answer is written.
+    if (grew) options.onPartialSources?.(allChunks, { subQuestionIndex: i, subQuestionCount: subQuestions.length });
+    onProgress?.({ stage: "researching", subQuestionIndex: i, subQuestionCount: subQuestions.length, subQuestion: subQuestions[i], answering: true });
     const answer = await researchSubQuestion(subQuestions[i], chunks, merged.indexMaps[i], systemPrompt, history, markTimedOut);
     subResults.push({ subQuestion: subQuestions[i], answer });
   }
@@ -197,7 +219,8 @@ export async function runDeepResearch(
     systemPrompt,
     maxTokens,
     onToken ?? (() => {}),
-    markTimedOut
+    markTimedOut,
+    options.answerLanguage
   );
 
   return { answer, subQuestions, citations: allChunks, timedOut };

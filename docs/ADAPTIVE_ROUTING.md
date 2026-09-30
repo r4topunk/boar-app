@@ -56,8 +56,8 @@ Every event carries `answerId`; drop events whose id is not the current answer's
 
 | Event | When |
 |---|---|
-| `stage` `{stage, tier, modelId?, detail?, at}` | `loading_model`, `retrieving` (multi-pass: `detail.index/count`), `prefill`, `generating` (first token), `verifying`, `synthesizing` |
-| `sources` `{tier, sources}` | Once the numbered source list is final: `[n]` in text = `sources[n-1]`, global and deduplicated |
+| `stage` `{stage, tier, modelId?, detail?, at}` | `loading_model`, `retrieving` (multi-pass: `detail.index/count`, and `detail.subQuestion`, the sub-question's text), `prefill`, `generating` (first token), `verifying`, `synthesizing` |
+| `sources` `{tier, sources}` | Single pass: once, when the numbered list is final (after grounding). Multi-pass: after each sub-question that found new sources, each list the previous one plus new sources at the end, then the final list before `synthesizing`. `[n]` in text = `sources[n-1]`, global and deduplicated; a source's number never changes |
 | `instant` `{snippet:{text, sourceIndex}, confidence}` | Extractive excerpt (0..1 confidence) |
 | `token` `{tier, text}` | Streamed text of the fast/deep answer |
 | `warning` `{code: "model_streams_from_storage", message}` | The model loaded but its weights stream from storage (slower) |
