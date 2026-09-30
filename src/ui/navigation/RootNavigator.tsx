@@ -6,6 +6,7 @@ import { createNativeStackNavigator, NativeStackNavigationProp } from "@react-na
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { NavigationBar } from "expo-navigation-bar";
 import { useTranslation } from "react-i18next";
 import { Tokens, useTokens } from "../theme";
 import { ChatScreen } from "../ChatScreen";
@@ -156,6 +157,10 @@ export function RootNavigator({ initialRoute }: { initialRoute: "Main" | "Setup"
       onStateChange={saveNavState}
     >
       <StatusBar style={t.scheme === "dark" ? "light" : "dark"} />
+      {/* Android 3-button navigation: edge-to-edge draws a contrast scrim behind the buttons that follows the
+          system theme (a light bar under the dark app on a light phone). This keeps the scrim and the buttons
+          on the app's own scheme, like the status bar above. No-op on iOS and with gesture navigation. */}
+      <NavigationBar style={t.scheme === "dark" ? "light" : "dark"} />
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
