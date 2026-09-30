@@ -218,12 +218,34 @@ const ARTICLE_CACHE = 16;
 /** Heading path in force at UTF-16 offset `start` of an article's text (chunks store offsets only). */
 export function sectionAt(text: string, start: number): string {
   const path: string[] = [];
-  for (const m of text.slice(0, start).matchAll(HEADING)) {
-    const level = m[1].length;
+  // Same result as matching HEADING over text.slice(0, start), from a heading index built once per text:
+  // articlePassages asks this for every chunk of an article (and pairs of them), which rescanned a big
+  // Wikivoyage guide from the top each time (Thailand, 257 chunks: 1.8 s on an M1).
+  for (const h of headingsOf(text)) {
+    if (h.at >= start) break;
+    const level = h.level;
     path.length = level - 1;
-    path[level - 1] = m[2].trim();
+    // A heading line cut by `start` reads as far as `start`, as the sliced match did.
+    path[level - 1] = (h.lineEnd > start ? text.slice(h.titleAt, start) : h.title).trim();
   }
   return path.slice(1).filter(Boolean).join(" > ");
+}
+
+let headingsText: string | null = null;
+let headingsCache: Array<{ at: number; level: number; titleAt: number; lineEnd: number; title: string }> = [];
+
+/** Every heading of `text` in order; the last text's index is kept (articlePassages works one article at a time). */
+function headingsOf(text: string) {
+  if (text === headingsText) return headingsCache;
+  const out: typeof headingsCache = [];
+  for (const m of text.matchAll(HEADING)) {
+    const at = m.index!;
+    const lineEnd = at + m[0].length;
+    out.push({ at, level: m[1].length, titleAt: lineEnd - m[2].length, lineEnd, title: m[2] });
+  }
+  headingsText = text;
+  headingsCache = out;
+  return out;
 }
 
 /**
