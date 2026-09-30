@@ -242,6 +242,7 @@
     },
     "row": {
       "copying": "Copiando",
+      "queued": "Na fila",
       "downloading": "Baixando",
       "verifying": "Conferindo",
       "loading": "Carregando",
@@ -747,6 +748,7 @@
     },
     "activity": {
       "title": "Em andamento",
+      "queued": "Na fila para baixar {{name}}",
       "downloading": "Baixando {{name}}",
       "verifying": "Verificando {{name}}",
       "indexing": "Montando o índice de busca"

@@ -35,7 +35,7 @@ vi.mock("../models/ModelManager", () => ({
 }));
 const presentIds = new Set<string>();
 
-import { cancelAllDownloads, getDownloadState, missingRequirements, PROGRESS_NOTIFY_MS, progressDue, resetDownloadState, restartDownload, startDownload, subscribeDownloads, type DownloadEvent } from "./downloadManager";
+import { cancelAllDownloads, getDownloadState, LARGE_DOWNLOAD_BYTES, missingRequirements, PROGRESS_NOTIFY_MS, progressDue, queuePosition, resetDownloadState, restartDownload, startableDownloads, startDownload, subscribeDownloads, type DownloadEvent } from "./downloadManager";
 import { onAssetInstalled, registerAssetProvider, unregisterAssetProvider } from "../models/assetRegistry";
 import { AssetIntegrityError, DownloadError } from "../models/integrity";
 
@@ -307,5 +307,76 @@ describe("progress notifications (perf audit #2/#4: iOS sends one event per netw
     await p;
     off();
     expect(events.at(-1)).toEqual({ assetId: "big", progressOnly: false });
+  });
+});
+
+describe("download queue: big files one at a time, small ones alongside", () => {
+  const big = (id: string) => ({ id, sizeBytes: LARGE_DOWNLOAD_BYTES * 20 }) as any;
+  const started = () => downloadMock.mock.calls.map((c) => c[0].id);
+
+  it("picks what may start: one big, up to three small, oldest first", () => {
+    const q = (id: string, large: boolean) => ({ id, large });
+    expect(startableDownloads([q("a", true), q("b", true), q("t1", false)], { large: 0, small: 0 })).toEqual(["a", "t1"]);
+    expect(startableDownloads([q("b", true), q("t2", false)], { large: 1, small: 3 })).toEqual([]);
+    expect(startableDownloads([q("t1", false), q("t2", false), q("t3", false), q("t4", false)], { large: 0, small: 1 })).toEqual(["t1", "t2"]);
+  });
+
+  it("queues the second big model behind the first and starts it when the first is done", async () => {
+    const first = startDownload(big("qwen3-4b"));
+    const second = startDownload(big("lfm2.5"));
+    expect(started()).toEqual(["qwen3-4b"]);
+    expect(getDownloadState("lfm2.5")).toMatchObject({ downloading: true, phase: "queued", progress: 0 });
+    expect(queuePosition("lfm2.5")).toBe(1);
+    // Asking again doesn't start a second copy, in the queue or running.
+    expect(startDownload(big("lfm2.5"))).toBe(second);
+    pending.get("qwen3-4b")!.resolve();
+    await first;
+    await settle();
+    expect(started()).toEqual(["qwen3-4b", "lfm2.5"]);
+    expect(getDownloadState("lfm2.5")?.phase).toBe("downloading");
+    pending.get("lfm2.5")!.resolve();
+    await second;
+  });
+
+  it("lets a small file through while a big one downloads", () => {
+    startDownload(big("qwen3-4b"));
+    startDownload(asset("embedding"));
+    expect(started()).toEqual(["qwen3-4b", "embedding"]);
+  });
+
+  it("moves on after a failure too", async () => {
+    const first = startDownload(big("a"));
+    const second = startDownload(big("b"));
+    pending.get("a")!.reject(new Error("network down"));
+    await first;
+    await settle();
+    expect(getDownloadState("a")?.phase).toBe("error");
+    expect(started()).toEqual(["a", "b"]);
+    pending.get("b")!.resolve();
+    await second;
+  });
+
+  it("restarts a queued download without waiting for its turn", async () => {
+    startDownload(big("a"));
+    const queued = startDownload(big("b"));
+    const restarted = restartDownload(big("b"));
+    await queued; // settled when it left the queue, not hanging until "a" finishes
+    await settle();
+    expect(getDownloadState("b")?.phase).toBe("queued");
+    pending.get("a")!.resolve();
+    await settle();
+    await settle();
+    expect(started()).toEqual(["a", "b"]);
+    pending.get("b")!.resolve();
+    await restarted;
+  });
+
+  it("cancelling everything settles the queued ones too", async () => {
+    startDownload(big("a"));
+    const queued = startDownload(big("b"));
+    await cancelAllDownloads();
+    await queued;
+    expect(getDownloadState("b")).toBeUndefined();
+    expect(started()).toEqual(["a"]);
   });
 });

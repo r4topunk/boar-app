@@ -10,7 +10,8 @@ export interface RunningDownload {
   assetId: string;
   /** 0..1 within the phase. */
   progress: number;
-  phase: "downloading" | "verifying";
+  /** "queued": waiting its turn behind another big download. */
+  phase: "queued" | "downloading" | "verifying";
 }
 
 export interface Activity {
@@ -23,7 +24,11 @@ export interface Activity {
 export function runningDownloads(states: ReturnType<typeof listDownloadStates>): RunningDownload[] {
   return states
     .filter(({ state }) => state.downloading)
-    .map(({ assetId, state }) => ({ assetId, progress: state.progress, phase: state.phase === "verifying" ? "verifying" : "downloading" }));
+    .map(({ assetId, state }) => ({
+      assetId,
+      progress: state.progress,
+      phase: state.phase === "verifying" || state.phase === "queued" ? state.phase : "downloading",
+    }));
 }
 
 export function useActivity(): Activity {
