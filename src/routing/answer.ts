@@ -786,6 +786,8 @@ export function createAnswerer(deps: AnswerDeps) {
       // Lexicon names aren't searched here: retrieve() already adds them to a PT question's search.
       const searchQuery = english ? (ACTION_INTENT.test(req.query) ? `${english} what to do` : english) : req.query;
       let raw: RetrievedChunk[] = req.reuseSources ?? [];
+      /** Multi-pass only: the cited sources as retrieved (ResearchResult.fullCitations), for the citation checks. */
+      let fullCited: RetrievedChunk[] = [];
       let retrievalMs: number | undefined;
       if (plan.retrieve && gen?.mode !== "multipass") {
         stage("retrieving", plan.instant !== "off" ? "instant" : genTier);
@@ -1099,6 +1101,9 @@ export function createAnswerer(deps: AnswerDeps) {
           text = withoutModelReferences(r.answer);
           timedOut = !!r.timedOut;
           sources = r.citations;
+          // P1: the sources in full, for CT-1 and attribution below (raw is empty here: retrieval ran inside
+          // the orchestrator, and sources are the compressed sub-question bodies).
+          if (r.fullCitations) fullCited = r.fullCitations;
         } else {
           stage("prefill", genTier, genLlm.id);
           const useTemplate = deps.engine.hasEmbeddedChatTemplate();
@@ -1159,10 +1164,13 @@ export function createAnswerer(deps: AnswerDeps) {
         ctxTokens: timings?.promptTokens,
         cachedTokens: timings?.cachedTokens,
       });
+      // A source in full: the retrieved chunk (single pass), or the orchestrator's (multi-pass), else as shown.
+      const fullOf = (c: RetrievedChunk) =>
+        raw.find((r) => r.chunkId === c.chunkId) ?? fullCited.find((r) => r.chunkId === c.chunkId) ?? c;
       // CT-1: a [n] stays only where source n supports its sentence.
       let allCitationsRemoved = false;
       if (/\[\d+\]/.test(text)) {
-        const cited = sources.map((c) => raw.find((r) => r.chunkId === c.chunkId) ?? c);
+        const cited = sources.map((c) => fullOf(c));
         const checked = checkCitations(text, cited);
         if (checked.removed.length) {
           reasonCodes.push(`citations:removed-${checked.removed.join("-")}`);
@@ -1211,8 +1219,9 @@ export function createAnswerer(deps: AnswerDeps) {
       // Its inverse (Boar, gate 9ef80f9): a sentence without [n] that an on-topic source supports, by
       // the same measure, gets that source's [n]. Never without support.
       // Health answers are the source's excerpt or checked for risky lines: not here.
-      if (guarded && !health && sources.length && text.trim() && !stopRequested) {
-        const attributed = attributeCitations(text, sources.map((c) => raw.find((r) => r.chunkId === c.chunkId) ?? c));
+      // P2: multi-pass answers too, now that the sources are checked in full (fullCitations): same 0.75 bar.
+      if (!health && sources.length && text.trim() && !stopRequested) {
+        const attributed = attributeCitations(text, sources.map((c) => fullOf(c)));
         if (attributed.added.length) {
           reasonCodes.push(`citations:added-${attributed.added.join("-")}`);
           text = attributed.text;
