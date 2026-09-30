@@ -18,7 +18,7 @@ Two checkouts: one for the app build (PR #36), one for this pack's files.
 
 ```bash
 gh repo clone rferrari/boar-app boar-bench && cd boar-bench && gh pr checkout 36 && npm ci && cd ..
-gh repo clone rferrari/boar-app boar-proof && cd boar-proof && gh pr checkout <this PR> && cd ..
+gh repo clone rferrari/boar-app boar-proof && cd boar-proof && gh pr checkout 42 && cd ..
 mkdir -p results && cd results        # everything you send back goes here
 
 # Phone identity (USB debugging on, `adb devices` shows it)
