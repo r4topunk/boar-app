@@ -27,9 +27,10 @@ export function composerSlots(s: {
   empty: boolean;
   canSend: boolean;
 }): ComposerSlots {
-  if (s.voice !== "idle") return { primary: "done", secondaryMic: false, sendDisabled: false };
-  // Voice waits while an answer streams: Stop owns the slot, and a dictation can't start behind it.
+  // An answer streaming always owns the slot with Stop, even mid-dictation (an answer started by Retry while
+  // listening must stay stoppable); the composer then ends the dictation, keeping its text.
   if (s.generating) return { primary: "stop", secondaryMic: false, sendDisabled: false };
+  if (s.voice !== "idle") return { primary: "done", secondaryMic: false, sendDisabled: false };
   if (s.empty && s.voiceAvailable) return { primary: "mic", secondaryMic: false, sendDisabled: false };
   return { primary: "send", secondaryMic: s.voiceAvailable && !s.empty, sendDisabled: s.empty || !s.canSend };
 }

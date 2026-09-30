@@ -39,6 +39,12 @@ describe("composerSlots (one trailing slot)", () => {
     expect(composerSlots({ ...base, voice: "finishing", empty: false }).primary).toBe("done");
     expect(composerSlots({ ...base, voice: "listening", empty: false }).secondaryMic).toBe(false);
   });
+  it("an answer streaming while listening (Retry mid-dictation): Stop, never done (PR #24)", () => {
+    for (const voice of ["listening", "finishing"] as const) {
+      expect(composerSlots({ ...base, generating: true, voice })).toEqual({ primary: "stop", secondaryMic: false, sendDisabled: false });
+      expect(composerSlots({ ...base, generating: true, voice, empty: false }).primary).toBe("stop");
+    }
+  });
 });
 
 describe("answer mode chip", () => {

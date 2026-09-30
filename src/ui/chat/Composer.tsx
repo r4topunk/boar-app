@@ -79,6 +79,12 @@ const ComposerView = forwardRef<TextInput, Props>(function Composer(
   });
   const slots = composerSlots({ generating, voice: voice.phase, voiceAvailable: voice.available, empty, canSend });
   const listening = voice.phase !== "idle";
+  // An answer starting mid-dictation (Retry in the list): Stop takes the slot, so end the dictation the
+  // way "done" does, keeping what was heard. One thing at a time: no hidden open mic behind a stream.
+  const finishVoice = voice.finish;
+  useEffect(() => {
+    if (generating && voice.phase === "listening") finishVoice();
+  }, [generating, voice.phase, finishVoice]);
 
   // 14 regular, as the mockup's placeholder and text.
   const text = { ...t.type.subhead, fontFamily: t.type.body.fontFamily, fontWeight: t.type.body.fontWeight };
