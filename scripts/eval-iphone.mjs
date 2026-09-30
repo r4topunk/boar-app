@@ -13,7 +13,8 @@
 //   --answer-anyway         re-ask a declined answer with "Answer anyway"
 //   --dataset <name>        recorded on rows as dataset-<name> (default: from the file name, questions.<name>.jsonl)
 //   --out <dir>             where to save the raw rows + report (default: eval-results/iphone/<date>)
-//   --runs-file <path>      also write one row per question (the re-ask wins) in the eval/ judge format
+//   --runs-file <path>      also write one row per question (the re-ask wins) in the eval/ judge format;
+//                           with several --models, one file per model (<path minus .jsonl>__<model>.jsonl)
 //   --bundle <id>           app bundle (default team.sopa.aoair)   --udid <id>   device (default: the only iPhone)
 //   --no-launch             don't (re)launch the app; it must already be in the foreground
 //   --timeout-min <n>       give up after n minutes (default 180)
@@ -92,28 +93,41 @@ const median = (xs) => {
 };
 const s1 = (ms) => (ms == null ? "-" : (ms / 1000).toFixed(1));
 
-function report(rows) {
+/** One final row per (config, question): the "Answer anyway" re-ask replaces its declined first try. */
+function finalRows(rows) {
   const final = new Map();
-  for (const r of rows) if (!final.has(r.queryId) || r.answeredAnyway) final.set(r.queryId, r);
-  const by = new Map();
-  for (const r of final.values()) by.set(r.category, [...(by.get(r.category) ?? []), r]);
+  for (const r of rows) {
+    const k = `${r.configId}|${r.queryId}`;
+    if (!final.has(k) || r.answeredAnyway) final.set(k, r);
+  }
+  return [...final.values()];
+}
+
+function report(rows) {
+  const final = finalRows(rows);
   const lines = [
-    "| category | n | ok | declined | ttft p50 s | first source p50 s | total p50 s | tok/s p50 | tiers |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| config | category | n | ok | declined | ttft p50 s | first source p50 s | total p50 s | tok/s p50 | tiers |",
+    "|---|---|---|---|---|---|---|---|---|---|",
   ];
-  for (const [cat, v] of [...by.entries()].sort()) {
+  const groups = new Map();
+  for (const r of final) {
+    const k = `${r.configId}|${r.category}`;
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  for (const [k, v] of [...groups.entries()].sort()) {
+    const [config, cat] = k.split("|");
     const tiers = {};
     for (const r of v) tiers[r.tier] = (tiers[r.tier] ?? 0) + 1;
-    const declined = rows.filter((r) => r.category === cat && r.declined && !r.answeredAnyway).length;
+    const declined = rows.filter((r) => r.configId === config && r.category === cat && r.declined && !r.answeredAnyway).length;
     lines.push(
-      `| ${cat} | ${v.length} | ${v.filter((r) => r.outcome === "success" && r.answer).length} | ${declined} | ${s1(median(v.map((r) => r.ttftMs)))} | ${s1(
+      `| ${config} | ${cat} | ${v.length} | ${v.filter((r) => r.outcome === "success" && r.answer).length} | ${declined} | ${s1(median(v.map((r) => r.ttftMs)))} | ${s1(
         median(v.map((r) => r.firstSourcesMs))
       )} | ${s1(median(v.map((r) => r.totalLatencyMs)))} | ${median(v.map((r) => r.tokPerSec))?.toFixed(1) ?? "-"} | ${Object.entries(tiers)
-        .map(([k, n]) => `${k} ${n}`)
+        .map(([t, n]) => `${t} ${n}`)
         .join(", ")} |`
     );
   }
-  return { lines, final: [...final.values()] };
+  return { lines, final };
 }
 
 async function main() {
@@ -124,7 +138,7 @@ async function main() {
     fail(e.message);
   }
   if (o.help || !o.questions) {
-    console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 21).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+    console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 22).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
     process.exit(o.help ? 0 : 1);
   }
   let questions = readFileSync(o.questions, "utf8")
@@ -199,8 +213,13 @@ async function main() {
   const md = [`# iPhone answer-pipeline eval ${requestId}`, "", `${rows.length} rows, ${final.length} questions, dataset ${dataset}${status.stopped ? " (STOPPED)" : ""}.`, "", ...lines, ""].join("\n");
   writeFileSync(join(out, "report.md"), md);
   if (o.runsFile) {
-    writeFileSync(o.runsFile, final.map((r) => JSON.stringify(r)).join("\n") + "\n");
-    console.log(`✓ judge rows → ${o.runsFile}`);
+    // One judge file per config: <runs-file> for a single config, <name>__<model>.jsonl for several.
+    const configs = [...new Set(final.map((r) => r.configId))];
+    for (const c of configs) {
+      const file = configs.length === 1 ? o.runsFile : o.runsFile.replace(/(\.jsonl)?$/, `__${c.replace(/^answer:/, "").replace(/[^\w.-]/g, "_")}.jsonl`);
+      writeFileSync(file, final.filter((r) => r.configId === c).map((r) => JSON.stringify(r)).join("\n") + "\n");
+      console.log(`✓ judge rows (${c}) → ${file}`);
+    }
   }
   console.log(`\n${md}\nRaw rows: ${rowsLocal}`);
 }
