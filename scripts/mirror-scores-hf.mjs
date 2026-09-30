@@ -35,7 +35,7 @@ const key = need("SUPABASE_PUBLISHABLE_KEY");
 async function fetchScores() {
   const rows = [];
   for (let offset = 0; ; offset += PAGE) {
-    const res = await fetch(scoresPageUrl(supabaseUrl, offset, PAGE), { headers: { apikey: key } });
+    const res = await fetch(scoresPageUrl(supabaseUrl, offset, PAGE), { headers: { apikey: key }, signal: AbortSignal.timeout(30_000) });
     if (!res.ok) throw new Error(`eval_scores: HTTP ${res.status} ${await res.text()}`);
     const page = await res.json();
     rows.push(...page);
@@ -68,7 +68,7 @@ const auth = { authorization: `Bearer ${token}` };
 // Skip files the dataset already has, so a quiet day makes no commit.
 const changed = {};
 for (const [path, content] of Object.entries(files)) {
-  const res = await fetch(`https://huggingface.co/datasets/${dataset}/resolve/main/${path}`, { headers: auth });
+  const res = await fetch(`https://huggingface.co/datasets/${dataset}/resolve/main/${path}`, { headers: auth, signal: AbortSignal.timeout(30_000) });
   if (res.ok && (await res.text()) === content) continue;
   if (!res.ok && res.status !== 404) throw new Error(`${path}: HTTP ${res.status}`);
   changed[path] = content;
@@ -81,6 +81,7 @@ if (Object.keys(changed).length === 0) {
 const res = await fetch(`https://huggingface.co/api/datasets/${dataset}/commit/main`, {
   method: "POST",
   headers: { ...auth, "content-type": "application/x-ndjson" },
+  signal: AbortSignal.timeout(60_000),
   body: commitBody(`Update scores (${rows.length} rows)`, changed),
 });
 if (!res.ok) throw new Error(`commit: HTTP ${res.status} ${await res.text()}`);

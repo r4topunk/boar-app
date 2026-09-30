@@ -12,9 +12,10 @@ Versão 0.9 (prévia) · 30 de setembro de 2026 · Contato: privacy@boarapp.com
 > direitos previstos na LGPD e no Código de Defesa do Consumidor se aplicam em qualquer caso.
 
 O BOAR é um aplicativo de pesquisa com IA offline para Android e iOS, e boarapp.com é o seu site. O
-BOAR é um projeto gratuito e de código aberto mantido pela sopa.team e seus colaboradores ("nós"),
-responsáveis pelos dados pessoais descritos aqui (o "controlador", nos termos do GDPR e da Lei Geral
-de Proteção de Dados Pessoais, LGPD, Lei nº 13.709/2018).
+BOAR é um projeto gratuito e de código aberto, feito pela sua comunidade de colaboradores ("nós"). Não
+há uma empresa por trás dele. Os mantenedores do projeto operam o serviço de compartilhamento e tratam
+os dados pessoais descritos aqui (o "controlador", nos termos do GDPR e da Lei Geral de Proteção de
+Dados Pessoais, LGPD, Lei nº 13.709/2018); o contato com eles é privacy@boarapp.com.
 
 Esta política cobre o aplicativo BOAR (a versão padrão e a versão offline) e o site boarapp.com. Ela
 foi escrita tendo em vista o GDPR da União Europeia e do Reino Unido, a LGPD, a CCPA/CPRA da

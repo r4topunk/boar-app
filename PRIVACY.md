@@ -8,9 +8,9 @@
 Version 0.9 (preview) · 30 September 2026 · Contact: privacy@boarapp.com
 
 BOAR is an offline AI research app for Android and iOS, and boarapp.com is its website. BOAR is a
-free, open-source project maintained by sopa.team and its contributors ("we", "us"), who are
-responsible for the personal data described here (the "controller" under the GDPR and Brazil's
-LGPD).
+free, open-source project built by its community of contributors ("we", "us"). There is no company
+behind it. The project's maintainers run the sharing service and handle the personal data described
+here (the "controller" under the GDPR and Brazil's LGPD); you reach them at privacy@boarapp.com.
 
 This policy covers the BOAR app (both the standard build and the offline build) and boarapp.com. It
 is written with the EU and UK GDPR, Brazil's LGPD, California's CCPA/CPRA and similar laws in mind,

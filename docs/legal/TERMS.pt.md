@@ -12,7 +12,7 @@ Versão 0.9 (prévia) · 30 de setembro de 2026 · Contato: privacy@boarapp.com
 > direitos previstos no Código de Defesa do Consumidor e na LGPD se aplicam em qualquer caso.
 
 Estes termos valem para o aplicativo BOAR e para o site boarapp.com. O BOAR é um projeto gratuito e de
-código aberto mantido pela sopa.team e seus colaboradores ("nós"). Ao instalar ou usar o BOAR, ou
+código aberto, feito pela sua comunidade de colaboradores ("nós"), sem uma empresa por trás dele. Ao instalar ou usar o BOAR, ou
 compartilhar resultados com ele, você aceita estes termos e a [Política de Privacidade](PRIVACY.pt.md).
 
 ## 1. Quem pode usar o BOAR

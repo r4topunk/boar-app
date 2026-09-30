@@ -7,8 +7,8 @@
 
 Version 0.9 (preview) · 30 September 2026 · Contact: privacy@boarapp.com
 
-These terms apply to the BOAR app and to boarapp.com. BOAR is a free, open-source project maintained
-by sopa.team and its contributors ("we", "us"). By installing or using BOAR, or sharing results with
+These terms apply to the BOAR app and to boarapp.com. BOAR is a free, open-source project built by its
+community of contributors ("we", "us"), with no company behind it. By installing or using BOAR, or sharing results with
 it, you accept these terms and the [Privacy Policy](PRIVACY.md). A Portuguese version is at
 [docs/legal/TERMS.pt.md](docs/legal/TERMS.pt.md). If the two differ, this English version prevails,
 except where your local law requires otherwise.
