@@ -8,3 +8,5 @@
 {"id": "trv-008", "category": "travel-practical", "query": "When is the best time to visit Chiang Mai, and when is the smoky season?", "gold": [{"source": "enwikivoyage", "title": "Chiang Mai"}]}
 {"id": "trv-009", "category": "travel-practical", "query": "Is tipping expected in restaurants in Portugal?", "gold": [{"source": "enwikivoyage", "title": "Portugal"}]}
 {"id": "trv-010", "category": "travel-practical", "query": "What should I know about using ride-hailing apps in Bangkok?", "gold": [{"source": "enwikivoyage", "title": "Bangkok"}]}
+{"id": "trv-011", "category": "travel-practical", "query": "Is tap water safe to drink in Georgia?", "gold": [{"source": "enwikivoyage", "title": "Georgia (country)"}]}
+{"id": "trv-012", "category": "travel-practical", "query": "Do I need a visa for Georgia?", "gold": [{"source": "enwikivoyage", "title": "Georgia (country)"}]}

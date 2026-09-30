@@ -182,7 +182,10 @@ async function retrieveOne(
 
   // Large-pack passages from articles the question names come first, in the
   // pack's own order; its keyword hits compete with everything else.
-  const named = wiki.flatMap((w) => w.hits.filter((h) => h.via === "title").map((h) => packHitToChunk(w.packId, h)));
+  // A named disambiguation page is a list of links, not a source to put first (any pack, any language).
+  const named = wiki
+    .flatMap((w) => w.hits.filter((h) => h.via === "title").map((h) => packHitToChunk(w.packId, h)))
+    .filter((c) => !isDisambiguation(c));
   const wikiLexical = wiki.flatMap((w) => w.hits.filter((h) => h.via !== "title").map((h) => packHitToChunk(w.packId, h)));
   // The bundled corpus and format-1 packs pass the relevance gate first (their chunks carry the
   // question's cosine similarity): an unrelated question gets none of them, and weak chunks can't

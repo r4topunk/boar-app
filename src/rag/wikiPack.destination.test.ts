@@ -93,7 +93,7 @@ describe("Wikivoyage destination rule", () => {
 
   it("every v2 travel question is a travel question; a generic word (época, tips, season, cash, thank you) doesn't make one", () => {
     const travel = readFileSync("eval/retrieval/questions.travel.v2.jsonl", "utf8").trim().split("\n").map((l) => JSON.parse(l).query as string);
-    expect(travel).toHaveLength(10);
+    expect(travel).toHaveLength(12);
     for (const q of travel) expect(isTravelQuestion(q), q).toBe(true);
     for (const q of [
       "Em que época Roma caiu?",
@@ -120,5 +120,61 @@ describe("Wikivoyage destination rule", () => {
       const named = await pack.titlesInQuestion(q, await pack.stems(q));
       expect(named.map((n) => n.id), q).not.toContain(como);
     }
+  });
+});
+
+// Self-review of #34 (PR34-1, PR34-2), on a Wikivoyage-only pack like the shipped one (no encyclopedia articles).
+describe("Wikivoyage destination rule on a Wikivoyage-only pack", () => {
+  const voyage = [
+    guide(8e9 + 1, "Darwin", ["## Understand", "", "Darwin is the capital of the Northern Territory. " + filler("Top End")]),
+    guide(8e9 + 2, "New York City", ["## Get around", "", "### By taxi", "", "Yellow cabs can be hailed on the street. " + filler("Cab")]),
+    guide(8e9 + 3, "Brazil", ["## Buy", "", "### Money", "", "The currency is the real. " + filler("Money"), "", "## Cope", "", "### Electricity", "", "Outlets take flat and round plugs; voltage is 127 V or 220 V. " + filler("Power")]),
+    guide(8e9 + 4, "Jordan", ["## Understand", "", "Jordan is a kingdom in the Middle East. " + filler("Petra")]),
+    guide(8e9 + 5, "Argentina", ["## Get in", "", "Most visitors need no visa for short stays. " + filler("Border")]),
+    guide(8e9 + 6, "Natal", ["## Understand", "", "Natal is a city on the coast of Rio Grande do Norte. " + filler("Dunes")]),
+    { ...guide(8e9 + 7, "Georgia (disambiguation)", ["There is more than one place called Georgia: the country, and the US state."]), aliases: ["Georgia"] },
+    guide(8e9 + 8, "Georgia (country)", ["## Stay healthy", "", "Tap water is safe to drink in most cities. " + filler("Water"), "", "## Get in", "", "Many nationalities need no visa. " + filler("Visa")]),
+  ];
+  let vp: WikiPack;
+  beforeAll(async () => {
+    const dir = mkdtempSync(join(tmpdir(), "boar-pack-voyage-"));
+    const shard = join(dir, "voyage.jsonl");
+    writeFileSync(shard, voyage.map((r) => JSON.stringify(r)).join("\n") + "\n");
+    const out = join(dir, "voyage.sqlite");
+    execFileSync(process.execPath, ["scripts/build-wiki-pack.mjs", "--out", out, "--shards", shard, "--no-embed"], { stdio: "pipe" });
+    vp = await WikiPack.open(nodeSqliteDatabase(out), decompress);
+  }, 60000);
+  const shareOf = async (q: string, title: string) => {
+    const id = await vp.resolveTitle(title, { fuzzy: false, source: "enwikivoyage" });
+    return (await vp.titlesInQuestion(q, await vp.stems(q))).find((n) => n.id === id)?.share ?? 0;
+  };
+
+  it("a name in a biography or history question is not a destination, even with a travel-looking word", async () => {
+    // A destination gets share 1 (goes first); these may still be found by the ordinary share rule, never as destinations.
+    expect(await shareOf("Where did Charles Darwin travel on the Beagle?", "Darwin")).toBeLessThan(1);
+    expect(await shareOf("Why are New York taxis yellow?", "New York City")).toBeLessThan(1);
+    expect(await shareOf("When did Brazil change its currency to the real?", "Brazil")).toBeLessThan(1);
+    expect(await shareOf("How long can Jordan stay in the air when he dunks?", "Jordan")).toBeLessThan(1);
+  });
+
+  it("only the first destination of a travel question counts (PT 'Argentina no Natal': Natal is Christmas)", async () => {
+    const q = "Preciso de visto para visitar a Argentina no Natal?";
+    expect(await shareOf(q, "Argentina")).toBe(1);
+    expect(await shareOf(q, "Natal")).toBeLessThan(1);
+  });
+
+  it("a bare name that redirects to a disambiguation page is never put first", async () => {
+    const dis = await vp.resolveTitle("Georgia (disambiguation)", { fuzzy: false, source: "enwikivoyage" });
+    for (const q of ["Is tap water safe to drink in Georgia?", "Do I need a visa for Georgia?"]) {
+      const named = await vp.titlesInQuestion(q, await vp.stems(q));
+      expect(named.map((n) => n.id), q).not.toContain(dis);
+      const hits = await vp.search(q);
+      expect(hits[0]?.title, q).not.toBe("Georgia (disambiguation)");
+    }
+  });
+
+  it("a practical travel question still goes to the guide it names", async () => {
+    expect(await shareOf("What plug type and voltage does Brazil use?", "Brazil")).toBe(1);
+    expect((await vp.search("What plug type and voltage does Brazil use?"))[0]?.title).toBe("Brazil");
   });
 });

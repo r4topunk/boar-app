@@ -192,10 +192,16 @@ const TRAVEL_INTENT = /\b(visit|visiting|things to (see|do)|what (can|should) (i
  * generic word makes other questions look like travel ("Em que época Roma caiu?", "Tips for learning Rust").
  */
 const TRAVEL_PRACTICAL =
-  /\b(plugs?|plug types?|voltage|currency|atms?|pay (by|with) (a )?card|tipping|tap water|drinking water|emergency numbers?|visas?|driving licen[cs]e|drive on the (left|right)|ride-?hailing|taxis?|say .+ in|phrasebook|best time to (visit|go|travel)|tomadas?|voltagem|moeda|pagar com cart[aã]o|gorjetas?|[aá]gua da torneira|preciso de visto|visto de turista|t[aá]xis?|como (se )?diz|melhor [eé]poca para)\b/i;
-/** A travel question: the only kind whose capitalized Wikivoyage destination goes first. */
+  /\b(plugs?|plug types?|voltage|what currency|currency (is )?used|atms?|pay (by|with) (a )?card|tipping|tap water|drinking water|emergency numbers?|visas?|driving licen[cs]e|drive on the (left|right)|ride-?hailing|say .+ in|phrasebook|best time to (visit|go|travel)|tomadas?|voltagem|moeda|pagar com cart[aã]o|gorjetas?|[aá]gua da torneira|preciso de visto|visto de turista|como (se )?diz|melhor [eé]poca para)\b/i;
+/** Trip-specific TRAVEL_INTENT phrases; not bare travel/trip/stay/eat ("Where did Darwin travel on the Beagle?"). */
+const TRIP_INTENT = /\b(visit|visiting|things to (see|do)|see and do|get (to|there|around)|getting (to|around)|hotels?|hostels?|airports?|tourists?|itinerary|sightseeing)\b/i;
+
+/**
+ * A travel question: the only kind whose capitalized Wikivoyage destination goes first. Narrower than
+ * TRAVEL_INTENT, which only orders sources (the guide before the encyclopedia article).
+ */
 export function isTravelQuestion(query: string): boolean {
-  return TRAVEL_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
+  return TRIP_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
 }
 
 /** Question words that open an EN or PT question: capitalized there, never a destination ("Como tratar…"). */
@@ -591,22 +597,29 @@ export class WikiPack {
     const scored = rows
       .filter((r) => r !== lead)
       .map((r) => {
+        // The section is read once per chunk here: the one-per-section filter below compared it for every pair.
+        const sec = sectionAt(a.text, r.start);
         const s = this.passageScore(a.text, r.start, r.end, stems);
-        if (!action) return { r, s };
+        if (!action) return { r, s, sec };
         // A what-to-do question wants the article's Treatment/First aid/During section, not its Prevention or History.
-        const kind = sectionKind(sectionAt(a.text, r.start));
-        if (kind === "background") return { r, s: s * 0.3 };
+        const kind = sectionKind(sec);
+        if (kind === "background") return { r, s: s * 0.3, sec };
         // Among what-to-do sections, the one that gives steps ("Stay indoors. Get down… Hold on…") over context; a
         // neutral heading whose text is mostly steps counts as a what-to-do section.
         const share = instructionShare(a.text.slice(r.start, r.end));
-        if (kind === "other") return { r, s: share >= STEPS_SHARE ? s + 0.5 + 0.4 * share : s };
-        return { r, s: s + (kind === "action" ? 0.5 : 0.25) + 0.4 * share };
+        if (kind === "other") return { r, s: share >= STEPS_SHARE ? s + 0.5 + 0.4 * share : s, sec };
+        return { r, s: s + (kind === "action" ? 0.5 : 0.25) + 0.4 * share, sec };
       })
       .sort((x, y) => y.s - x.s || y.r.start - x.r.start)
       // One passage per section (the best-scored, first after the sort): two chunks of "Intravenous fluids" would
       // crowd out another section.
-      .filter((x, i, all) => all.findIndex((y) => sectionAt(a.text, y.r.start) === sectionAt(a.text, x.r.start)) === i);
-    const ordered = action ? stepsFirst(scored, (x) => sectionAt(a.text, x.r.start)) : scored;
+      .filter(
+        (
+          (seen) => (x: { sec: string }) =>
+            !seen.has(x.sec) && (seen.add(x.sec), true)
+        )(new Set<string>())
+      );
+    const ordered = action ? stepsFirst(scored, (x) => x.sec) : scored;
     const picked = ordered.slice(0, nSections).filter((x) => x.s > 0.15);
     const leadHit = () => this.hit(articleId, lead.id, lead.start, lead.end, 1, "title", true);
     if (explain) {
@@ -659,6 +672,11 @@ export class WikiPack {
     return this.hit(c.articleId, c.chunkId, c.start, c.end, c.score, "bm25");
   }
 
+  private async isDisambiguationPage(id: number): Promise<boolean> {
+    const row = await this.db.getFirstAsync<{ title: string }>("SELECT title FROM articles WHERE id = ?", [id]);
+    return !!row && /\(disambiguation\)$/i.test(row.title);
+  }
+
   /**
    * Articles named by the question itself: its longest n-grams that are
    * titles or redirects, in Wikipedia and in Wikivoyage (the guide first when
@@ -684,6 +702,10 @@ export class WikiPack {
     // the opening question word is never a name ("Como tratar uma queimadura?" -> Como, Italy).
     const travel = isTravelQuestion(query);
     const opening = (query.match(/[\p{L}\p{N}]+/u)?.[0] ?? "").toLowerCase();
+    // Capitalized multi-word names that resolved to nothing ("Charles Darwin" in a Wikivoyage-only pack):
+    // their inner words are part of a person's or thing's name, never a destination.
+    const unresolvedNames: string[][] = [];
+    let destinationTaken = false;
     for (const cand of titleCandidates(query)) {
       if (used.length >= max) break;
       const lower = cand.toLowerCase();
@@ -696,6 +718,9 @@ export class WikiPack {
       // (then only an exact title or alias can match it: "queimadura" -> Burn through its Portuguese alias).
       if (single && !/^\p{Lu}/u.test(cand) && !(await this.isRare(lower, rare)) && (await this.stems(lower)).length) continue;
       const ids: Array<{ id: number; primary: boolean }> = [];
+      // A word of a longer capitalized name that resolved to nothing is part of that name ("Darwin" in "Charles
+      // Darwin", "Jordan" in "Michael Jordan"): never an article of its own, destination or not.
+      if (single && unresolvedNames.some((words) => words.includes(lower))) continue;
       for (const source of sources) {
         const id =
           (await this.resolveTitle(cand, { fuzzy: false, source })) ??
@@ -703,10 +728,18 @@ export class WikiPack {
         // A destination a travel question names ("plug type in Brazil", "ride-hailing in Bangkok") is its subject even
         // though the name is common across the guides (low idf): the guide goes first, its best sections picked below.
         // Only in a travel question (TRAVEL_INTENT or TRAVEL_PRACTICAL).
-        const destination = travel && source === "enwikivoyage" && /^\p{Lu}/u.test(cand);
+        // A disambiguation page ("Georgia" -> "Georgia (disambiguation)") is a list of links, never the subject.
+        if (id !== null && (await this.isDisambiguationPage(id))) continue;
+        // Only the first destination the question names ("visitar a Argentina no Natal": Natal is Christmas).
+        const destination = travel && !destinationTaken && source === "enwikivoyage" && /^\p{Lu}/u.test(cand);
+        if (destination && id !== null) destinationTaken = true;
         if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) || destination });
       }
-      if (!ids.length) continue;
+      if (!ids.length) {
+        const words = lower.split(/\s+/);
+        if (words.length > 1 && cand.split(/\s+/).every((w) => /^\p{Lu}/u.test(w))) unresolvedNames.push(words);
+        continue;
+      }
       const own = await this.stems(cand);
       const words = new Set((lower.match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 1 && !STOPWORDS.has(w)));
       // A name with a word the index doesn't know ("ERC20", "sangramento nasal") can only have matched an exact
