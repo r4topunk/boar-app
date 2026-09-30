@@ -33,8 +33,12 @@ jobs:
       fail-fast: true
       matrix:
         variant: [downloader, offline]
+    env:
+      VARIANT: ${{ matrix.variant }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -70,19 +74,19 @@ jobs:
           # Public by design (the publishable key); empty means no "Share results" button.
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
-        run: scripts/build-variant.sh ${{ matrix.variant }}
+        run: scripts/build-variant.sh "$VARIANT"
 
       - name: Check package, versionCode and signer
         run: |
           version=$(node -p "require('./app.json').expo.version")
-          RELEASE_VARIANT=${{ matrix.variant }} scripts/check-release-apk.sh "dist/boar-${{ matrix.variant }}-${version}-arm64.apk"
+          RELEASE_VARIANT="$VARIANT" scripts/check-release-apk.sh "dist/boar-${VARIANT}-${version}-arm64.apk"
 
       - name: Name it as the release does
         run: |
           version=$(node -p "require('./app.json').expo.version")
-          if [ "${{ matrix.variant }}" = downloader ]; then name="boar-v${version}-arm64.apk"; else name="boar-offline-v${version}-arm64.apk"; fi
+          if [ "$VARIANT" = downloader ]; then name="boar-v${version}-arm64.apk"; else name="boar-offline-v${version}-arm64.apk"; fi
           mkdir -p out
-          mv "dist/boar-${{ matrix.variant }}-${version}-arm64.apk" "out/$name"
+          mv "dist/boar-${VARIANT}-${version}-arm64.apk" "out/$name"
           (cd out && sha256sum "$name" > "$name.sha256" && cat "$name.sha256")
 
       - name: Remove the key
@@ -98,12 +102,14 @@ jobs:
   publish:
     name: Draft release
     needs: build
-    if: inputs.tag != ''
+    if: inputs.tag != '' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           path: out
