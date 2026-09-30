@@ -116,6 +116,11 @@ jobs:
           version=$(node -p "require('./app.json').expo.version")
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3"; exit 1; }
           [ "$TAG" = "v$version" ] || { echo "tag $TAG doesn't match app.json's version $version"; exit 1; }
+          # An existing tag must be this commit: --target is ignored for a tag that's already there.
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null || true)
+          if [ -n "$existing" ] && [ "$existing" != "$GITHUB_SHA" ]; then
+            echo "tag $TAG already points to $existing, not this build ($GITHUB_SHA)"; exit 1
+          fi
           gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "BOAR $TAG" --notes "Draft: write the notes before publishing."
           # One at a time, in this order: make setup installs the first .apk.
           for f in "boar-$TAG-arm64.apk" "boar-$TAG-arm64.apk.sha256" "boar-offline-$TAG-arm64.apk" "boar-offline-$TAG-arm64.apk.sha256"; do
