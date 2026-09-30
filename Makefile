@@ -1,4 +1,4 @@
-.PHONY: shots-fidelity help setup install check-android start run-android build-eas test typecheck review clean knowledge-pack knowledge-pack-small apk-offline apk-downloader apk-both audit-apk
+.PHONY: shots-fidelity help setup install check-android start run-android build-eas test typecheck review clean knowledge-pack knowledge-pack-small apk-offline apk-downloader apk-both audit-apk check-release-apk
 
 help:
 	@echo "BOAR - Adaptive Local Intelligence"
@@ -12,6 +12,7 @@ help:
 	@echo "make apk-downloader - Release APK that downloads models in-app (declares INTERNET)"
 	@echo "make apk-both     - Both variants, into dist/, each audited"
 	@echo "make audit-apk APK=path.apk - Fail if an APK declares INTERNET or ships network/cloud libs"
+	@echo "make check-release-apk APK=path.apk [RELEASE_VARIANT=offline] - Before uploading: package, versionCode and release signer"
 	@echo "make test         - Run unit tests"
 	@echo "make typecheck    - Run TypeScript type checking"
 	@echo "make review       - CodeRabbit review of this branch against main (run before pushing)"
@@ -78,6 +79,9 @@ apk-both: apk-downloader apk-offline
 
 audit-apk:
 	scripts/audit-offline-apk.sh $(APK)
+
+check-release-apk:
+	RELEASE_VARIANT=$(or $(RELEASE_VARIANT),downloader) scripts/check-release-apk.sh $(APK)
 
 test:
 	npm test
