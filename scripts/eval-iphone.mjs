@@ -23,7 +23,7 @@
 //   --no-launch             don't (re)launch the app; it must already be in the foreground
 //   --timeout-min <n>       give up after n minutes (default 180)
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, openSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -189,14 +189,13 @@ async function main() {
   if (o.launch) {
     // Fresh process in the foreground; the console (llama.cpp + [javascript] logs) goes to console.log.
     const log = join(out, "console.log");
+    // The console goes straight to a file descriptor (no pipe through this process), so unref() lets the CLI exit.
+    const fd = openSync(log, "a");
     const child = spawn(
       DEVICECTL[0],
       [...DEVICECTL.slice(1), "device", "process", "launch", "--device", o.udid, "--terminate-existing", "--console", "-e", '{"GGML_METAL_DEVICES":"0","OS_ACTIVITY_DT_MODE":"YES"}', o.bundle],
-      { stdio: ["ignore", "pipe", "pipe"], detached: true }
+      { stdio: ["ignore", fd, fd], detached: true }
     );
-    const sink = (await import("node:fs")).createWriteStream(log);
-    child.stdout.pipe(sink);
-    child.stderr.pipe(sink);
     child.unref();
     console.log(`✓ launched ${o.bundle} (console → ${log})`);
     await sleep(8000);
@@ -252,4 +251,6 @@ async function main() {
   console.log(`\n${md}\nRaw rows: ${rowsLocal}`);
 }
 
-main().catch((e) => fail(e.message));
+main()
+  .then(() => process.exit(0))
+  .catch((e) => fail(e.message));
