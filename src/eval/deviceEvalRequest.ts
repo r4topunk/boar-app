@@ -127,36 +127,42 @@ export async function runDeviceEvalRequest(
 /** Pipeline "answer": the live answer() over the request's questions (answerEval.ts), same status protocol. */
 async function runAnswerRequest(
   request: EvalRequest,
-  installed: Awaited<ReturnType<typeof listInstalledEvalModels>>,
-  installedModels: string[],
+  installedBefore: Awaited<ReturnType<typeof listInstalledEvalModels>>,
+  installedModelsBefore: string[],
   callbacks: Pick<RunEvaluationOptions, "onProgress" | "onRow" | "shouldStop">
 ): Promise<EvaluationRun | null> {
   const { requestId } = request;
-  const resolved = resolveAnswerRequest(request, installed, EVAL_SET);
-  if (!resolved.ok) {
-    await writeStatus({ requestId, state: "failed", error: resolved.error, installedModels });
-    return null;
-  }
-  const configs = resolved.models.length ? resolved.models.map((m) => `answer:${m.id}`) : ["answer:current"];
-  const total = configs.length * resolved.questions.length;
-  let completed = 0;
-  let current: string | undefined;
+  let installed = installedBefore;
+  let installedModels = installedModelsBefore;
   let writes = Promise.resolve();
   // Every status carries the fields this build understood: the CLI may first read one after "accepted".
   const queueStatus = (status: Omit<EvalRequestStatus, "updatedAt">) => {
     writes = writes.then(() => writeStatus({ ...status, understood: UNDERSTOOD_FIELDS })).catch(() => {});
     return writes;
   };
+  // Downloads first, so a request can install the model it then evaluates (e.g. Qwen3-4B on a phone without it).
+  let install: EvalRequestStatus["install"];
+  if (request.install) {
+    await queueStatus({ requestId, state: "accepted", installedModels });
+    install = await installForEval(request.install, (line) => {
+      console.log(`[EVAL] ${line}`);
+      queueStatus({ requestId, state: "running", current: line, installedModels });
+    });
+    installed = await listInstalledEvalModels();
+    installedModels = installed.map((m) => m.id);
+  }
+  const resolved = resolveAnswerRequest(request, installed, EVAL_SET);
+  if (!resolved.ok) {
+    await queueStatus({ requestId, state: "failed", error: resolved.error, installedModels, install });
+    return null;
+  }
+  const configs = resolved.models.length ? resolved.models.map((m) => `answer:${m.id}`) : ["answer:current"];
+  const total = configs.length * resolved.questions.length;
+  let completed = 0;
+  let current: string | undefined;
   await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels });
   console.log(`[EVAL] device request ${requestId} (answer pipeline): ${configs.join(", ")} x ${resolved.questions.length} questions`);
   try {
-    let install: EvalRequestStatus["install"];
-    if (request.install) {
-      install = await installForEval(request.install, (line) => {
-        console.log(`[EVAL] ${line}`);
-        queueStatus({ requestId, state: "running", configs, total, completed, current: line, installedModels });
-      });
-    }
     const run = await runAnswerEvaluation({
       answerSettings: request.answerSettings,
       questions: resolved.questions,
