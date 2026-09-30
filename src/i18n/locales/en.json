@@ -299,6 +299,7 @@
     },
     "row": {
       "copying": "Copying",
+      "queued": "Waiting",
       "downloading": "Downloading",
       "verifying": "Checking",
       "loading": "Loading",
@@ -804,6 +805,7 @@
     },
     "activity": {
       "title": "In progress",
+      "queued": "Waiting to download {{name}}",
       "downloading": "Downloading {{name}}",
       "verifying": "Checking {{name}}",
       "indexing": "Building the search index"

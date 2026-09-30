@@ -47,6 +47,7 @@ function seal(state: RowState, t: TFunction): Seal {
     case "not-installed":
       return { label: t("flows.row.notOnDisk"), tone: "neutral", emphasis: "outline" };
     case "downloading":
+      if (state.phase === "queued") return { label: t("flows.row.queued"), tone: "neutral", emphasis: "outline", icon: "clock" };
       return { label: t(state.phase === "copying" ? "flows.row.copying" : "flows.row.downloading"), tone: "field", emphasis: "outline", icon: "loader" };
     case "verifying":
       return { label: t("flows.row.verifying"), tone: "field", emphasis: "outline", icon: "loader" };

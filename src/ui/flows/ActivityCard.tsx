@@ -34,17 +34,18 @@ export function ActivityCard({ activity, onOpenDownloads, onOpenIndex }: Props) 
       {downloads.map((d) => {
         const asset = findAsset(d.assetId);
         const name = asset ? catalogLabel(asset, t, { technical: true }) : d.assetId;
-        const label = t(d.phase === "verifying" ? "flows.activity.verifying" : "flows.activity.downloading", { name });
+        const label = t(`flows.activity.${d.phase}`, { name });
         const pct = Math.floor(d.progress * 100);
+        const queued = d.phase === "queued";
         return (
           <Pressable key={d.assetId} onPress={onOpenDownloads} accessibilityRole="button" style={{ gap: tokens.space.xxs }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", gap: tokens.space.sm }}>
               <Text variant="footnote" numberOfLines={1} style={{ flex: 1 }}>
                 {label}
               </Text>
-              <Text variant="footnote" color="secondary">{`${pct}%`}</Text>
+              {queued ? null : <Text variant="footnote" color="secondary">{`${pct}%`}</Text>}
             </View>
-            <Progress label={label} value={d.progress} />
+            {queued ? null : <Progress label={label} value={d.progress} />}
           </Pressable>
         );
       })}

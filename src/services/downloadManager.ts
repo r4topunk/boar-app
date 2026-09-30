@@ -30,10 +30,11 @@ export interface DownloadState {
   progress: number;
   error: string | null;
   /**
+   * "queued" = waiting for its turn (see the download queue below).
    * "verifying" = sha256 of the finished file (streaming, native); progress
    * then counts bytes hashed. "verified" = downloaded and sha256 matched.
    */
-  phase?: "downloading" | "verifying" | "verified" | "error";
+  phase?: "queued" | "downloading" | "verifying" | "verified" | "error";
   /** Set with `error`. */
   errorKind?: IntegrityErrorKind;
   /** Retrying the same source won't help; don't auto-retry (see AssetIntegrityError). */
@@ -66,6 +67,85 @@ export interface DownloadEvent {
 }
 type Listener = (event: DownloadEvent) => void;
 const listeners = new Set<Listener>();
+
+/**
+ * The download queue. Big files (models, knowledge packs) download one at a time, in the order
+ * they were asked for: on one connection several at once share the bandwidth, so all of them
+ * finish late, instead of the first one being usable early; each also hashes its whole file at the
+ * end, and checks free space only when it starts. Small files (the embedding model, map tiles, the
+ * city index) run a few at a time next to them, so a 5 GB model doesn't hold up a 30 MB file.
+ */
+export const LARGE_DOWNLOAD_BYTES = 100 * 1024 * 1024;
+export const LARGE_AT_ONCE = 1;
+export const SMALL_AT_ONCE = 3;
+
+interface Waiting {
+  asset: CatalogModel;
+  /** Settles the promise startDownload returned (on finish, or when taken out of the queue). */
+  done: () => void;
+}
+const waiting: Waiting[] = [];
+const runningLarge = new Set<string>();
+const runningSmall = new Set<string>();
+
+export const isLargeDownload = (asset: { sizeBytes?: number }) => (asset.sizeBytes ?? 0) >= LARGE_DOWNLOAD_BYTES;
+
+/** Pure: the queued ids that may start now, oldest first, given what is already running. */
+export function startableDownloads(
+  queue: { id: string; large: boolean }[],
+  running: { large: number; small: number }
+): string[] {
+  let large = running.large;
+  let small = running.small;
+  const out: string[] = [];
+  for (const q of queue) {
+    if (q.large ? large < LARGE_AT_ONCE : small < SMALL_AT_ONCE) {
+      out.push(q.id);
+      if (q.large) large++;
+      else small++;
+    }
+  }
+  return out;
+}
+
+/** Where a queued download is in its line (1 = next), or undefined when it isn't waiting. */
+export function queuePosition(assetId: string): number | undefined {
+  const me = waiting.find((w) => w.asset.id === assetId);
+  if (!me) return undefined;
+  const large = isLargeDownload(me.asset);
+  return waiting.filter((w) => isLargeDownload(w.asset) === large).findIndex((w) => w.asset.id === assetId) + 1;
+}
+
+function pump() {
+  const ids = startableDownloads(
+    waiting.map((w) => ({ id: w.asset.id, large: isLargeDownload(w.asset) })),
+    { large: runningLarge.size, small: runningSmall.size }
+  );
+  for (const id of ids) {
+    const i = waiting.findIndex((w) => w.asset.id === id);
+    if (i < 0) continue;
+    const [{ asset, done }] = waiting.splice(i, 1);
+    const lane = isLargeDownload(asset) ? runningLarge : runningSmall;
+    lane.add(asset.id);
+    run(asset).finally(() => {
+      lane.delete(asset.id);
+      done();
+      pump();
+    });
+  }
+}
+
+/** Takes a download out of the queue before it started; its promise settles. False if it wasn't waiting. */
+function dequeue(assetId: string): boolean {
+  const i = waiting.findIndex((w) => w.asset.id === assetId);
+  if (i < 0) return false;
+  const [{ done }] = waiting.splice(i, 1);
+  inFlight.delete(assetId);
+  inFlightAssets.delete(assetId);
+  state.delete(assetId);
+  done();
+  return true;
+}
 
 function notify(event: DownloadEvent = { progressOnly: false }) {
   listeners.forEach((l) => l(event));
@@ -125,6 +205,9 @@ export function listDownloadStates(): Array<{ assetId: string; state: DownloadSt
  * file that no longer exists.
  */
 export function resetDownloadState(): void {
+  for (const w of waiting.splice(0)) w.done();
+  runningLarge.clear();
+  runningSmall.clear();
   state.clear();
   inFlight.clear();
   inFlightAssets.clear();
@@ -140,6 +223,8 @@ export function resetDownloadState(): void {
  * truncate them (see restartDownload for the same race).
  */
 export async function cancelAllDownloads(): Promise<void> {
+  // The queued ones never started: out of the queue, nothing to stop.
+  for (const w of [...waiting]) dequeue(w.asset.id);
   const running = [...inFlight.entries()];
   await Promise.all(
     running.map(async ([id, promise]) => {
@@ -171,6 +256,8 @@ export async function cancelAllDownloads(): Promise<void> {
  * downloaded model comes back verified as 0 bytes.
  */
 export async function restartDownload(asset: CatalogModel): Promise<void> {
+  // Still waiting for its turn: nothing is writing to the file yet.
+  dequeue(asset.id);
   const stale = inFlight.get(asset.id);
   await modelManager.signalCancelDownload(asset);
   if (stale) {
@@ -204,11 +291,33 @@ async function startRequirements(asset: CatalogModel): Promise<void> {
   for (const req of missing) startDownload(req).catch(() => {});
 }
 
-/** Starts a download if one isn't already running for this asset; otherwise no-ops. */
+/**
+ * Queues a download unless one is already queued or running for this asset (then returns that one).
+ * The promise settles when it finished, failed (see its state) or was taken out of the queue.
+ */
 export function startDownload(asset: CatalogModel): Promise<void> {
   const existing = inFlight.get(asset.id);
   if (existing) return existing;
 
+  let done!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    done = resolve;
+  });
+  inFlight.set(asset.id, promise);
+  inFlightAssets.set(asset.id, asset);
+  state.set(asset.id, { downloading: true, phase: "queued", progress: 0, error: null, bytesWritten: 0, bytesExpected: asset.sizeBytes });
+  waiting.push({ asset, done });
+  pump();
+  // One that started at once already announced itself; one that waits says so.
+  if (waiting.some((w) => w.asset.id === asset.id)) notify({ assetId: asset.id, progressOnly: false });
+  // A places pack without the gazetteer can't answer "restaurants in <city>" (PL-1): whatever
+  // screen starts a download, what the asset requires comes with it.
+  void startRequirements(asset);
+  return promise;
+}
+
+/** One download, from its first byte to verified (or its error). Runs when the queue gives it a turn. */
+function run(asset: CatalogModel): Promise<void> {
   const now = Date.now();
   downloadTimestamps.set(asset.id, { lastBytes: 0, lastTime: now, startTime: now });
 
@@ -312,12 +421,6 @@ export function startDownload(asset: CatalogModel): Promise<void> {
       lastProgressNotify.delete(asset.id);
       notify({ assetId: asset.id, progressOnly: false });
     });
-
-  inFlight.set(asset.id, promise);
-  inFlightAssets.set(asset.id, asset);
-  // A places pack without the gazetteer can't answer "restaurants in <city>" (PL-1): whatever
-  // screen starts a download, what the asset requires comes with it.
-  void startRequirements(asset);
   return promise;
 }
 

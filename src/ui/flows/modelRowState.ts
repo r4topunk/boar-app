@@ -12,7 +12,7 @@
 import type { DownloadErrorDetail, IntegrityErrorKind } from "../../models/integrity";
 import { COMPACT_ONLY_MAX_RAM_BYTES } from "../../routing/defaultModel";
 
-export type DownloadPhase = "downloading" | "copying" | "verifying" | "verified" | "error";
+export type DownloadPhase = "queued" | "downloading" | "copying" | "verifying" | "verified" | "error";
 /** The trust layer's error kinds (src/models/integrity.ts). */
 export type DownloadErrorKind = IntegrityErrorKind;
 export type FitVerdict = "resident" | "streaming" | "thrashing" | "insufficient";
@@ -56,7 +56,8 @@ export interface RowInput {
 
 export type RowState =
   | { kind: "not-installed" }
-  | { kind: "downloading"; phase: "downloading" | "copying"; progress: number }
+  /** "queued": waiting for its turn in the download queue (src/services/downloadManager.ts). */
+  | { kind: "downloading"; phase: "queued" | "downloading" | "copying"; progress: number }
   | { kind: "verifying"; progress: number | null }
   | { kind: "failed"; errorKind: DownloadErrorKind | "load"; message: string; permanent: boolean; detail?: DownloadErrorDetail }
   | { kind: "loading" }
@@ -146,7 +147,8 @@ function stateOf(input: RowInput): RowState {
   }
   if (dl?.downloading) {
     if (dl.phase === "verifying") return { kind: "verifying", progress: verifyProgress(dl) };
-    return { kind: "downloading", phase: dl.phase === "copying" ? "copying" : "downloading", progress: dl.progress };
+    const phase = dl.phase === "copying" || dl.phase === "queued" ? dl.phase : "downloading";
+    return { kind: "downloading", phase, progress: dl.progress };
   }
   if (!input.present) return { kind: "not-installed" };
   if (input.loadError) return { kind: "failed", errorKind: "load", message: input.loadError, permanent: false };
