@@ -208,6 +208,14 @@ export function isTravelQuestion(query: string): boolean {
 const ORIGIN_CUE =
   /\b(from|live in|living in|lives in|resident of|citizens? of|passport holders? of|compared (to|with)|saindo de|vindo de|partindo de|morando em|moro em|cidad[ãa]os? d[aeo]s?|comparad[oa] (a|com))\s+(the\s+|a\s+|an\s+|o\s+|os\s+|as\s+)?$/i;
 
+/**
+ * Words right before a place that make it where the question goes (EN, PT): "in Norway", "a visa for Japan",
+ * "visit Chiang Mai", "does Brazil use", "para o Brasil". A destination needs one, so the capitalized opening
+ * word ("Camping in Norway…", "Hotels in Tokyo…", "Moro em Lisboa…") never is one.
+ */
+const PLACE_CUE =
+  /\b(in|to|for|at|around|near|into|across|visit|visiting|does|do|is|are|em|para|pra|no|na|nos|nas|[àa]|ao|aos|[àa]s|visitar|conhecer)\s+(the\s+|a\s+|an\s+|o\s+|os\s+|as\s+)?$/i;
+
 /** Question words that open an EN or PT question: capitalized there, never a destination ("Como tratar…"). */
 const QUESTION_WORDS = new Set([
   "what", "when", "where", "why", "how", "who", "which", "whose", "is", "are", "can", "do", "does", "did", "should", "tell",
@@ -759,7 +767,7 @@ export class WikiPack {
 
   /**
    * The destination of a travel question: the first place it names, in reading order, that is a Wikivoyage
-   * guide in the destination role. Not where the traveller comes from ("a visa for Japan if I live in the United
+   * guide in the destination role, right after a place cue (PLACE_CUE: never the opening word). Not where the traveller comes from ("a visa for Japan if I live in the United
    * States", "to Kyoto from Tokyo Station"), not a region qualifying the place before it ("Victoria, British
    * Columbia", tried first as the guide "Victoria (British Columbia)"), not a word of a longer name that isn't
    * a guide ("Charles Darwin"), not the opening question word, never a disambiguation page.
@@ -782,7 +790,7 @@ export class WikiPack {
       const lower = c.toLowerCase();
       if (single && lower === opening && QUESTION_WORDS.has(lower)) continue;
       const before = query.slice(0, pos);
-      if (ORIGIN_CUE.test(before)) continue;
+      if (ORIGIN_CUE.test(before) || !PLACE_CUE.test(before)) continue;
       if (/\p{Lu}[\p{L}\p{N}.'’-]*,\s*$/u.test(before)) continue;
       const region = query.slice(end).match(/^,\s*(\p{Lu}[\p{L}.'’-]*(?:\s+\p{Lu}[\p{L}.'’-]*){0,3})/u)?.[1];
       const guide = { fuzzy: false, source: "enwikivoyage" as const };
