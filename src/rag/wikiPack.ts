@@ -652,7 +652,10 @@ export class WikiPack {
         const id =
           (await this.resolveTitle(cand, { fuzzy: false, source })) ??
           (singularTitle(cand) ? await this.resolveTitle(singularTitle(cand)!, { fuzzy: false, source }) : null);
-        if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) });
+        // A destination a travel question names ("plug type in Brazil", "ride-hailing in Bangkok") is its subject even
+        // though the name is common across the guides (low idf): the guide goes first, its best sections picked below.
+        const destination = source === "enwikivoyage" && /^\p{Lu}/u.test(cand);
+        if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) || destination });
       }
       if (!ids.length) continue;
       const own = await this.stems(cand);
