@@ -18,9 +18,9 @@ import { ModelManager } from "../models/ModelManager";
 import { resolvePlace, tilesFor } from "../rag/pois";
 import { getDownloadState, startDownload } from "../services/downloadManager";
 import { nameTilesAfter } from "../ui/flows/adapters";
-// The packs' catalog entries register when their module loads (the Knowledge screen imports them);
-// load them here so install.assets can find e.g. boar-wikivoyage-en without that screen opened first.
-import "../rag/wikiEnPacks";
+// The packs' catalog entries register when their module loads; load them here so install.assets can
+// find them without the Knowledge screen opened first. The English Wikipedia and Wikivoyage entries
+// (wikiEnPacks) aren't in the app's catalog, so they're only loaded when a benchmark installs (below).
 import "../rag/cryptoPack";
 import "../rag/preparedness";
 import "../rag/poiRegions";
@@ -55,6 +55,8 @@ export interface InstallReport {
  * Sequential and awaited; a failure is reported, not thrown, and the run goes on.
  */
 export async function installForEval(spec: EvalInstall, log: (line: string) => void = () => {}): Promise<InstallReport> {
+  // Only in a device benchmark: registering these in every build would put 15 Wikipedia shards in the catalog.
+  require("../rag/wikiEnPacks");
   const report: InstallReport = { installed: [], already: [], failed: [] };
   const manager = new ModelManager();
   const fetchOne = async (asset: NonNullable<ReturnType<typeof findAsset>>) => {
