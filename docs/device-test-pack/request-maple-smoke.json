@@ -1,0 +1,42 @@
+{
+ "requestId": "req-ricardo-maple-smoke",
+ "pipeline": "answer",
+ "models": [
+  "qwen3-4b-instruct-2507-q4km",
+  "maple-preview-TQ2_0"
+ ],
+ "questions": [
+  {
+   "id": "vit-fa-004",
+   "query": "is Japan's population larger than Nigeria's?",
+   "category": "comparison"
+  },
+  {
+   "id": "vit-fa-006",
+   "query": "could a blue whale weigh more than the largest dinosaur?",
+   "category": "reasoning"
+  },
+  {
+   "id": "vit-fa-011",
+   "query": "Who won the First World War?",
+   "category": "honesty-refusal"
+  },
+  {
+   "id": "vit-cry-007",
+   "query": "What is d/acc?",
+   "category": "crypto"
+  },
+  {
+   "id": "vit-hlt-003",
+   "query": "Is dengue more dangerous the second time you get it?",
+   "category": "health"
+  }
+ ],
+ "evalSetVersion": "vitalik-lantern-factual-5",
+ "answerAnyway": true,
+ "answerSettings": {
+  "quickFirst": true,
+  "alwaysComplete": false
+ },
+ "confirmLargeModels": true
+}

@@ -1,0 +1,102 @@
+{
+ "requestId": "req-ricardo-s16-qwen3-4b",
+ "pipeline": "answer",
+ "models": [
+  "qwen3-4b-instruct-2507-q4km"
+ ],
+ "questions": [
+  {
+   "id": "cry-001",
+   "query": "Which signature algorithms are quantum resistant?",
+   "category": "crypto-expert"
+  },
+  {
+   "id": "cry-002",
+   "query": "What is the difference between ML-DSA and SLH-DSA?",
+   "category": "crypto-expert"
+  },
+  {
+   "id": "cry-003",
+   "query": "Why is RSA broken by quantum computers but SHA-256 is not?",
+   "category": "crypto-expert"
+  },
+  {
+   "id": "cry-004",
+   "query": "What is EIP-4844 and what are blobs in Ethereum?",
+   "category": "crypto-expert"
+  },
+  {
+   "id": "trv-001",
+   "query": "What emergency numbers should I know in Thailand?",
+   "category": "travel-practical"
+  },
+  {
+   "id": "trv-002",
+   "query": "What plug type and voltage does Brazil use?",
+   "category": "travel-practical"
+  },
+  {
+   "id": "trv-003",
+   "query": "Is tap water safe to drink in Mexico City?",
+   "category": "travel-practical"
+  },
+  {
+   "id": "trv-004",
+   "query": "How do I get from Lisbon airport to the city center?",
+   "category": "travel-practical"
+  },
+  {
+   "id": "dng-001",
+   "query": "I just got bitten by a snake while hiking, two hours from the nearest road. What do I do right now?",
+   "category": "danger-situation"
+  },
+  {
+   "id": "dng-002",
+   "query": "My hiking partner is shivering, confused and slurring words in the cold. What should I do?",
+   "category": "danger-situation"
+  },
+  {
+   "id": "dng-003",
+   "query": "My child spilled boiling water on their arm. What do I do?",
+   "category": "danger-situation"
+  },
+  {
+   "id": "dng-004",
+   "query": "An earthquake starts while I'm inside a hotel room. What should I do, and what about after it stops?",
+   "category": "danger-situation"
+  },
+  {
+   "id": "mth-001",
+   "query": "My rental car uses 7.5 liters per 100 km. What is that in miles per US gallon?",
+   "category": "math-reasoning"
+  },
+  {
+   "id": "mth-002",
+   "query": "A hike is 18 km with 1,200 m of total climbing. Using Naismith's rule, about how long will it take?",
+   "category": "math-reasoning"
+  },
+  {
+   "id": "mth-003",
+   "query": "My dinner bill is 2,450 Thai baht and 1 US dollar is 36.5 baht. How much is that in dollars, and what is the total with a 10% tip?",
+   "category": "math-reasoning"
+  },
+  {
+   "id": "mth-004",
+   "query": "Three of us are hiking for two days and each person needs 3 liters of water per day. How much water do we need and how much does it weigh?",
+   "category": "math-reasoning"
+  }
+ ],
+ "evalSetVersion": "dataset-v2-s16",
+ "answerAnyway": true,
+ "answerSettings": {
+  "quickFirst": true,
+  "alwaysComplete": false
+ },
+ "install": {
+  "assets": [
+   "qwen3-4b-instruct-2507-q4km",
+   "boar-crypto",
+   "boar-wikivoyage-en"
+  ]
+ }
+}
