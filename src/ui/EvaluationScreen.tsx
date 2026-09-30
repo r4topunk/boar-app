@@ -7,7 +7,18 @@ import { getRoutingPreset } from "../models/settings";
 import type { CatalogModel } from "../models/manifest";
 import { EVAL_SET, EVAL_SET_VERSION } from "../eval/evalSet";
 import { EvalConfig, evalConfigId, EvalResultRow } from "../eval/evalHarness.pure";
-import { exportEvalResults, listInstalledEvalModels, runEvaluation, EvalProgress, EvaluationRun } from "../eval/evalHarness";
+import {
+  discardRun,
+  exportEvalResults,
+  keepFinishedRows,
+  listInstalledEvalModels,
+  loadLatestRun,
+  markRunShared,
+  runEvaluation,
+  EvalProgress,
+  EvaluationRun,
+  SavedRun,
+} from "../eval/evalHarness";
 import { runDeviceEvalRequest } from "../eval/deviceEvalRequest";
 import type { EvalRequest } from "../eval/deviceEvalRequest.pure";
 import { resultsSharingAvailable, shareDevice, shareEvalRun } from "../eval/shareResults";
@@ -75,14 +86,30 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
   const [shared, setShared] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<ShareDevice | null>(null);
   const stopRef = useRef(false);
+  // A run the app was closed during (a big model can run the phone out of memory): continue it
+  // instead of starting over. evalResume.pure.ts.
+  const [unfinished, setUnfinished] = useState<SavedRun | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [installed, p] = await Promise.all([listInstalledEvalModels(), getRoutingPreset()]);
+      const [installed, p, saved] = await Promise.all([
+        listInstalledEvalModels(),
+        getRoutingPreset(),
+        deviceRequest ? Promise.resolve(null) : loadLatestRun().catch(() => null),
+      ]);
       setModels(installed);
       setPreset(p);
       setSelected(new Set([...installed.map((m) => `model:${m.id}`), "adaptive"]));
+      if (!saved || (saved.rows.length === 0 && !saved.manifest.inFlight)) return;
+      if (!saved.manifest.endedAt) {
+        setUnfinished(saved);
+      } else if (!saved.manifest.sharedAt) {
+        // The last run, not shared yet: it can still be shared or exported after a restart.
+        setRows(saved.rows);
+        setRun({ runId: saved.manifest.runId, rows: saved.rows, savedPath: saved.savedPath, stopped: !!saved.manifest.stopped });
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const configs: EvalConfig[] = [
@@ -103,13 +130,14 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
     });
   };
 
-  const handleRun = async () => {
+  const handleRun = async (resume?: { saved: SavedRun; skipKilled: boolean }) => {
     impact(ImpactFeedbackStyle.Medium);
     stopRef.current = false;
     setRunning(true);
     setStopping(false);
-    setRows([]);
+    setRows(resume ? resume.saved.rows : []);
     setRun(null);
+    setUnfinished(null);
     const callbacks = {
       onProgress: setProgress,
       onRow: (row: EvalResultRow) => setRows((prev) => [...prev, row]),
@@ -118,7 +146,11 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
     try {
       const result = deviceRequest
         ? await runDeviceEvalRequest(deviceRequest, (p) => t("evaluation.adaptiveConfig", { preset: p }), callbacks)
-        : await runEvaluation({ configs: chosen, ...callbacks });
+        : await runEvaluation({
+            configs: chosen,
+            ...callbacks,
+            ...(resume && { resume: { manifest: resume.saved.manifest, rows: resume.saved.rows, skipKilled: resume.skipKilled } }),
+          });
       setRun(result);
     } catch (e: any) {
       toast({ message: `${t("evaluation.runFailedTitle")}: ${t(userErrorKey(e))}`, tone: "danger" });
@@ -127,6 +159,22 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
       setStopping(false);
       setProgress(null);
     }
+  };
+
+  const handleKeepFinished = async () => {
+    if (!unfinished) return;
+    impact(ImpactFeedbackStyle.Light);
+    const kept = await keepFinishedRows(unfinished);
+    setUnfinished(null);
+    setRows(kept.rows);
+    setRun(kept);
+  };
+
+  const handleDiscard = async () => {
+    if (!unfinished) return;
+    impact(ImpactFeedbackStyle.Light);
+    await discardRun(unfinished.manifest.runId).catch(() => {});
+    setUnfinished(null);
   };
 
   const handleStop = async () => {
@@ -189,7 +237,10 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     sendingRef.current = false;
     setSharing(false);
-    if (shareSucceeded(outcome.result)) setShared(run.runId);
+    if (shareSucceeded(outcome.result)) {
+      setShared(run.runId);
+      markRunShared(run.runId).catch(() => {});
+    }
     const status = outcome.status ? t("evaluation.shareProgress.log.status", { status: outcome.status }) : null;
     setShareUi((s) => s && { step: null, outcome, log: status ? [...s.log, { key: `${s.log.length}`, text: status }] : s.log });
     impact(shareSucceeded(outcome.result) ? ImpactFeedbackStyle.Medium : ImpactFeedbackStyle.Light);
@@ -211,6 +262,10 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
   })();
 
   const canRun = !running && !chatBusy && chosen.length > 0 && models !== null;
+  const killedLabel = unfinished?.manifest.inFlight
+    ? unfinished.manifest.configs.find((c) => evalConfigId(c) === unfinished.manifest.inFlight!.configId)?.label
+    : undefined;
+  const unfinishedTotal = unfinished ? unfinished.manifest.configs.length * unfinished.manifest.queryIds.length : 0;
 
   const autoStarted = useRef(false);
   useEffect(() => {
@@ -238,6 +293,38 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
           </Text>
         )}
       </View>
+
+      {unfinished && !running && (
+        <Section title={t("evaluation.unfinished.title")}>
+          <View style={{ padding: tokens.space.base, gap: tokens.space.sm }}>
+            <Text variant="callout">
+              {t("evaluation.unfinished.saved", { done: unfinished.rows.length, total: unfinishedTotal })}
+              {killedLabel ? ` ${t("evaluation.unfinished.killed", { model: killedLabel })}` : ""}
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: tokens.space.sm }}>
+              <Button
+                size="sm"
+                icon="play"
+                label={killedLabel ? t("evaluation.unfinished.continueSkipping") : t("evaluation.unfinished.continue")}
+                onPress={() => handleRun({ saved: unfinished, skipKilled: true })}
+                disabled={!!chatBusy || models === null}
+              />
+              {killedLabel && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="rotate-ccw"
+                  label={t("evaluation.unfinished.retry")}
+                  onPress={() => handleRun({ saved: unfinished, skipKilled: false })}
+                  disabled={!!chatBusy || models === null}
+                />
+              )}
+              <Button size="sm" variant="secondary" icon="check" label={t("evaluation.unfinished.keep")} onPress={handleKeepFinished} />
+              <Button size="sm" variant="ghost" icon="trash-2" label={t("evaluation.unfinished.discard")} onPress={handleDiscard} />
+            </View>
+          </View>
+        </Section>
+      )}
 
       {!deviceRequest && (
         <Section title={t("evaluation.configsTitle")}>
@@ -291,7 +378,7 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
           {running ? (
             <Button variant="destructive" icon="square" label={stopping ? t("evaluation.stopping") : t("evaluation.stop")} onPress={handleStop} disabled={stopping} />
           ) : (
-            <Button label={t("evaluation.run")} icon="play" onPress={handleRun} disabled={!canRun} />
+            <Button label={t("evaluation.run")} icon="play" onPress={() => handleRun()} disabled={!canRun} />
           )}
           {run && !running && (
             <>

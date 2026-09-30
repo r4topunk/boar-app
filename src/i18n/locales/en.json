@@ -64,6 +64,16 @@
     "progress": "Config {{config}}/{{configs}} · Query {{query}}/{{queries}}",
     "savedTo": "Saved to {{path}}",
     "stoppedEarly": "Stopped early — partial results saved.",
+    "unfinished": {
+      "title": "Unfinished evaluation",
+      "saved": "{{done}} of {{total}} answers were saved before the app closed.",
+      "killed": "It closed while {{model}} was running, probably because the phone ran out of memory. Skip it to count it as failed on this phone, or try it again.",
+      "continue": "Continue",
+      "continueSkipping": "Skip and continue",
+      "retry": "Try again",
+      "keep": "Keep what's done",
+      "discard": "Discard"
+    },
     "exportJsonl": "Export JSONL",
     "exportCsv": "Export CSV",
     "exportFailedTitle": "Export failed",
