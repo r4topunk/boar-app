@@ -19,16 +19,35 @@ import type { FitVerdict } from "../inference/memoryFit";
 export const COMPACT_ONLY_MAX_RAM_BYTES = 4.5 * 1024 ** 3;
 /**
  * On a phone with at most COMPACT_ONLY_MAX_RAM_BYTES, nothing bigger than the
- * compact model is chosen automatically (Piston, CR-1: the 4B on 3.8 GB was
- * OOM-killed). The compact 1.5B is ~1.1 GB; this leaves margin for its peers.
+ * compact model is used unless the user confirmed it (Piston, CR-1: the 4B on
+ * 3.8 GB was OOM-killed): not as the saved pick, the default or deep. The
+ * compact 1.5B is ~1.0 GB; this leaves margin for its peers.
  */
 export const LOW_RAM_MAX_MODEL_BYTES = 1.6e9;
 
-/** True when a model may not be picked automatically on this device (only after the user confirms it). */
-export function tooBigForLowRam(m: { answerTier?: "default" | "compact"; sizeBytes?: number }, totalRamBytes: number): boolean {
+/**
+ * Lower cap for the automatic pick only (rankAnswerModels, the automatic deep
+ * tier). Measured on an iPhone 13 (4 GB, 2026-09-30): ~1.5 GB models
+ * (MiniCPM5-2B, LFM2.5-2.6B Q4_0) load but thrash mmap and decode at
+ * ~0.35 tok/s, so the app never picks them by itself. A model of this size the
+ * user already chose stays in use (LOW_RAM_MAX_MODEL_BYTES decides that).
+ */
+export const AUTO_PICK_MAX_MODEL_BYTES = 1.1e9;
+
+function aboveLowRamCap(m: { answerTier?: "default" | "compact"; sizeBytes?: number }, totalRamBytes: number, cap: number): boolean {
   const lowRam = totalRamBytes > 0 && totalRamBytes <= COMPACT_ONLY_MAX_RAM_BYTES;
   if (!lowRam || m.answerTier === "compact") return false;
-  return m.answerTier === "default" || (m.sizeBytes ?? Number.POSITIVE_INFINITY) > LOW_RAM_MAX_MODEL_BYTES;
+  return m.answerTier === "default" || (m.sizeBytes ?? Number.POSITIVE_INFINITY) > cap;
+}
+
+/** True when a model may not be used on this device, even as the saved pick, until the user confirms it. */
+export function tooBigForLowRam(m: { answerTier?: "default" | "compact"; sizeBytes?: number }, totalRamBytes: number): boolean {
+  return aboveLowRamCap(m, totalRamBytes, LOW_RAM_MAX_MODEL_BYTES);
+}
+
+/** True when the app may not pick a model by itself on this device (the user can still choose it). */
+export function tooBigForAutoPick(m: { answerTier?: "default" | "compact"; sizeBytes?: number }, totalRamBytes: number): boolean {
+  return aboveLowRamCap(m, totalRamBytes, AUTO_PICK_MAX_MODEL_BYTES);
 }
 
 /** The compact tier, or an untiered model no bigger than it: too small to answer from memory unasked. */
@@ -104,7 +123,7 @@ export function rankAnswerModels(candidates: AnswerModelCandidate[], totalRamByt
   const others = candidates.filter((c) => !c.answerTier);
 
   const notPicked = (c: AnswerModelCandidate): NotPickedReason => {
-    if (tooBigForLowRam(c, totalRamBytes)) return "low-ram";
+    if (tooBigForAutoPick(c, totalRamBytes)) return "low-ram";
     if (!fits(c)) return "wont-fit";
     if (tooSlow(c)) return "too-slow";
     if (!c.answerTier && c.tokPerSec === undefined) return "unmeasured";
@@ -117,7 +136,7 @@ export function rankAnswerModels(candidates: AnswerModelCandidate[], totalRamByt
     const reason: PickReason = !def || lowRam ? "compact-low-ram" : tooSlow(def) && fits(def) ? "compact-default-too-slow" : "compact-does-not-fit";
     pick = { id: compact.id, reason };
   } else {
-    const allowed = (c: AnswerModelCandidate) => !tooBigForLowRam(c, totalRamBytes);
+    const allowed = (c: AnswerModelCandidate) => !tooBigForAutoPick(c, totalRamBytes);
     const fast = others.filter((c) => allowed(c) && fits(c) && c.tokPerSec !== undefined && !tooSlow(c)).sort((a, b) => size(b) - size(a))[0];
     if (fast) pick = { id: fast.id, reason: "largest-fast" };
     else {

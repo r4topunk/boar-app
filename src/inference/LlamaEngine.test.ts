@@ -5,9 +5,11 @@ type FakeContext = {
   released: boolean;
   release: () => Promise<void>;
   completion: (params: unknown, onToken: (d: { token: string }) => void) => Promise<{ text: string }>;
-  stopCompletion: () => Promise<void>;
+  stopCompletion: () => Promise<void> | undefined;
   releasedWhileGenerating: boolean;
 };
+/** llama.rn's JSI stopCompletion returns undefined instead of a promise (rc.4 and rc.6 alike). */
+let stopReturnsNothing = false;
 const created: FakeContext[] = [];
 const initParams: Record<string, unknown>[] = [];
 const ram = { total: 12 * 1024 ** 3, rss: 1024 ** 3, avail: 0 };
@@ -62,8 +64,9 @@ vi.mock("llama.rn", () => ({
               resolve({ text: "Hi" });
             }, 20);
         }),
-      stopCompletion: async () => {
+      stopCompletion: () => {
         finish?.();
+        return stopReturnsNothing ? undefined : Promise.resolve();
       },
     };
     created.push(ctx);
@@ -94,6 +97,7 @@ beforeEach(() => {
   maxConcurrentInits = 0;
   initFailures.length = 0;
   platform.OS = "android";
+  stopReturnsNothing = false;
 });
 
 describe("LlamaEngine Metal fallback (iPhone 13)", () => {
@@ -197,6 +201,23 @@ describe("LlamaEngine load/unload", () => {
     expect(created[0].released).toBe(true);
     expect(created[0].releasedWhileGenerating).toBe(false);
     expect(engine.getModelInfo()?.filename).toBe("models/b.gguf");
+  });
+
+  it("switches models twice mid-generation with a stopCompletion that returns no promise and keeps one context loaded", async () => {
+    stopReturnsNothing = true;
+    const engine = new LlamaEngine();
+    await engine.load("models/a.gguf");
+    const first = engine.generate({ prompt: "say hi" });
+    await engine.load("models/b.gguf");
+    const second = engine.generate({ prompt: "say hi" });
+    await engine.load("models/a.gguf");
+    await expect(first).resolves.toBe("Hi");
+    await expect(second).resolves.toBe("Hi");
+    expect(created).toHaveLength(3);
+    expect(live()).toHaveLength(1);
+    expect(live()[0].model).toContain("models/a.gguf");
+    expect(created.some((c) => c.releasedWhileGenerating)).toBe(false);
+    expect(engine.getModelInfo()?.filename).toBe("models/a.gguf");
   });
 });
 

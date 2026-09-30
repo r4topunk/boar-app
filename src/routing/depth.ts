@@ -19,7 +19,7 @@
  *
  * Pure and deterministic, like router.ts: same inputs, same plan.
  */
-import { tooBigForLowRam } from "./defaultModel";
+import { tooBigForAutoPick } from "./defaultModel";
 import { isRetrievalIrrelevant } from "./classify";
 import type { FitVerdict } from "../inference/memoryFit";
 import type { AnswerTier } from "./events";
@@ -161,10 +161,10 @@ export function measuredSpeeds(records: SpeedSample[]): Map<string, number> {
 /** Rule D6 for a picker: eligible for the automatic deep tier? No measurement (or too few samples) = not eligible. */
 export function deepAutoEligible(
   speed: ModelSpeed | null | undefined,
-  /** CR-1: with the model and the device RAM, a model above the compact size is never automatic on a low-RAM phone. */
+  /** CR-1: with the model and the device RAM, a model above AUTO_PICK_MAX_MODEL_BYTES is never automatic on a low-RAM phone. */
   device?: { model: { answerTier?: "default" | "compact"; sizeBytes?: number }; totalRamBytes: number }
 ): boolean {
-  if (device && tooBigForLowRam(device.model, device.totalRamBytes)) return false;
+  if (device && tooBigForAutoPick(device.model, device.totalRamBytes)) return false;
   return !!speed && speed.samples >= MIN_SPEED_SAMPLES && speed.medianTokPerSec >= DEEP_AUTO_MIN_TOK_PER_SEC;
 }
 

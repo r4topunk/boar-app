@@ -269,7 +269,7 @@
       "saveFailed": "Couldn't save that change. Try again.",
       "resetFailed": "Couldn't erase the data: {{error}}",
       "quickFirstHint": "Shows a source passage in under a second.",
-      "alwaysCompleteHint": "Researches each part of the question. Slower.",
+      "alwaysCompleteHint": "Researches each part of the question. Much slower, and no better answers on 4 GB phones.",
       "palette": "Colors",
       "paletteFogueira": "Campfire",
       "paletteLuar": "Moonlight",
