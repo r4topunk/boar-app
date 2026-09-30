@@ -11,7 +11,7 @@ Crypto + travel questions of eval set v2 (n = 30: 20 crypto, 10 travel). The qua
 | Qwen2.5-1.5B Q4_K_M | **0.42** (0.36–0.49), 42% correct | 0.33 (0.28–0.39), 10% correct | 1.3 s | crypto 60.2 s, travel 30.0 s |
 | LFM2.5-1.2B Q4_K_M | **0.37** (0.31–0.43), 22% correct | 0.33 (0.28–0.39), 12% correct | 1.2 s | crypto 49.4 s, travel 39.4 s |
 
-- **Crypto alone, Qwen:** quick 0.44 (0.37–0.52) vs full 0.33 (0.28–0.38). The intervals don't overlap.
+- **Crypto alone, Qwen:** quick 0.44 (0.37–0.52) vs full 0.33 (0.28–0.38). The intervals overlap slightly (0.37–0.38).
 - **Travel alone, Qwen:** quick 0.41 vs full 0.34, with overlapping intervals (n = 10).
 - **"Quick" is as shipped.** A declined answer (no strong source) is scored as the decline. With "Answer anyway" re-asks the quick numbers are 0.43 (Qwen) and 0.39 (LFM), and the conclusion doesn't change.
 - **A tested variant doesn't close the gap.** Giving the full mode's synthesis the top sources (experiment knob, not shipped) scored 0.36. The gap comes from the multi-pass itself with a small model: decomposition plus errors compounding across steps.
