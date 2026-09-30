@@ -18,6 +18,12 @@ import { ModelManager } from "../models/ModelManager";
 import { resolvePlace, tilesFor } from "../rag/pois";
 import { getDownloadState, startDownload } from "../services/downloadManager";
 import { nameTilesAfter } from "../ui/flows/adapters";
+// The packs' catalog entries register when their module loads (the Knowledge screen imports them);
+// load them here so install.assets can find e.g. boar-wikivoyage-en without that screen opened first.
+import "../rag/wikiEnPacks";
+import "../rag/cryptoPack";
+import "../rag/preparedness";
+import "../rag/poiRegions";
 import { DEFAULT_PERSONALITY_ID, getPersonality } from "../constants/personalities";
 import { EVAL_RESULTS_DIR, EvalProgress } from "./evalHarness";
 import { EvalConfig, evalRowsToJsonl, newEvalRunId } from "./evalHarness.pure";
