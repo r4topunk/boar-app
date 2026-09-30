@@ -9,14 +9,14 @@ import { splitThinking } from "../../services/thinking";
 import { cleanCitations } from "../../services/citations";
 import { splitInlineBullets } from "../../services/answerFormat";
 import { answerPhase, canDeepen, isLocating, noSourceKind, type AnswerState, type TierState } from "./answerReducer";
-import { declineAfterSnippet, declineCopy, answerReceiptShort, pillStep, snippetAutoCollapses, generatingSteps, noticeShown, stepsCardShown, showsAnswerBody, noSourceNote, offersAskModel, receiptTagKey, showsInstantSnippet, stepSpinnerRuns, sourceLanguageLead, previewText, receiptDetails, receiptLine, type GeneratingStep } from "./presentation";
+import { declineAfterSnippet, declineCopy, answerReceiptShort, pillStep, snippetAutoCollapses, generatingSteps, noticeShown, stepsCardShown, showsAnswerBody, noSourceNote, offersAskModel, receiptTagKey, showsInstantSnippet, sourceLanguageLead, previewText, receiptDetails, receiptLine } from "./presentation";
 import { answerSourceSplit, groupSources, sourcesCardMode, relevanceBands, bestBand, BAND_FILL, sourceParts, type RelevanceBand } from "./sourceLabel";
 import { answerShowsEmergencyNote } from "./safetyNote";
 import { withoutUncitedPreface } from "./uncitedPreface";
 import { formatSeconds } from "./shareFormat";
 import { LocatingPrompt, PlacesCard } from "./PlacesCard";
 import type { AnswerReceipt } from "./answerEvents";
-import { sameAnswerFields, sameNumbers, sameSteps } from "./renderEquality";
+import { sameAnswerFields, sameNumbers } from "./renderEquality";
 import { lineSlop } from "./touch";
 import { chatLargeText } from "./largeText";
 import Reanimated, { LayoutAnimationConfig } from "react-native-reanimated";
@@ -24,8 +24,9 @@ import { Reveal } from "./Reveal";
 import { useSmoothText } from "./useSmoothText";
 import { answerStillShowing, isDraining } from "./streamReveal";
 import { Swap } from "./Swap";
-import { StepsSlot } from "./StepsSlot";
 import { useMotion } from "../theme/motion";
+import { deepFromFor, deepSectionLabeled, foldAttempt, researchPhase, summaryItems, timelinePillStep, type AttemptTimeline, type Timeline } from "./liveResearch";
+import { ResearchPanel } from "./ResearchCard";
 
 export interface AssistantMessageProps {
   answer: AnswerState;
@@ -60,6 +61,19 @@ export interface AssistantMessageProps {
   onAnswerAnyway?: () => void;
   onUseLocation?: () => void;
   onGetMap?: () => void;
+}
+
+/**
+ * One tier's research timeline (LIVE_RESEARCH): while `on` (the tier runs), each render folds what the
+ * answer shows into it (the events keep no history: which part found which article is only known here);
+ * after, it stays as it was, for the pill. Null for answers that never researched in this mount (history).
+ * `foldTimeline` returns the same object when nothing changed, so the panel's memo holds while text streams.
+ */
+function useTimeline(attempt: string, on: boolean, sources: AnswerState["sources"], from: number, detail: unknown, searching: boolean): Timeline | null {
+  // Keyed by the attempt: Retry reuses this message (and this ref) for a new answer() id (foldAttempt).
+  const ref = useRef<AttemptTimeline | null>(null);
+  ref.current = foldAttempt(ref.current, attempt, on, { sources: from > 0 ? sources.slice(from) : sources, detail, searching });
+  return ref.current?.timeline ?? null;
 }
 
 function useElapsedSeconds(running: boolean): number {
@@ -109,40 +123,6 @@ const StepSpinner = memo(function StepSpinner({ still = false }: { still?: boole
     />
   );
 });
-
-/**
- * What the answer is doing, as the mockup's step card: every step from the start (generatingSteps), each
- * with its icon; on the right a check when done, the turning ring on the current one, a small dot for the
- * ones still to come. Visual only; the reader hears stage changes through the screen's announcer.
- */
-const StepsCard = memo(function StepsCard({ steps, still }: { steps: GeneratingStep[]; still: boolean }) {
-  const t = useTokens();
-  // Icon-align round: leading icon and trailing status on the optical centre of the label's first line.
-  const line = useOpticalLine("footnote");
-  return (
-    <Card padding="compact" radius="card" style={{ gap: t.space.sm }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-      {steps.map((s) => (
-        <View key={s.key} style={{ flexDirection: "row", alignItems: "flex-start", gap: icon.gap }}>
-          <IconSlot name={s.icon} line={line} color={s.status === "active" ? t.color.accent.solid : t.color.text.secondary} />
-          <Text variant="footnote" weight={s.status === "active" ? "semibold" : "regular"} color={s.status === "pending" ? "secondary" : "primary"} style={{ flex: 1 }}>
-            {s.label}
-          </Text>
-          {s.status === "done" ? (
-            <IconSlot name="check" line={line} color={t.color.status.success.solid} edge="end" />
-          ) : (
-            <LineSlot line={line}>
-              {s.status === "active" ? (
-                <StepSpinner still={still} />
-              ) : (
-                <View style={{ width: t.space.sm, height: t.space.sm, borderRadius: t.radius.full, backgroundColor: t.color.line.hairline }} />
-              )}
-            </LineSlot>
-          )}
-        </View>
-      ))}
-    </Card>
-  );
-}, (a, b) => a.still === b.still && sameSteps(a.steps, b.steps));
 
 /** Seconds since the answer started, as the mockup's pill at the right of the name (the receipt takes its place when done). */
 function Elapsed({ locale, step }: { locale: string; step?: string }) {
@@ -969,6 +949,7 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
     return () => onRevealing?.(false);
   }, [onRevealing, revealing]);
   const t = useTokens();
+  const blockMotion = useMotion();
   const { t: tr } = useTranslation();
   const phase = answerPhase(answer);
   // No strong source: no [n] citations, even if weak passages came back (weak-sources spec rule 4).
@@ -998,34 +979,70 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
     showsAnswerBody(answer) && !!(answer.fast?.text || answer.deep?.text || answer.instant || answer.extract || answer.places?.places.length);
   const done = !active && (lastTier?.outcome || instantOnly);
   const steps = running && !stopping ? generatingSteps(answer, tr) : null;
-  // The pill keeps its last step until it becomes the receipt (one swap, not two).
-  const currentStep = steps?.find((x) => x.status === "active")?.short;
-  const lastStep = useRef<string | undefined>(undefined);
-  if (currentStep) lastStep.current = currentStep;
-  const shownStep = pillStep(currentStep, lastStep.current);
-  const ringStill = !stepSpinnerRuns(answer);
-  // D3: the card shrinks at the first words while they take its place (the pill keeps the progress).
+  // D3: the live research card stays until the answer's own text starts, then folds into its pill.
   const stepsShown = stepsCardShown(answer, steps);
-  const fastSteps = !answer.deep && stepsShown && !props.waitingLibrary;
-  const fastStreaming = running && !answer.deep && !answer.fast?.outcome;
-  const deepStreaming = running && !!answer.deep && !answer.deep.outcome;
+  // The answer's own tier: the fast one, or the deep one for a question the router sent straight to the deep
+  // tier (no fast pass). Only a Deepen (deep after fast) is a section of its own, titled "Deeper answer".
+  const isDeepen = deepSectionLabeled(answer);
+  const deepOnly = !!answer.deep && !answer.fast;
+  const firstTier = deepOnly ? answer.deep : answer.fast;
+  const fastSteps = !isDeepen && stepsShown && !props.waitingLibrary;
+  const deepLive = isDeepen && stepsShown;
+  // LIVE_RESEARCH (direction A): each pass's research as a timeline, folded from what the answer shows on
+  // each render while it runs, then kept for the pill. Not for places (its sources are places).
+  const rPhase = researchPhase(phase);
+  const noArticle = !!answer.weakSources && answer.sources.length === 0;
+  // The attempt each timeline folds: the first answer() id (a Retry replaces it), and the last one for a Deepen.
+  const firstAttempt = answer.answerIds[0] ?? "";
+  const lastAttempt = answer.answerIds[answer.answerIds.length - 1] ?? "";
+  const fastTl = useTimeline(
+    firstAttempt,
+    running && !stopping && !isDeepen && !answer.places && !props.waitingLibrary && !firstTier?.outcome,
+    answer.sources,
+    0,
+    firstTier?.detail,
+    rPhase === "searching"
+  );
+  // A Deepen's timeline lists what its own search appends (the first answer's articles are in its sources card).
+  const deepFrom = useRef<{ key: string; from: number | null } | null>(null);
+  deepFrom.current = deepFromFor(deepFrom.current, lastAttempt, isDeepen && !answer.deep?.outcome, answer.sources.length);
+  const deepTl = useTimeline(lastAttempt, running && !stopping && isDeepen && !answer.deep?.outcome, answer.sources, deepFrom.current.from ?? 0, answer.deep?.detail, rPhase === "searching");
+  // The pill keeps its last step until it becomes the receipt (one swap, not two). It follows the card: a Deep
+  // Research part past its search reads "Reading…", not "Searching…" for the whole research (iPhone, r4to).
+  const tlStep = timelinePillStep(isDeepen ? deepTl : fastTl, rPhase);
+  const currentStep = tlStep && steps ? tr(tlStep) : steps?.find((x) => x.status === "active")?.short;
+  // Per attempt too: a retry's pill never starts from the previous attempt's last step.
+  const lastStep = useRef<{ key: string; step?: string }>({ key: lastAttempt });
+  if (lastStep.current.key !== lastAttempt) lastStep.current = { key: lastAttempt };
+  if (currentStep) lastStep.current.step = currentStep;
+  const shownStep = pillStep(currentStep, lastStep.current.step);
+  // The pill only where a model answered: an extractive-only answer shows its passage, not "1 article".
+  const fastPill = !!fastTl && !fastSteps && !!firstTier && summaryItems(fastTl) != null;
+  const deepPill = !!deepTl && !deepLive && summaryItems(deepTl) != null;
+  // The research card or its pill carries the articles while the answer runs: no count card below as well.
+  const researchCarries = fastSteps || fastPill || deepLive || deepPill;
+  const fastStreaming = running && !isDeepen && !firstTier?.outcome;
+  const deepStreaming = running && isDeepen && !answer.deep?.outcome;
+  const bodyEnter = useMemo(() => blockMotion.entering(), [blockMotion]);
 
-  const topReceipt = answer.fast?.receipt ?? (instantOnly ? answer.instantDone?.receipt : undefined);
+  // A question routed straight to the deep tier: its receipt is the answer's, by the name.
+  const topReceipt = answer.fast?.receipt ?? (deepOnly ? answer.deep?.receipt : instantOnly ? answer.instantDone?.receipt : undefined);
   const receipt = useReceipt(topReceipt, locale, receiptTagKey(answer), !!answer.weakDeclined);
   const locating = isLocating(answer);
   const waitingForCity = answer.places?.coverage === "needs_place" || locating;
   const fresh = !!props.fresh;
   const motion = useMemo(() => ({ appear: fresh, gap: t.space.md }), [fresh, t.space.md]);
-  const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless;
+  const sourcesShown = answer.sources.length > 0 && !placesOnly && !sourceless && !(cardMode === "found" && researchCarries);
   const instantBanner = !!instantOnly && !!answer.instantDone && answer.instantDone.outcome !== "success";
   const emergency = answerShowsEmergencyNote(answer, props.question ?? "", placesOnly);
   // The body's block opens with its first words, not before (an empty block would grow a bare gap).
-  const fastBody = !!answer.fast?.text && showsAnswerBody(answer);
+  const fastBody = !!firstTier?.text && showsAnswerBody(answer);
   // Waiting for the user to pick a city: no clock, no receipt (nothing was answered yet).
   const deepenNow = !active && phase === "done" && canDeepen(answer);
   const deepenEst = answer.deepAvailable?.estSeconds ? formatSeconds(answer.deepAvailable.estSeconds * 1000, locale) : null;
   // A decline has its receipt too, time only (Prism CX-9, NOVO NORTE P2).
-  const pill = waitingForCity ? null : active && !answer.deep ? "elapsed" : receipt ? "receipt" : null;
+  // A deep-tier-only answer has no first receipt to show meanwhile: its clock runs like a fast answer's.
+  const pill = waitingForCity ? null : active && !isDeepen ? "elapsed" : receipt ? "receipt" : null;
   return (
     <BlockMotion.Provider value={motion}>
       {/* The row's first mount (a new answer is empty then; a recycled or reopened one is whole) enters nothing:
@@ -1118,35 +1135,30 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
               </Card>
             ) : null}
           </Block>
-          {/* The steps and the text share one slot: the card gives way to the first words in place (D3, v2 P3). */}
-          <Block shown={fastSteps || fastBody}>
-            <StepsSlot
-              steps={fastSteps && steps ? <StepsCard steps={steps} still={ringStill} /> : null}
-              body={
-                fastBody && answer.fast ? (
-                  <TierBody tier={answer.fast} streaming={fastStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="fast" onDraining={onDraining} />
-                ) : null
-              }
-              released={!active || !!answer.fast?.outcome}
-            />
+          {/* The research card, folding into its pill above the text at the first words (LIVE_RESEARCH, D3). */}
+          <Block shown={fastSteps || fastPill || fastBody}>
+            {fastTl && (fastSteps || fastPill) ? <ResearchPanel timeline={fastTl} phase={fastSteps ? rPhase : null} live={fastSteps} none={noArticle} /> : null}
+            {fastBody && firstTier ? (
+              <Reanimated.View entering={bodyEnter}>
+                <TierBody tier={firstTier} streaming={fastStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="fast" onDraining={onDraining} />
+              </Reanimated.View>
+            ) : null}
           </Block>
-          <Block shown={noticeShown(answer.fast, interrupted && !answer.deep)}>
-            <Notice tier={answer.fast} snippetShown={!!answer.instant} interrupted={interrupted && !answer.deep} onRetry={props.onRetry} />
+          <Block shown={noticeShown(firstTier, interrupted && !isDeepen)}>
+            <Notice tier={firstTier} snippetShown={!!answer.instant} interrupted={interrupted && !isDeepen} onRetry={props.onRetry} />
           </Block>
 
-          <Block shown={!!answer.deep}>
-            {answer.deep && (
+          {/* A Deepen only: a question routed to the deep tier is the answer itself, above (iPhone, r4to). */}
+          <Block shown={isDeepen}>
+            {isDeepen && answer.deep && (
               <View style={{ paddingTop: t.space.md, borderTopWidth: t.size.hairline, borderTopColor: t.color.line.hairline }}>
                 {/* A section overline in secondary, like the others: ember isn't decoration (Prism CH-22). */}
                 <Text variant="label" color="secondary" header>
                   {tr("chat.deep.title")}
                 </Text>
                 <View style={{ paddingTop: t.space.sm }}>
-                  <StepsSlot
-                    steps={stepsShown && steps ? <StepsCard steps={steps} still={ringStill} /> : null}
-                    body={<TierBody tier={answer.deep} streaming={deepStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="deep" onDraining={onDraining} />}
-                    released={!active || !!answer.deep.outcome}
-                  />
+                  {deepTl && (deepLive || deepPill) ? <ResearchPanel timeline={deepTl} phase={deepLive ? rPhase : null} live={deepLive} /> : null}
+                  <TierBody tier={answer.deep} streaming={deepStreaming} sourceTitles={sourceTitles} onOpenSource={onOpenSource} drainKey="deep" onDraining={onDraining} />
                 </View>
                 <Block shown={noticeShown(answer.deep, interrupted)} gap={t.space.sm}>
                   <Notice tier={answer.deep} snippetShown={false} interrupted={interrupted} onRetry={props.onRetry} />
@@ -1181,7 +1193,8 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
           <Block shown={sourcesShown}>
             {sourcesShown && (
               // CT-2: once the engine says which [n] stayed, the card lists only those; nothing cited = no card.
-              // While it writes, only the count (Prism): no list that could shrink, no passage shown as a source yet.
+              // While it writes, only the count (Prism), and not even that while the research card or its pill
+              // carries the articles (LIVE_RESEARCH): the list comes in once the engine says which [n] stayed.
               // The count crossfades into the list while the block's height follows (SEND-MOTION S7).
               <Swap swapKey={cardMode === "found" || cardMode === "related" ? cardMode : "list"}>
                 {cardMode === "found" ? (

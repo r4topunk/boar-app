@@ -21,15 +21,22 @@ describe("chat perf guards (LAYOUT-AUDIT)", () => {
     expect(init![0]).toMatch(/finally \{\s*initInFlight\.current = false;/);
   });
 
-  it("GFXINFO: the step ring is the chat's only looping animation, and it stops once the text streams", () => {
+  it("GFXINFO: the chat's only loops are the library spinner and the research card's ambient, which stops once the text streams", () => {
     const files = [...readdirSync(__dirname).filter((f) => f.endsWith(".tsx")), "../ChatScreen.tsx", "../ChatHeader.tsx"];
     const loops = files.filter((f) => /Animated\.loop|withRepeat/.test(read(f)));
-    expect(loops).toEqual(["AssistantMessage.tsx"]);
+    expect(loops.sort()).toEqual(["AssistantMessage.tsx", "ResearchCard.tsx"]);
     const am = read("AssistantMessage.tsx");
     expect(am.match(/Animated\.loop/g)).toHaveLength(1);
     expect(am).toMatch(/const turning = !reduceMotion && !still;/);
-    expect(am).toMatch(/<StepSpinner still=\{still\} \/>/);
-    expect(am.match(/<StepsCard steps=\{steps\} still=\{ringStill\} \/>/g)).toHaveLength(2);
-    expect(am).toMatch(/const ringStill = !stepSpinnerRuns\(answer\);/);
+    // LIVE_RESEARCH: one loop drives the shimmer and the pulse, only on the live card, never under reduce motion;
+    // the live card goes (it folds into the pill) at the answer's first words (stepsCardShown).
+    const rc = read("ResearchCard.tsx");
+    expect(rc.match(/Animated\.loop/g)).toHaveLength(1);
+    expect(rc).toMatch(/const ambient = useAmbient\(live && !reduceMotion\);/);
+    expect(rc).toMatch(/duration: t\.motion\.loop\.sweep/);
+    expect(am).toMatch(/const fastSteps = !isDeepen && stepsShown && !props\.waitingLibrary;/);
+    expect(am).toMatch(/const deepLive = isDeepen && stepsShown;/);
+    expect(am).toMatch(/live=\{fastSteps\}/);
+    expect(am).toMatch(/live=\{deepLive\}/);
   });
 });

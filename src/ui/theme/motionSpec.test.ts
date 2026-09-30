@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crossfadeSpec, DELAY, DURATION, motionSpec, TRAVEL } from "./motionSpec";
+import { crossfadeSpec, DELAY, DURATION, enterScale, motionSpec, POP_SCALE, TRAVEL } from "./motionSpec";
 
 describe("motionSpec (DS §6)", () => {
   it("enter is base 220 decelerate with travel; exit is fast 150 accelerate", () => {
@@ -24,6 +24,14 @@ describe("motionSpec (DS §6)", () => {
     expect(x.out.duration).toBe(90);
     expect(x.in).toMatchObject({ duration: 220, delay: 90 });
     expect(crossfadeSpec(true).in).toMatchObject({ duration: 90, delay: 90, travel: 0 });
+  });
+
+  it("a pop enter starts slightly small, and is a plain fade under reduce motion", () => {
+    expect(POP_SCALE).toBeGreaterThan(0.8);
+    expect(POP_SCALE).toBeLessThan(1);
+    expect(enterScale(true, false)).toBe(POP_SCALE);
+    expect(enterScale(true, true)).toBe(1);
+    expect(enterScale(false, false)).toBe(1);
   });
 
   it("a skeleton waits 150 ms before it shows", () => {

@@ -5,9 +5,31 @@ import { numberFormat } from "./numberFormat";
 import { placesEmptyTitle } from "./placesFormat";
 import { chatModelName, chatModelNameById, type NameableModel } from "./modelName";
 import { answerSourceSplit } from "./sourceLabel";
+import { articleCount } from "./liveResearch";
 import { formatCount, toWords } from "../flows/format";
 
 type T = (key: string, opts?: Record<string, unknown>) => string;
+
+/**
+ * A Deep Research sub-question in progress ("part 2 of 3"): the engine sends it on the `retrieving`
+ * stage (answer.ts, multipass onProgress), so the searching step says which part it is on. Newer
+ * engines add the sub-question itself (detail.subQuestion, optional, written by the model): read
+ * defensively, one line, and only when it says something.
+ */
+function subQuestion(state: AnswerState): { index: number; count: number; question?: string } | null {
+  const d = (state.deep ?? state.fast)?.detail;
+  if (d?.index == null || !d.count) return null;
+  const raw = (d as { subQuestion?: unknown }).subQuestion;
+  const question = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
+  return question ? { index: d.index + 1, count: d.count, question } : { index: d.index + 1, count: d.count };
+}
+
+/** The searching step's label: "Researching 2/3: <sub-question>", "Researching part 2 of 3…", or plain searching. */
+function searchLabel(state: AnswerState, t: T): string {
+  const part = subQuestion(state);
+  if (!part) return t("chat.stage.searching");
+  return part.question ? t("chat.stage.partQuestion", part) : t("chat.stage.part", part);
+}
 
 /** The stage line under an answer that has no text yet (or a deep pass in progress). */
 export function stageLine(state: AnswerState, t: T): string | null {
@@ -15,13 +37,14 @@ export function stageLine(state: AnswerState, t: T): string | null {
   const phase = answerPhase(state);
   switch (phase) {
     case "searching":
-      return t("chat.stage.searching");
+      return searchLabel(state, t);
     case "loading_model":
       return t("chat.stage.loadingModel");
-    case "reading":
-      return state.sources.length > 0
-        ? t("chat.stage.reading", { count: state.sources.length })
-        : t("chat.stage.thinking");
+    case "reading": {
+      // Articles, not passages: three passages of one article are one source read (LIVE_RESEARCH audit #1).
+      const n = articleCount(state.sources);
+      return n > 0 ? t("chat.stage.reading", { count: n }) : t("chat.stage.thinking");
+    }
     case "verifying":
       return t("chat.stage.verifying");
     case "synthesizing": {
@@ -52,8 +75,11 @@ export function phaseAnnouncement(
     case "locating":
       // Once, when the wait starts: what is happening and that the city can be typed.
       return { message: t("chat.announce.locating") };
-    case "generating":
-      return { message: t("chat.announce.answering") };
+    case "generating": {
+      // Once per answer, with what it rests on (LIVE_RESEARCH a11y): the rows themselves are never announced.
+      const n = state.places ? 0 : articleCount(state.sources);
+      return { message: n > 0 ? t("chat.announce.answeringFrom", { count: n }) : t("chat.announce.answering") };
+    }
     case "done":
       if (state.places) {
         if (state.places.coverage === "needs_place") return { message: t("chat.places.whichCity") };
@@ -256,7 +282,7 @@ export function generatingSteps(state: AnswerState, t: T): GeneratingStep[] | nu
   const at = order[phase];
   if (at == null) return null;
   const status = (i: number): StepStatus => (i < at ? "done" : i === at ? "active" : "pending");
-  const n = state.sources.length;
+  const n = articleCount(state.sources);
   const read =
     phase === "loading_model"
       ? { label: t("chat.stage.loadingModel"), icon: "cpu" as const }
@@ -270,7 +296,7 @@ export function generatingSteps(state: AnswerState, t: T): GeneratingStep[] | nu
         ? { label: stageLine(state, t) ?? t("chat.stage.synthesizing"), icon: "layers" as const }
         : { label: t("chat.stage.writing"), icon: "zap" as const };
   return [
-    { key: "search", label: t("chat.stage.searching"), short: t("chat.stepShort.search"), icon: "search", status: status(0) },
+    { key: "search", label: phase === "searching" ? searchLabel(state, t) : t("chat.stage.searching"), short: t("chat.stepShort.search"), icon: "search", status: status(0) },
     { key: "read", label: read.label, short: t(phase === "loading_model" ? "chat.stepShort.load" : "chat.stepShort.read"), icon: read.icon, status: status(1) },
     { key: "write", label: write.label, short: t("chat.stepShort.write"), icon: write.icon, status: status(2) },
   ];

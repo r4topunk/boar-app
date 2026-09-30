@@ -13,9 +13,35 @@ describe("stageLine", () => {
     expect(stageLine({ answerIds: ["a"], sources: [] }, t)).toBe("chat.stage.searching");
   });
 
-  it("counts the sources being read", () => {
-    const s: AnswerState = { answerIds: ["a"], sources: [chunk, chunk], fast: { text: "", stage: "prefill" } };
-    expect(stageLine(s, t)).toBe('chat.stage.reading{"count":2}');
+  it("counts the articles being read, not their passages (LIVE_RESEARCH #1)", () => {
+    const s: AnswerState = { answerIds: ["a"], sources: [chunk, { ...chunk, chunkId: "c2" }], fast: { text: "", stage: "prefill" } };
+    expect(stageLine(s, t)).toBe('chat.stage.reading{"count":1}');
+    const two: AnswerState = { ...s, sources: [chunk, { ...chunk, chunkId: "c2", docId: "d2" }] };
+    expect(stageLine(two, t)).toBe('chat.stage.reading{"count":2}');
+  });
+
+  it("says which Deep Research part it is searching (engine: retrieving + detail)", () => {
+    const s: AnswerState = {
+      answerIds: ["a"],
+      sources: [],
+      fast: { text: "x", stage: null, outcome: "success" },
+      deep: { text: "", stage: "retrieving", detail: { index: 1, count: 3 } },
+    };
+    expect(stageLine(s, t)).toBe('chat.stage.part{"index":2,"count":3}');
+    expect(stageLine({ ...s, deep: { text: "", stage: "retrieving", detail: {} } }, t)).toBe("chat.stage.searching");
+  });
+
+  it("names the sub-question when a newer engine sends it (optional detail.subQuestion)", () => {
+    const at = (subQuestion: unknown): AnswerState => ({
+      answerIds: ["a"],
+      sources: [],
+      fast: { text: "x", stage: null, outcome: "success" },
+      deep: { text: "", stage: "retrieving", detail: { index: 0, count: 2, subQuestion } as never },
+    });
+    expect(stageLine(at("  How does\nmethane trap heat? "), t)).toBe('chat.stage.partQuestion{"index":1,"count":2,"question":"How does methane trap heat?"}');
+    expect(generatingSteps(at("What is CO2?"), t)![0].label).toBe('chat.stage.partQuestion{"index":1,"count":2,"question":"What is CO2?"}');
+    // Missing, blank or not a string: the numbered part, as today's engine.
+    for (const q of [undefined, "   ", 42]) expect(stageLine(at(q), t)).toBe('chat.stage.part{"index":1,"count":2}');
   });
 
   it("numbers the parts of a deep pass from 1", () => {
@@ -229,6 +255,17 @@ describe("generatingSteps (mockup: all steps from the start)", () => {
 
   it("is null once the answer is done", () => {
     expect(generatingSteps({ ...base, fast: { text: "x", stage: null, outcome: "success" } } as AnswerState, t)).toBeNull();
+  });
+
+  it("counts articles in the reading step and names the Deep Research part in the searching one", () => {
+    const passages = { ...base, sources: [chunk, { ...chunk, chunkId: "c2" }, { ...chunk, chunkId: "c3", docId: "d2" }] } as AnswerState;
+    expect(generatingSteps({ ...passages, fast: tier("prefill") }, t)![1].label).toBe('chat.stage.reading{"count":2}');
+    const deep = { ...passages, fast: { text: "x", stage: null, outcome: "success" }, deep: { text: "", stage: "retrieving", detail: { index: 0, count: 3 } } } as AnswerState;
+    const st = generatingSteps(deep, t)!;
+    expect(st[0]).toMatchObject({ status: "active", label: 'chat.stage.part{"index":1,"count":3}', short: "chat.stepShort.search" });
+    // Past the search the step is plain "searching" again: the part was the search's progress.
+    const synth = generatingSteps({ ...deep, deep: { text: "", stage: "synthesizing" } } as AnswerState, t)!;
+    expect(synth[0].label).toBe("chat.stage.searching");
   });
 });
 
