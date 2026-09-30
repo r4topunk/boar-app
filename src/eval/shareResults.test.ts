@@ -6,7 +6,9 @@ import {
   deviceIdentity,
   inferenceFeatures,
   parseCpuFeatures,
+  shareCanRetry,
   shareOutcome,
+  shareSucceeded,
   signedMessage,
   submitResultsUrl,
 } from "./shareResults.pure";
@@ -63,8 +65,8 @@ describe("shareOutcome", () => {
     [400, "rejected"],
     [401, "rejected"],
     [412, "rejected"],
-    [500, "failed"],
-    [503, "failed"],
+    [500, "server-error"],
+    [503, "busy"],
     [0, "failed"],
   ] as const)("%i -> %s", (status, result) => {
     expect(shareOutcome(status).result).toBe(result);
@@ -72,11 +74,31 @@ describe("shareOutcome", () => {
 
   it("tells the cooldown from the daily limit and keeps the time the server gave", () => {
     const at = "2026-09-29T16:23:54.043438+00:00";
-    expect(shareOutcome(429, { error: "cooldown", retryAt: at })).toEqual({ result: "cooldown", retryAt: at });
-    expect(shareOutcome(429, { error: "rate_limited", retryAt: at })).toEqual({ result: "rate-limited", retryAt: at });
-    expect(shareOutcome(429, { error: "rate_limited", retryAt: "soon" })).toEqual({ result: "rate-limited", retryAt: undefined });
-    expect(shareOutcome(429, null)).toEqual({ result: "rate-limited", retryAt: undefined });
-    expect(shareOutcome(429, { error: "network_limited" })).toEqual({ result: "network-limited" });
+    expect(shareOutcome(429, { error: "cooldown", retryAt: at })).toMatchObject({ result: "cooldown", retryAt: at });
+    expect(shareOutcome(429, { error: "rate_limited", retryAt: at })).toMatchObject({ result: "rate-limited", retryAt: at });
+    expect(shareOutcome(429, { error: "rate_limited", retryAt: "soon" })).toMatchObject({ result: "rate-limited", retryAt: undefined });
+    expect(shareOutcome(429, null)).toMatchObject({ result: "rate-limited", retryAt: undefined });
+    expect(shareOutcome(429, { error: "network_limited" })).toMatchObject({ result: "network-limited" });
+  });
+});
+
+describe("shareOutcome: review, server trouble and details", () => {
+  it("tells a run waiting for review from a public one", () => {
+    expect(shareOutcome(201, { pendingReview: true }).result).toBe("shared-pending");
+    expect(shareOutcome(201, { pendingReview: false }).result).toBe("shared");
+  });
+
+  it("tells a busy server from a broken one, and keeps what it said", () => {
+    expect(shareOutcome(503, { error: "review_queue_full" })).toEqual({ result: "busy", status: 503, detail: "review_queue_full" });
+    expect(shareOutcome(500, { error: "could not save the run" })).toEqual({ result: "server-error", status: 500, detail: "could not save the run" });
+    expect(shareOutcome(401, { error: "attestation refused: wrong challenge" }).detail).toBe("attestation refused: wrong challenge");
+  });
+
+  it("offers a retry only where trying again can help, and counts review as shared", () => {
+    expect(["offline", "busy", "server-error", "failed"].every((r) => shareCanRetry(r as never))).toBe(true);
+    expect(["shared", "rejected", "rate-limited", "key-failed"].some((r) => shareCanRetry(r as never))).toBe(false);
+    expect(shareSucceeded("shared-pending")).toBe(true);
+    expect(shareSucceeded("offline")).toBe(false);
   });
 });
 

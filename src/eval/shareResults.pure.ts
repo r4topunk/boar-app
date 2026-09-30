@@ -82,31 +82,79 @@ export function buildSubmission(
 
 export type ShareResult =
   | "shared"
+  /** Stored, but this phone couldn't attest its key: the team reviews it before it's public. */
+  | "shared-pending"
   | "already-shared"
   | "rate-limited"
   | "cooldown"
   | "network-limited"
   | "rejected"
+  /** No answer from the server: no connection, or it timed out. */
+  | "offline"
+  /** The server is at a limit for everyone right now (busy, review queue full). */
+  | "busy"
+  | "server-error"
+  /** This phone couldn't make or use a key to sign with. */
+  | "key-failed"
   | "failed";
 
 export interface ShareOutcome {
   result: ShareResult;
   /** When this phone may share again (rate-limited, cooldown), as the server's ISO time. */
   retryAt?: string;
+  /** The HTTP status, when the server answered. */
+  status?: number;
+  /** What the server or the phone said, shown under "details" (English, technical). */
+  detail?: string;
 }
 
 /** What submit-results answered, as something the screen can say. */
-export function shareOutcome(status: number, body?: { error?: unknown; retryAt?: unknown } | null): ShareOutcome {
-  if (status === 201) return { result: "shared" };
-  if (status === 409) return { result: "already-shared" };
+export function shareOutcome(status: number, body?: { error?: unknown; retryAt?: unknown; pendingReview?: unknown } | null): ShareOutcome {
+  const detail = typeof body?.error === "string" ? body.error : undefined;
+  if (status === 201) return { result: body?.pendingReview === true ? "shared-pending" : "shared", status };
+  if (status === 409) return { result: "already-shared", status };
   if (status === 429) {
     // Many phones on one network (shared Wi-Fi, mobile carrier) together hit a separate cap.
-    if (body?.error === "network_limited") return { result: "network-limited" };
+    if (body?.error === "network_limited") return { result: "network-limited", status, detail };
     const retryAt = typeof body?.retryAt === "string" && !Number.isNaN(Date.parse(body.retryAt)) ? body.retryAt : undefined;
-    return { result: body?.error === "cooldown" ? "cooldown" : "rate-limited", retryAt };
+    return { result: body?.error === "cooldown" ? "cooldown" : "rate-limited", retryAt, status, detail };
   }
-  if (status >= 400 && status < 500) return { result: "rejected" };
-  return { result: "failed" };
+  if (status >= 400 && status < 500) return { result: "rejected", status, detail };
+  if (status === 503) return { result: "busy", status, detail };
+  if (status >= 500) return { result: "server-error", status, detail };
+  return { result: "failed", status, detail };
+}
+
+/** The steps of a share, in order, as the progress screen shows them. */
+export const SHARE_STEPS = ["prepare", "challenge", "key", "sign", "send"] as const;
+export type ShareStep = (typeof SHARE_STEPS)[number];
+
+/** What a step reports for the progress screen's log (no secrets: a challenge is single-use). */
+export interface ShareStepInfo {
+  /** challenge: its first characters. */
+  challenge?: string;
+  /** key: made now or reused, and whether the secure hardware vouched for it. */
+  key?: "new-attested" | "new-unattested" | "existing";
+  /** send: the payload's size and row count. */
+  bytes?: number;
+  rows?: number;
+}
+
+/**
+ * The progress screen shows each step for at least this long, and the whole share for at least
+ * SHARE_MIN_MS, so a fast network still shows what happened instead of a flash.
+ */
+export const STEP_MIN_MS = 350;
+export const SHARE_MIN_MS = 1500;
+
+/** Results a user can do something about by trying again, now or later. */
+export function shareCanRetry(result: ShareResult): boolean {
+  return result === "offline" || result === "busy" || result === "server-error" || result === "failed";
+}
+
+/** Results that count as shared (the run is on the server). */
+export function shareSucceeded(result: ShareResult): boolean {
+  return result === "shared" || result === "shared-pending" || result === "already-shared";
 }
 
 /** The string the phone's key signs: the server's one-time challenge, then the exact payload. */

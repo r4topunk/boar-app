@@ -38,7 +38,9 @@ access and can't share.
 4. **Server checks.** The function checks the chain (Android: Google's attestation root, not
    revoked, a key in secure hardware for `team.sopa.aoair` signed with BOAR's release key;
    iOS: Apple's App Attest root and BOAR's App ID), then the signature. From then on the phone
-   is known by its key and only signs.
+   is known by its key and only signs. A phone whose secure hardware can't attest (some genuine
+   phones) sends a plain key instead: its runs are stored, but wait for the team's review before
+   they're public.
 5. **Limits and storing.** In one database transaction: the same run twice is answered
    "already shared", then 3 runs per phone in 24 hours, at least 1 hour apart, 6 per network
    a day and 300 an hour in total. Then the run, its answers and its scores are stored.
@@ -46,9 +48,11 @@ access and can't share.
    with impossible timings or memory is kept, but its scores stay hidden until someone looks.
 
 Stored runs can't be changed or deleted, not even with the server's secret key; only the
-database owner can hide a score or block a device. What the app says for each answer
-(shared, already shared, cooldown or daily limit with the time sharing opens again, network
-limit, refused) is in `src/eval/shareResults.pure.ts`.
+database owner can approve or hide a score, or block a device. The app shows each step of a
+share on a progress screen, then what happened and why (shared, sent for review, already
+shared, cooldown or daily limit with the time sharing opens again, network limit, refused, no
+connection, server busy or failing, no key to sign with), with the run always exportable as JSONL
+or CSV. Those answers are in `src/eval/shareResults.pure.ts`.
 
 ### Which builds can share
 
