@@ -822,6 +822,42 @@ describe("answer(): topic guard for every snippet (Prism RT-1)", () => {
     expect(big.result.receipt.reasonCodes).not.toContain("grounding:all-citations-removed-declined-compact");
   });
 
+  it("O2 (exp-03): the compact model declines a numeric question whose passages are about something else, before prefill", async () => {
+    const KANTO = chunk(
+      "k1",
+      "Kantō region",
+      "The Kantō region holds a third of Japan's population, about 43 million people in 2020. It is a geographical area of Honshu."
+    );
+    const run = async (setup: () => void, req: any = {}, o2Compact = true) => {
+      f = makeFake();
+      setup();
+      f.deps.o2Compact = o2Compact;
+      f.retrieved = [KANTO];
+      f.deps.engine.generate = async () => "Japan has 43 million people [1].";
+      const events: AnswerEvent[] = [];
+      const result = await createAnswerer(f.deps).answer({ query: "What is Japan's population?", ...req }, (e) => events.push(e), ctx).done;
+      return { events, result };
+    };
+    const compact = await run(() => {});
+    expect(compact.result.receipt.reasonCodes).toContain("grounding:o2-off-subject");
+    expect(f.generations).toHaveLength(0);
+    expect(compact.events.find((e) => e.type === "warning")).toMatchObject({
+      code: "weak_sources",
+      declined: true,
+      message: "The passages found are about Kantō region, not Japan.",
+    });
+    // The passages were found: they stay with the decline.
+    expect(compact.result.sources.map((c) => c.title)).toEqual(["Kantō region"]);
+    for (const [label, other] of [
+      ["answerAnyway", await run(() => {}, { answerAnyway: true })],
+      ["the default tier", await run(() => ((f.installed = [lfm]), (f.activeId = "lfm8")))],
+      ["the flag off", await run(() => {}, {}, false)],
+    ] as const) {
+      expect(other.result.receipt.reasonCodes, label).not.toContain("grounding:o2-off-subject");
+      expect(other.result.text, label).toContain("43 million");
+    }
+  });
+
   it("Boar (A): the decline waits for attribution; a supported sentence gets its [n] back and the answer stands", async () => {
     f.retrieved = [CANBERRA];
     // The [1] is on a sentence from memory (removed); the first sentence is the source's own claim.
