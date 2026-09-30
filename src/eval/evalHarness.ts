@@ -37,7 +37,7 @@ import {
 } from "./evalHarness.pure";
 import {
   killedRows,
-  manifestNames,
+  savedRunIds,
   parseEvalRows,
   parseManifest,
   remainingWork,
@@ -200,12 +200,27 @@ const runPaths = (runId: string) => ({
   manifest: `${EVAL_RESULTS_DIR}${runId}.run.json`,
 });
 
+/**
+ * Written whole to "<path>.tmp", then moved over the old file, so a kill mid-write can't leave a
+ * torn file. A kill between the two steps leaves the complete .tmp, which readSaved falls back to.
+ */
+async function saveAtomically(path: string, content: string): Promise<void> {
+  const tmp = `${path}.tmp`;
+  await FileSystem.writeAsStringAsync(tmp, content);
+  await FileSystem.deleteAsync(path, { idempotent: true });
+  await FileSystem.moveAsync({ from: tmp, to: path });
+}
+
+async function readSaved(path: string): Promise<string> {
+  return FileSystem.readAsStringAsync(path).catch(() => FileSystem.readAsStringAsync(`${path}.tmp`).catch(() => ""));
+}
+
 async function saveManifest(m: EvalRunManifest): Promise<void> {
-  await FileSystem.writeAsStringAsync(runPaths(m.runId).manifest, JSON.stringify(m));
+  await saveAtomically(runPaths(m.runId).manifest, JSON.stringify(m));
 }
 
 async function saveRows(runId: string, rows: EvalResultRow[]): Promise<void> {
-  await FileSystem.writeAsStringAsync(runPaths(runId).rows, evalRowsToJsonl(rows));
+  await saveAtomically(runPaths(runId).rows, evalRowsToJsonl(rows));
 }
 
 /** The run this session is executing, so the screen doesn't offer to "continue" it. */
@@ -220,13 +235,15 @@ export interface SavedRun {
 /** The newest run saved on the phone, unless it is the one running now. */
 export async function loadLatestRun(): Promise<SavedRun | null> {
   const files = await FileSystem.readDirectoryAsync(EVAL_RESULTS_DIR).catch(() => [] as string[]);
-  const newest = manifestNames(files)[0];
-  if (!newest) return null;
-  const manifest = parseManifest(await FileSystem.readAsStringAsync(`${EVAL_RESULTS_DIR}${newest}`).catch(() => ""));
-  if (!manifest || manifest.runId === activeRunId) return null;
-  const paths = runPaths(manifest.runId);
-  const rows = parseEvalRows(await FileSystem.readAsStringAsync(paths.rows).catch(() => ""));
-  return { manifest, rows, savedPath: paths.rows };
+  for (const runId of savedRunIds(files)) {
+    const paths = runPaths(runId);
+    const manifest = parseManifest(await readSaved(paths.manifest));
+    if (!manifest) continue;
+    if (manifest.runId === activeRunId) return null;
+    const rows = parseEvalRows(await readSaved(paths.rows));
+    return { manifest, rows, savedPath: paths.rows };
+  }
+  return null;
 }
 
 /** Ends an unfinished run with what it has, the model it died on counted as failed. */
@@ -245,7 +262,8 @@ export async function markRunShared(runId: string): Promise<void> {
 
 export async function discardRun(runId: string): Promise<void> {
   const paths = runPaths(runId);
-  await Promise.all([paths.rows, paths.manifest].map((p) => FileSystem.deleteAsync(p, { idempotent: true })));
+  const all = [paths.rows, paths.manifest].flatMap((p) => [p, `${p}.tmp`]);
+  await Promise.all(all.map((p) => FileSystem.deleteAsync(p, { idempotent: true })));
 }
 
 /**

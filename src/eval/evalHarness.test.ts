@@ -67,6 +67,10 @@ vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: async (p: string) => {
     files.delete(p);
   },
+  moveAsync: async ({ from, to }: { from: string; to: string }) => {
+    files.set(to, files.get(from)!);
+    files.delete(from);
+  },
 }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: async () => {} }));
 
@@ -284,7 +288,7 @@ describe("runEvaluation", () => {
     });
     expect(run.stopped).toBe(true);
     expect(run.rows).toHaveLength(1);
-    expect(writeMock).toHaveBeenCalledWith(run.savedPath, evalRowsToJsonl(run.rows));
+    expect(files.get(run.savedPath)).toBe(evalRowsToJsonl(run.rows));
     expect(run.savedPath).toMatch(/^file:\/\/\/docs\/eval\/eval-.*\.jsonl$/);
   });
 
@@ -385,6 +389,13 @@ describe("a run the app is closed during", () => {
     await runEvaluation({ configs: [{ kind: "model", modelId: PHI.id, label: "Phi" }], queries: [queries[0]] });
     expect(seen).toBeNull();
     expect((await loadLatestRun())!.manifest.endedAt).toBeGreaterThan(0);
+  });
+
+  it("falls back to the complete .tmp a kill between write and move leaves, and skips a torn manifest", async () => {
+    const m: EvalRunManifest = { runId: "eval-b", evalSetVersion: "1", configs: [], queryIds: ["greeting-1"], startedAt: 1 };
+    files.set("file:///docs/eval/eval-b.run.json.tmp", JSON.stringify(m));
+    files.set("file:///docs/eval/eval-c.run.json", "{torn");
+    expect((await loadLatestRun())!.manifest.runId).toBe("eval-b");
   });
 
   it("ignores a manifest that isn't a run", async () => {

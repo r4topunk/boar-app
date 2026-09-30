@@ -110,7 +110,8 @@ export function parseManifest(json: string): EvalRunManifest | null {
   }
 }
 
-/** Newest first, from eval/ file names ("<runId>.run.json"). Run ids sort by time. */
-export function manifestNames(files: string[]): string[] {
-  return files.filter((f) => f.endsWith(".run.json")).sort().reverse();
+/** Run ids newest first, from eval/ file names ("<runId>.run.json", or its ".tmp" left by a kill). Run ids sort by time. */
+export function savedRunIds(files: string[]): string[] {
+  const ids = new Set(files.map((f) => /^(.+)\.run\.json(\.tmp)?$/.exec(f)?.[1]).filter((id): id is string => !!id));
+  return [...ids].sort().reverse();
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { EVAL_SET } from "./evalSet";
 import type { EvalResultRow } from "./evalHarness.pure";
-import { KILLED_ERROR, killedRows, manifestNames, parseEvalRows, parseManifest, remainingWork, runState, type EvalRunManifest } from "./evalResume.pure";
+import { KILLED_ERROR, killedRows, savedRunIds, parseEvalRows, parseManifest, remainingWork, runState, type EvalRunManifest } from "./evalResume.pure";
 
 const q = (id: string) => EVAL_SET.find((x) => x.id === id)!;
 const queries = [q("greeting-1"), q("grounded-2")];
@@ -50,9 +50,9 @@ describe("evalResume", () => {
     expect(parseManifest(JSON.stringify(manifest))).toEqual(manifest);
     expect(parseManifest("{}")).toBeNull();
     expect(parseManifest("nope")).toBeNull();
-    expect(manifestNames(["eval-2026-01-02.run.json", "eval-2026-01-02.jsonl", "eval-2026-03-01.run.json", "requests"])).toEqual([
-      "eval-2026-03-01.run.json",
-      "eval-2026-01-02.run.json",
+    expect(savedRunIds(["eval-2026-01-02.run.json", "eval-2026-01-02.jsonl", "eval-2026-03-01.run.json.tmp", "eval-2026-01-02.run.json.tmp", "requests"])).toEqual([
+      "eval-2026-03-01",
+      "eval-2026-01-02",
     ]);
     expect(runState(manifest)).toBe("unfinished");
     expect(runState({ ...manifest, endedAt: 2 })).toBe("ended");
