@@ -6,7 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decompress } from "fzstd";
 import { nodeSqliteDatabase } from "./testing/nodeSqlite";
-import { WikiPack } from "./wikiPack";
+import { WikiPack, isTravelQuestion } from "./wikiPack";
+import { readFileSync } from "node:fs";
 
 // The Wikivoyage destination rule (a guide a travel question names goes first) and its limits (Ricardo, #34):
 // a capitalized word that happens to be a guide's name, in a question that isn't about travel, never goes first.
@@ -25,6 +26,16 @@ const rows = [
   ),
   guide(7e9 + 20, "Como", ["## Understand", "", "Como is a lakeside city in Lombardy. " + filler("Lake")]),
   guide(7e9 + 21, "Darwin", ["## Understand", "", "Darwin is the capital of the Northern Territory, named after Charles Darwin. " + filler("Top End")]),
+  guide(7e9 + 22, "Rome", ["## Understand", "", "Rome was the capital of an empire that fell in the fifth century. " + filler("Forum")]),
+  guide(7e9 + 23, "Rust", ["## Understand", "", "Rust is a small town in Burgenland, Austria, known for storks and wine. " + filler("Stork")]),
+  {
+    page_id: 904, title: "Fall of the Western Roman Empire", source: "enwiki",
+    text: `# Fall of the Western Roman Empire\n\nThe Western Roman Empire fell in 476 when Romulus Augustulus was deposed. ${filler("Empire")}`,
+  },
+  {
+    page_id: 905, title: "Rust (programming language)", source: "enwiki",
+    text: `# Rust (programming language)\n\nRust is a programming language; learning Rust means learning ownership, borrowing and sockets. ${filler("Borrow")}`,
+  },
   {
     page_id: 900, title: "Burn", source: "enwiki", aliases: ["Queimadura", "Queimaduras"],
     text: `# Burn\n\nA burn is an injury to skin caused by heat. Cool the burn with running water for twenty minutes. ${filler("Burn")}`,
@@ -75,6 +86,29 @@ describe("Wikivoyage destination rule", () => {
 
   it("health and science questions never put a Wikivoyage guide first", async () => {
     for (const q of ["How do I treat a burn?", "Why do earthquakes happen at plate boundaries?", "How does photosynthesis work?", "When did Darwin publish his theory?"]) {
+      const hit = await first(q);
+      expect(hit?.source, q).not.toBe("enwikivoyage");
+    }
+  });
+
+  it("every v2 travel question is a travel question; a generic word (época, tips, season, cash, thank you) doesn't make one", () => {
+    const travel = readFileSync("eval/retrieval/questions.travel.v2.jsonl", "utf8").trim().split("\n").map((l) => JSON.parse(l).query as string);
+    expect(travel).toHaveLength(10);
+    for (const q of travel) expect(isTravelQuestion(q), q).toBe(true);
+    for (const q of [
+      "Em que época Roma caiu?",
+      "Tips for learning Rust",
+      "What is the best time complexity of sorting in Rust?",
+      "How do Rust sockets work?",
+      "Which season does Game of Thrones end?",
+      "Is cash king in Bitcoin?",
+      "How do I say thank you to a colleague?",
+      "Tenho visto Roma no mapa, onde fica?",
+    ]) expect(isTravelQuestion(q), q).toBe(false);
+  });
+
+  it("so those questions don't put the guide they happen to name first", async () => {
+    for (const q of ["Tips for learning Rust", "How do Rust sockets work?"]) {
       const hit = await first(q);
       expect(hit?.source, q).not.toBe("enwikivoyage");
     }

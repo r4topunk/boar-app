@@ -188,10 +188,16 @@ const TRAVEL_INTENT = /\b(visit|visiting|things to (see|do)|what (can|should) (i
 /**
  * Practical travel questions TRAVEL_INTENT doesn't word as a trip ("What plug type does Brazil use?", "Is tap
  * water safe in Mexico City?", "How do I say thank you in Thai?"), EN and PT. With TRAVEL_INTENT, the only
- * questions whose capitalized destination goes first (see titlesInQuestion).
+ * questions whose capitalized destination goes first (see titlesInQuestion). Specific phrases only: a bare
+ * generic word makes other questions look like travel ("Em que época Roma caiu?", "Tips for learning Rust").
  */
 const TRAVEL_PRACTICAL =
-  /\b(plugs?|voltage|sockets?|outlets?|adapters?|currency|cash|atms?|pay by card|tipping|tips?|tap water|drinking water|emergency numbers?|visas?|driv(e|es|ing)|ride-?hailing|taxis?|say .+ in|phrasebook|thank you|best time|season|tomadas?|voltagem|moeda|dinheiro|cart[aã]o|gorjetas?|[aá]gua da torneira|vistos?|dirigir|t[aá]xis?|como (se )?diz|melhor [eé]poca|[eé]poca)\b/i;
+  /\b(plugs?|plug types?|voltage|currency|atms?|pay (by|with) (a )?card|tipping|tap water|drinking water|emergency numbers?|visas?|driving licen[cs]e|drive on the (left|right)|ride-?hailing|taxis?|say .+ in|phrasebook|best time to (visit|go|travel)|tomadas?|voltagem|moeda|pagar com cart[aã]o|gorjetas?|[aá]gua da torneira|preciso de visto|visto de turista|t[aá]xis?|como (se )?diz|melhor [eé]poca para)\b/i;
+/** A travel question: the only kind whose capitalized Wikivoyage destination goes first. */
+export function isTravelQuestion(query: string): boolean {
+  return TRAVEL_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
+}
+
 /** Question words that open an EN or PT question: capitalized there, never a destination ("Como tratar…"). */
 const QUESTION_WORDS = new Set([
   "what", "when", "where", "why", "how", "who", "which", "whose", "is", "are", "can", "do", "does", "did", "should", "tell",
@@ -676,7 +682,7 @@ export class WikiPack {
     const used: string[] = [];
     // A destination only counts in a travel question (#34: "When did Darwin publish…" -> Darwin, Australia), and
     // the opening question word is never a name ("Como tratar uma queimadura?" -> Como, Italy).
-    const travel = TRAVEL_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
+    const travel = isTravelQuestion(query);
     const opening = (query.match(/[\p{L}\p{N}]+/u)?.[0] ?? "").toLowerCase();
     for (const cand of titleCandidates(query)) {
       if (used.length >= max) break;

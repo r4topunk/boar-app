@@ -17,7 +17,7 @@
   },
   "questions": "eval/retrieval/questions.travel.v2.jsonl",
   "n": 10,
-  "measuredAt": "2026-09-30T16:01:20.426Z",
+  "measuredAt": "2026-09-30T16:05:39.852Z",
   "results": {
     "full (named titles first)": {
       "all": {
@@ -26,8 +26,8 @@
         "recall@3": 0.9,
         "recall@6": 1,
         "mrr10": 0.858,
-        "p50ms": 89.5,
-        "p95ms": 276.4
+        "p50ms": 95.4,
+        "p95ms": 294.4
       },
       "dev": {
         "n": 5,
@@ -35,8 +35,8 @@
         "recall@3": 1,
         "recall@6": 1,
         "mrr10": 0.867,
-        "p50ms": 65,
-        "p95ms": 276.4
+        "p50ms": 65.8,
+        "p95ms": 294.4
       },
       "test": {
         "n": 5,
@@ -44,8 +44,8 @@
         "recall@3": 0.8,
         "recall@6": 1,
         "mrr10": 0.85,
-        "p50ms": 89.5,
-        "p95ms": 160.2
+        "p50ms": 95.4,
+        "p95ms": 162
       },
       "byCategory": {
         "travel-practical": {
@@ -54,8 +54,8 @@
           "recall@3": 0.9,
           "recall@6": 1,
           "mrr10": 0.858,
-          "p50ms": 89.5,
-          "p95ms": 276.4
+          "p50ms": 95.4,
+          "p95ms": 294.4
         }
       },
       "misses": []
