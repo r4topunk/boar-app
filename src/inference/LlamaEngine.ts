@@ -363,7 +363,11 @@ export class LlamaEngine {
     // Stop takes effect between tokens, so a completion still processing its
     // prompt can run on for a while; wait for it rather than release under it.
     if (this.inFlight) {
-      await this.context?.stopCompletion().catch(() => {});
+      // try/await, not .catch(): llama.rn 0.13.0-rc.6's JSI stopCompletion returns undefined, not a promise,
+      // and a throw here left the old context loaded next to the new one (two LLMs mapped, 0.4 tok/s).
+      try {
+        await this.context?.stopCompletion();
+      } catch {}
       await this.inFlight.catch(() => {});
     }
     const context = this.context;
