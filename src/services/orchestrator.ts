@@ -58,16 +58,16 @@ export interface ResearchOptions {
   /** Called once all sources are known (before synthesis), with the final numbered list. */
   onSources?: (sources: RetrievedChunk[]) => void;
   /**
-   * Called after each sub-question's retrieval and topic filter, before its generation, with the
-   * numbered list so far, only when it grew. Each list extends the previous one (mergeSources keeps
-   * first-seen order), so a source's number never changes; the last one equals what onSources gets.
-   */
-  /**
    * The answer's language line (src/routing/context.ts PT_ANSWER_LANGUAGE for a Portuguese question), after the
    * synthesis input as the single-pass prompt puts it after the question. Only the synthesis gets it: the
    * sub-questions stay as the decomposition writes them (usually English, which matches the English sources).
    */
   answerLanguage?: string;
+  /**
+   * Called after each sub-question's retrieval and topic filter, before its generation, with the
+   * numbered list so far, only when it grew. Each list extends the previous one (mergeSources keeps
+   * first-seen order), so a source's number never changes; the last one equals what onSources gets.
+   */
   onPartialSources?: (sources: RetrievedChunk[], progress: { subQuestionIndex: number; subQuestionCount: number }) => void;
 }
 
