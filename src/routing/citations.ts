@@ -123,6 +123,8 @@ export function attributeCitations(answer: string, sources: RetrievedChunk[]): A
     // A citation right after the sentence's punctuation ("… Zone. [1]") is its own (Prism CIT-2: "[1]. [1]").
     if (/^\s*\[\d+\]/.test(answer.slice(at + sentence.length))) return sentence;
     if (keyTerms(sentence).length < MIN_KEY_TERMS) return sentence;
+    // A heading or a bold title line ("## Greenhouse effect", "**Causes:**") names a topic, it claims nothing.
+    if (/^\s*(#{1,6}\s|\*\*[^*]+\*\*\s*:?\s*$)/.test(sentence)) return sentence;
     let best = -1;
     let bestSupport = 0;
     sources.forEach((source, i) => {

@@ -104,6 +104,19 @@ describe("runDeepResearch citations", () => {
   });
 });
 
+describe("runDeepResearch fullCitations (P1)", () => {
+  it("returns every cited source as retrieved, aligned with citations, while the prompts get the compressed body", async () => {
+    const sentences = Array.from({ length: 9 }, (_, i) => `The French Revolution changed France in its phase number ${i + 1} of the revolution.`);
+    const LONG = chunk("long", "French Revolution (phases)", sentences.join(" "));
+    sameForAll = [LONG, EU];
+    const r = await runDeepResearch("Compare the causes of both revolutions", undefined, undefined, 256);
+    expect(r.fullCitations?.map((c) => c.chunkId)).toEqual(r.citations.map((c) => c.chunkId));
+    const i = r.citations.findIndex((c) => c.chunkId === "long");
+    expect(r.fullCitations![i].body).toBe(LONG.body);
+    expect(r.citations[i].body.length).toBeLessThan(LONG.body.length);
+  });
+});
+
 describe("runDeepResearch partial sources (retrieval progress)", () => {
   const Q = "Compare the causes of both revolutions";
   const ids = (s: RetrievedChunk[]) => s.map((c) => c.chunkId);

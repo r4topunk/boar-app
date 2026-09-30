@@ -39,6 +39,12 @@ export interface ResearchResult {
    * citations pointed at the wrong sources.)
    */
   citations: RetrievedChunk[];
+  /**
+   * `citations` as retrieved, before the sub-question's compression (same order, so fullCitations[n - 1] is
+   * source [n] in full). The synthesis's [n] are checked against these (CT-1) and restored from them
+   * (attribution), as single pass checks against the full retrieved chunk, not the compressed prompt text.
+   */
+  fullCitations?: RetrievedChunk[];
   /** True if any stage hit STAGE_TIMEOUT_MS and was cut off early. */
   timedOut?: boolean;
 }
@@ -178,15 +184,19 @@ export async function runDeepResearch(
   const subResults: { subQuestion: string; answer: string }[] = [];
   const perQuestion: RetrievedChunk[][] = [];
   let allChunks: RetrievedChunk[] = [];
+  // Each source as retrieved, before compressContext trimmed it to the sub-question's budget.
+  const fullById = new Map<string, RetrievedChunk>();
+  const full = () => allChunks.map((c) => fullById.get(c.chunkId) ?? c);
   for (let i = 0; i < subQuestions.length; i++) {
     // llamaEngine.stop() only interrupts whichever single completion call is
     // in flight *right now* — with several sequential completions here
     // (decompose, each sub-question, synthesize), a stop request needs its
     // own check between stages or the pipeline just carries on to the next
     // one regardless of the user having asked it to stop.
-    if (shouldStop?.()) return { answer: "", subQuestions, citations: allChunks, timedOut };
+    if (shouldStop?.()) return { answer: "", subQuestions, citations: allChunks, fullCitations: full(), timedOut };
     onProgress?.({ stage: "researching", subQuestionIndex: i, subQuestionCount: subQuestions.length, subQuestion: subQuestions[i] });
     const retrieved = await retrieve(subQuestions[i], options.retrieveK ?? 6);
+    for (const c of retrieved) if (!fullById.has(c.chunkId)) fullById.set(c.chunkId, c);
     const compressed = compressContext(subQuestions[i], retrieved, { tokenBudget: SUB_QUESTION_CONTEXT_TOKENS }).chunks;
     // CT-2 / RT-1 here too: a source off the topic of this sub-question (or of the whole
     // question, which the decomposition rephrases) is not read, numbered or shown.
@@ -206,7 +216,7 @@ export async function runDeepResearch(
   }
   options.onSources?.(allChunks);
 
-  if (shouldStop?.()) return { answer: "", subQuestions, citations: allChunks, timedOut };
+  if (shouldStop?.()) return { answer: "", subQuestions, citations: allChunks, fullCitations: full(), timedOut };
 
   onProgress?.({ stage: "synthesizing" });
   // The final synthesized answer respects the user's Max Output Tokens
@@ -223,5 +233,5 @@ export async function runDeepResearch(
     options.answerLanguage
   );
 
-  return { answer, subQuestions, citations: allChunks, timedOut };
+  return { answer, subQuestions, citations: allChunks, fullCitations: full(), timedOut };
 }

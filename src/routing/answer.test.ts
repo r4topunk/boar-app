@@ -1828,6 +1828,60 @@ describe("answer(): multi-pass retrieval progress", () => {
   });
 });
 
+describe("answer(): multi-pass citations (P1 full cited chunks, P2 attribution)", () => {
+  // What the orchestrator shows for Canberra after compressing it to a sub-question's budget: the 1908 sentence is gone.
+  const CANBERRA_COMPRESSED = { ...CANBERRA, body: "Canberra is the capital city of Australia." };
+  const SELECTED = "The site of Canberra was selected for the location of the nation's capital in 1908 as a compromise between Sydney and Melbourne";
+  const multipass = (answer: string, full?: RetrievedChunk[]) => {
+    f.deps.runMultipass = async (_q, _s, _h, _m, onProgress, onToken, _stop, options) => {
+      options.onSources?.([CANBERRA_COMPRESSED, HALL]);
+      onProgress({ stage: "synthesizing" });
+      onToken(answer);
+      return { answer, subQuestions: ["a", "b"], citations: [CANBERRA_COMPRESSED, HALL], ...(full ? { fullCitations: full } : {}) };
+    };
+  };
+  const run = async (reused: RetrievedChunk[] = [HALL]) => {
+    const { deepen } = createAnswerer(f.deps);
+    // By default the reused sources leave Canberra out: its full text can only come from fullCitations.
+    return deepen("Why was Canberra chosen as the capital of Australia?", reused, () => {}, ctx).done;
+  };
+
+  it("P1: CT-1 checks a synthesis [n] against the full retrieved chunk, not the compressed body", async () => {
+    multipass(`${SELECTED} [1].`, [CANBERRA, HALL]);
+    const r = await run();
+    expect(r.text).toContain(`${SELECTED} [1]`);
+    expect(r.receipt.reasonCodes.some((c) => c.startsWith("citations:removed"))).toBe(false);
+    expect(r.cited).toEqual([1]);
+  });
+
+  it("P1 and P2 hold when the earlier answer's compressed sources are reused (the usual deeper answer)", async () => {
+    multipass(`${SELECTED} [1].`, [CANBERRA, HALL]);
+    const checked = await run([CANBERRA_COMPRESSED, HALL]);
+    expect(checked.receipt.reasonCodes.some((c) => c.startsWith("citations:removed"))).toBe(false);
+    expect(checked.cited).toEqual([1]);
+    multipass(`${SELECTED}. Canberra has the best coffee in the southern hemisphere.`, [CANBERRA, HALL]);
+    const restored = await run([CANBERRA_COMPRESSED, HALL]);
+    expect(restored.receipt.reasonCodes).toContain("citations:added-1");
+    expect(restored.text).toContain(`${SELECTED} [1].`);
+  });
+
+  it("P1 control: without the full chunks the same [n] is judged against the compressed body and removed", async () => {
+    multipass(`${SELECTED} [1].`);
+    const r = await run();
+    expect(r.receipt.reasonCodes).toContain("citations:removed-1");
+    expect(r.text).not.toMatch(/\[1\]/);
+  });
+
+  it("P2: attribution restores the [n] a full source supports, and never adds one without support", async () => {
+    multipass(`${SELECTED}. Canberra has the best coffee in the southern hemisphere.`, [CANBERRA, HALL]);
+    const r = await run();
+    expect(r.receipt.reasonCodes).toContain("citations:added-1");
+    expect(r.text).toContain(`${SELECTED} [1].`);
+    expect(r.text).toMatch(/southern hemisphere\.$/);
+    expect(r.cited).toEqual([1]);
+  });
+});
+
 describe("answer(): multi-pass answer language", () => {
   it("a Portuguese question asks the synthesis for Portuguese; an English one doesn't", async () => {
     const seen: (string | undefined)[] = [];
