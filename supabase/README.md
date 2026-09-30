@@ -43,7 +43,10 @@ checks every signature, but nothing proves the key is in a real phone running BO
 runs is flagged `unattested` and waits in the review list. A script can make such keys too, so
 there's room for at most 100 unattested runs a day in total, on top of the usual limits.
 
-## The public copy on Hugging Face
+## The public copy on Hugging Face (optional, off)
+
+Off until `HF_DATASET` is set. Before turning it on, add the Hugging Face dataset to `PRIVACY.md`
+(sections 2.3, 5 and 6) and `TERMS.md` (sections 4 and 6).
 
 `.github/workflows/mirror-scores.yml` runs `scripts/mirror-scores-hf.mjs` once a day. It reads the
 public scores with the publishable key, so it only ever sees approved `eval_scores` rows, and
@@ -67,7 +70,7 @@ delete from eval_devices where id = '<id>';
 commit;
 ```
 
-The next daily copy drops those rows from the Hugging Face dataset, but its git history still
+If the Hugging Face copy is on, the next daily copy drops those rows from the dataset, but its git history still
 has them. Remove them from the history too: after the copy, squash the dataset's history on
 the dataset's Settings page, or with
 `curl -X POST -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/datasets/$HF_DATASET/super-squash/main`.

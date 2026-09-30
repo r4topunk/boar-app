@@ -1,9 +1,9 @@
 name: Mirror scores to Hugging Face
 
-# Once a day, copy the public (approved) scores to the Hugging Face dataset named by the
-# HF_DATASET variable. Reads with the publishable key only. Needs the HF_TOKEN secret (a
-# fine-grained token with write access to that dataset) and the SUPABASE_URL and
-# SUPABASE_PUBLISHABLE_KEY variables. Does nothing until HF_DATASET is set.
+# Optional, off by default: does nothing until the HF_DATASET variable is set. Once a day,
+# copies the public (approved) scores to that Hugging Face dataset, reading with the publishable
+# key only. Needs the HF_TOKEN secret (a fine-grained token with write access to that dataset)
+# and the SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY variables.
 on:
   schedule:
     - cron: "17 3 * * *"

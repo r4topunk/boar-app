@@ -59,7 +59,7 @@ We don't receive any of it.
 
 ### 2.2 Searching Hugging Face for a model
 
-If you use "Find more models", BOAR sends your search words to Hugging Face's public API, only when
+If you use "Search Hugging Face", BOAR sends your search words to Hugging Face's public API, only when
 you search. Hugging Face's privacy policy applies.
 
 ### 2.3 Sharing an evaluation run (optional)
@@ -83,10 +83,8 @@ sent, the app shows you every field. We receive:
 We never receive your own questions, conversations, documents, name, contacts or location.
 
 **What is public:** the phone's brand and model, chipset, RAM, core information, the app and test
-versions, and each model's scores and speeds. This appears on the public results, readable by anyone,
-and once a day approved results are copied to an open dataset on Hugging Face that anyone can
-download and reuse (CC BY 4.0). The key, the IP hash, the answers and the certificate details are
-never public, and never leave our database.
+versions, and each model's scores and speeds. This appears on the public results, readable by anyone.
+The key, the IP hash, the answers and the certificate details are never public.
 
 **Review:** some genuine phones can't prove their key comes from secure hardware. Their runs are stored
 but kept hidden until the BOAR team reviews them.
@@ -139,9 +137,7 @@ decisions about you.
 - **Supabase** stores shared runs, on Amazon Web Services in the United States (us-west-2), under
   Supabase's data processing terms.
 - **Vercel** hosts the website. **Google** provides analytics, only with consent.
-- **Hugging Face** serves downloads (section 2.1) and hosts the open dataset of public results
-  (section 2.3). **GitHub** serves downloads and runs the daily job that copies public results to
-  that dataset; the job reads only what is already public.
+- **Hugging Face** and **GitHub** serve the downloads (section 2.1), as independent services.
 
 Some of these are in the United States. Where the law requires, transfers are covered by the providers'
 Standard Contractual Clauses or equivalent safeguards (GDPR art. 46; LGPD art. 33).
@@ -153,11 +149,9 @@ Standard Contractual Clauses or equivalent safeguards (GDPR art. 46; LGPD art. 3
 | One-time sharing codes | Deleted after 1 hour |
 | IP hash on a shared run | 7 days, then erased (the limits only look back 24 hours) |
 | Shared runs, their answers, the phone details and the key | For as long as the public results exist, or until you ask us to delete them |
-| The open dataset on Hugging Face | The same public results, until deleted from our database; the next daily copy removes them, and we then clear the dataset's history |
 | Website analytics | 2 months (Google Analytics' shortest setting) |
 
 Stored runs can't be changed after they're stored. Only we can delete them, and we do on request.
-Copies that other people downloaded from the open dataset are outside our control.
 
 ## 7. Your rights
 
