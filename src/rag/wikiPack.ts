@@ -185,6 +185,19 @@ export function sectionKind(section: string): "action" | "action-sub" | "backgro
 
 const TRAVEL_INTENT = /\b(visit|visiting|things to (see|do)|what (can|should) (i|we) (see|do)|see and do|travel|trip|get (to|there|around)|getting (to|around)|stay|hotel|hostel|eat|restaurants?|sights?|tourists?|itinerary|by (train|bus|car|ferry)|airport)\b/i;
 
+/**
+ * Practical travel questions TRAVEL_INTENT doesn't word as a trip ("What plug type does Brazil use?", "Is tap
+ * water safe in Mexico City?", "How do I say thank you in Thai?"), EN and PT. With TRAVEL_INTENT, the only
+ * questions whose capitalized destination goes first (see titlesInQuestion).
+ */
+const TRAVEL_PRACTICAL =
+  /\b(plugs?|voltage|sockets?|outlets?|adapters?|currency|cash|atms?|pay by card|tipping|tips?|tap water|drinking water|emergency numbers?|visas?|driv(e|es|ing)|ride-?hailing|taxis?|say .+ in|phrasebook|thank you|best time|season|tomadas?|voltagem|moeda|dinheiro|cart[aã]o|gorjetas?|[aá]gua da torneira|vistos?|dirigir|t[aá]xis?|como (se )?diz|melhor [eé]poca|[eé]poca)\b/i;
+/** Question words that open an EN or PT question: capitalized there, never a destination ("Como tratar…"). */
+const QUESTION_WORDS = new Set([
+  "what", "when", "where", "why", "how", "who", "which", "whose", "is", "are", "can", "do", "does", "did", "should", "tell",
+  "como", "quando", "onde", "porque", "por", "qual", "quais", "quem", "quanto", "quantos", "o", "a", "os", "as", "é", "existe",
+]);
+
 /** Cosine (bge-small) of a lead that's about the question even without its words. */
 export const SEMANTIC_KEEP = 0.7;
 
@@ -661,11 +674,18 @@ export class WikiPack {
     ];
     const found: Array<{ id: number; share: number }> = [];
     const used: string[] = [];
+    // A destination only counts in a travel question (#34: "When did Darwin publish…" -> Darwin, Australia), and
+    // the opening question word is never a name ("Como tratar uma queimadura?" -> Como, Italy).
+    const travel = TRAVEL_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
+    const opening = (query.match(/[\p{L}\p{N}]+/u)?.[0] ?? "").toLowerCase();
     for (const cand of titleCandidates(query)) {
       if (used.length >= max) break;
       const lower = cand.toLowerCase();
       if (used.some((u) => u.includes(lower))) continue; // inside a longer title already found
       const single = !cand.includes(" ");
+      // The question's opening word is capitalized because it opens the sentence, not because it's a name:
+      // "Como funciona a fotossíntese?" never names Como (Lombardy), in any pack.
+      if (single && lower === opening && QUESTION_WORDS.has(lower)) continue;
       // A lone word only counts when it's capitalized in the question, rare in the index, or not in the index at all
       // (then only an exact title or alias can match it: "queimadura" -> Burn through its Portuguese alias).
       if (single && !/^\p{Lu}/u.test(cand) && !(await this.isRare(lower, rare)) && (await this.stems(lower)).length) continue;
@@ -676,7 +696,8 @@ export class WikiPack {
           (singularTitle(cand) ? await this.resolveTitle(singularTitle(cand)!, { fuzzy: false, source }) : null);
         // A destination a travel question names ("plug type in Brazil", "ride-hailing in Bangkok") is its subject even
         // though the name is common across the guides (low idf): the guide goes first, its best sections picked below.
-        const destination = source === "enwikivoyage" && /^\p{Lu}/u.test(cand);
+        // Only in a travel question (TRAVEL_INTENT or TRAVEL_PRACTICAL).
+        const destination = travel && source === "enwikivoyage" && /^\p{Lu}/u.test(cand);
         if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) || destination });
       }
       if (!ids.length) continue;
