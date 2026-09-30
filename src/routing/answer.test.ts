@@ -556,6 +556,16 @@ describe("answer(): CR-1 low-RAM phone (3.8 GB)", () => {
     expect(f.loads).toEqual([qwen4.filename]);
   });
 
+  it("a saved untiered 1.3 GB model the user never confirmed is still used (only the automatic pick skips it)", async () => {
+    const hf13: InstalledLlm = { id: "hf-1.3", label: "Llama 3.2 1B Q8_0", filename: "models/hf13.gguf", sizeBytes: 1.3e9, roles: ["fast"], isDefault: false };
+    f.installed = [hf13, compact];
+    f.activeId = hf13.id;
+    const { result } = await collect("Why was Canberra chosen as the capital of Australia?");
+    expect(f.loads).toEqual([hf13.filename]);
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("model:low-ram-unconfirmed"))).toBe(false);
+    expect(await createAnswerer(f.deps).effectiveModel()).toEqual({ id: hf13.id, label: hf13.label });
+  });
+
   it("no automatic deep model or verifier above the compact size", async () => {
     f.installed = [compact, { ...moe, sizeBytes: 11 * GB }, qwen7];
     f.activeId = compact.id;
