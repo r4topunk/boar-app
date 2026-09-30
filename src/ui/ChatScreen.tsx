@@ -2,6 +2,7 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "
 import { AppState, FlatList, LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Share, TextInput, View } from "react-native";
 import { KeyboardAvoidingView, KeyboardController } from "react-native-keyboard-controller";
 import Animated from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { DrawerActions, useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -53,6 +54,7 @@ import { takePendingEvalRequest } from "../eval/deviceEvalRequest";
 import type { EvalRequest } from "../eval/deviceEvalRequest.pure";
 import { ChatHeader } from "./ChatHeader";
 import { Banner, Button, IconButton, Progress, Screen, Sheet, Text, useAnnounce, useToast } from "./components";
+import { footerBottom } from "./components/Screen";
 import { useTheme, useTokens } from "./theme";
 import { answer as runAnswer, deepen as runDeepen, effectiveAnswerModel, type AnswerContext } from "./chat/answerApi";
 import type { AnswerEvent, AnswerHandle, AnswerRequest, AnswerResult } from "./chat/answerEvents";
@@ -120,6 +122,7 @@ let draftInput = "";
 export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void }) {
   const tk = useTokens();
   const { reduceMotion } = useTheme();
+  const insets = useSafeAreaInsets();
   const motion = useMotion();
   // For callbacks that must stay stable (the event flush, finish).
   const motionRef = useRef(motion);
@@ -1032,7 +1035,14 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
       {/* automaticOffset: the view's onLayout y is relative to its parent (below the safe area and the
           header), so without it the padding came out short and the composer sat behind the keyboard
           (Prism K-1, Android offline 06f508b). The native window position fixes any offset above. */}
-      <KeyboardAvoidingView behavior="padding" automaticOffset style={{ flex: 1 }}>
+      {/* The composer keeps its bottom gap (home indicator, navigation bar) with the keyboard up; the offset takes
+          it back so the composer ends sm above the keyboard, at every frame of the keyboard's move (Composer). */}
+      <KeyboardAvoidingView
+        behavior="padding"
+        automaticOffset
+        keyboardVerticalOffset={tk.space.sm - footerBottom(insets.bottom, tk.space.xs, tk.space.sm)}
+        style={{ flex: 1 }}
+      >
         {loadCrash && (
           <View style={{ paddingHorizontal: tk.space.gutterChat, paddingTop: tk.space.sm }}>
             <Banner
