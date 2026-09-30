@@ -93,7 +93,7 @@ describe("Wikivoyage destination rule", () => {
 
   it("every v2 travel question is a travel question; a generic word (época, tips, season, cash, thank you) doesn't make one", () => {
     const travel = readFileSync("eval/retrieval/questions.travel.v2.jsonl", "utf8").trim().split("\n").map((l) => JSON.parse(l).query as string);
-    expect(travel).toHaveLength(12);
+    expect(travel).toHaveLength(16);
     for (const q of travel) expect(isTravelQuestion(q), q).toBe(true);
     for (const q of [
       "Em que época Roma caiu?",
@@ -133,6 +133,14 @@ describe("Wikivoyage destination rule on a Wikivoyage-only pack", () => {
     guide(8e9 + 5, "Argentina", ["## Get in", "", "Most visitors need no visa for short stays. " + filler("Border")]),
     guide(8e9 + 6, "Natal", ["## Understand", "", "Natal is a city on the coast of Rio Grande do Norte. " + filler("Dunes")]),
     { ...guide(8e9 + 7, "Georgia (disambiguation)", ["There is more than one place called Georgia: the country, and the US state."]), aliases: ["Georgia"] },
+    guide(8e9 + 9, "Japan", ["## Get in", "", "Visitors from many countries need no visa for short stays. " + filler("Visa")]),
+    guide(8e9 + 10, "United States", ["## Get in", "", "The visa waiver program covers many nationalities. " + filler("Border")]),
+    guide(8e9 + 11, "New Zealand", ["## Get in", "", "Most visitors need an electronic travel authority. " + filler("Kiwi")]),
+    guide(8e9 + 12, "Kyoto", ["## Get in", "", "The shinkansen from Tokyo Station takes about two hours. " + filler("Temple")]),
+    { ...guide(8e9 + 13, "Tokyo/Chiyoda", ["## Get in", "", "Tokyo Station is the main rail hub. " + filler("Rail")]), aliases: ["Tokyo Station"] },
+    guide(8e9 + 14, "Victoria", ["## Understand", "", "Victoria is a state in the south-east of Australia. " + filler("Melbourne")]),
+    guide(8e9 + 15, "Victoria (British Columbia)", ["## Sleep", "", "Tourists stay downtown near the Inner Harbour. " + filler("Harbour")]),
+    guide(8e9 + 16, "British Columbia", ["## Sleep", "", "Tourists stay in many places across the province. " + filler("Province")]),
     guide(8e9 + 8, "Georgia (country)", ["## Stay healthy", "", "Tap water is safe to drink in most cities. " + filler("Water"), "", "## Get in", "", "Many nationalities need no visa. " + filler("Visa")]),
   ];
   let vp: WikiPack;
@@ -161,6 +169,20 @@ describe("Wikivoyage destination rule on a Wikivoyage-only pack", () => {
     const q = "Preciso de visto para visitar a Argentina no Natal?";
     expect(await shareOf(q, "Argentina")).toBe(1);
     expect(await shareOf(q, "Natal")).toBeLessThan(1);
+  });
+
+  it("in a two-place question the destination goes first, not the origin or the region (self-review of dbf0cd5)", async () => {
+    const cases: Array<[string, string, string]> = [
+      ["Do I need a visa for Japan if I live in the United States?", "Japan", "United States"],
+      ["Do I need a visa for Japan as a citizen of New Zealand?", "Japan", "New Zealand"],
+      ["How do I get to Kyoto from Tokyo Station?", "Kyoto", "Tokyo/Chiyoda"],
+      ["Where do tourists stay in Victoria, British Columbia?", "Victoria (British Columbia)", "British Columbia"],
+    ];
+    for (const [q, dest, other] of cases) {
+      expect(await shareOf(q, dest), q).toBe(1);
+      expect(await shareOf(q, other), q).toBeLessThan(1);
+      expect((await vp.search(q))[0]?.title, q).toBe(dest);
+    }
   });
 
   it("a bare name that redirects to a disambiguation page is never put first", async () => {

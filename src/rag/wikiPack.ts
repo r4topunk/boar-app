@@ -204,6 +204,10 @@ export function isTravelQuestion(query: string): boolean {
   return TRIP_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
 }
 
+/** Words right before a place that make it where the traveller comes from, not where they go (EN, PT). */
+const ORIGIN_CUE =
+  /\b(from|live in|living in|lives in|resident of|citizens? of|passport holders? of|compared (to|with)|saindo de|vindo de|partindo de|morando em|moro em|cidad[ãa]os? d[aeo]s?|comparad[oa] (a|com))\s+(the\s+|a\s+|an\s+|o\s+|os\s+|as\s+)?$/i;
+
 /** Question words that open an EN or PT question: capitalized there, never a destination ("Como tratar…"). */
 const QUESTION_WORDS = new Set([
   "what", "when", "where", "why", "how", "who", "which", "whose", "is", "are", "can", "do", "does", "did", "should", "tell",
@@ -705,7 +709,9 @@ export class WikiPack {
     // Capitalized multi-word names that resolved to nothing ("Charles Darwin" in a Wikivoyage-only pack):
     // their inner words are part of a person's or thing's name, never a destination.
     const unresolvedNames: string[][] = [];
-    let destinationTaken = false;
+    // A travel question's destination goes first even though its name is common across the guides (low idf):
+    // "plug type in Brazil", "ride-hailing in Bangkok". One per question, chosen by its role (destinationOf).
+    const destination = travel ? await this.destinationOf(query, opening) : null;
     for (const cand of titleCandidates(query)) {
       if (used.length >= max) break;
       const lower = cand.toLowerCase();
@@ -725,15 +731,9 @@ export class WikiPack {
         const id =
           (await this.resolveTitle(cand, { fuzzy: false, source })) ??
           (singularTitle(cand) ? await this.resolveTitle(singularTitle(cand)!, { fuzzy: false, source }) : null);
-        // A destination a travel question names ("plug type in Brazil", "ride-hailing in Bangkok") is its subject even
-        // though the name is common across the guides (low idf): the guide goes first, its best sections picked below.
-        // Only in a travel question (TRAVEL_INTENT or TRAVEL_PRACTICAL).
         // A disambiguation page ("Georgia" -> "Georgia (disambiguation)") is a list of links, never the subject.
         if (id !== null && (await this.isDisambiguationPage(id))) continue;
-        // Only the first destination the question names ("visitar a Argentina no Natal": Natal is Christmas).
-        const destination = travel && !destinationTaken && source === "enwikivoyage" && /^\p{Lu}/u.test(cand);
-        if (destination && id !== null) destinationTaken = true;
-        if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) || destination });
+        if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) });
       }
       if (!ids.length) {
         const words = lower.split(/\s+/);
@@ -749,7 +749,52 @@ export class WikiPack {
       for (const { id, primary } of ids) found.push({ id, share: primary ? 1 : share });
       used.push(lower);
     }
+    if (destination) {
+      const at = found.findIndex((f) => f.id === destination);
+      if (at >= 0) found.splice(at, 1);
+      found.unshift({ id: destination, share: 1 });
+    }
     return found;
+  }
+
+  /**
+   * The destination of a travel question: the first place it names, in reading order, that is a Wikivoyage
+   * guide in the destination role. Not where the traveller comes from ("a visa for Japan if I live in the United
+   * States", "to Kyoto from Tokyo Station"), not a region qualifying the place before it ("Victoria, British
+   * Columbia", tried first as the guide "Victoria (British Columbia)"), not a word of a longer name that isn't
+   * a guide ("Charles Darwin"), not the opening question word, never a disambiguation page.
+   */
+  private async destinationOf(query: string, opening: string): Promise<number | null> {
+    const at = (c: string) => {
+      const m = new RegExp(`(^|[^\\p{L}\\p{N}])${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u").exec(query);
+      return m ? m.index + m[1].length : -1;
+    };
+    const cands = titleCandidates(query)
+      .filter((c) => /^\p{Lu}/u.test(c))
+      .map((c) => ({ c, at: at(c) }))
+      .filter((x) => x.at >= 0)
+      .sort((a, b) => a.at - b.at || b.c.length - a.c.length);
+    const unresolved: Array<[number, number]> = [];
+    for (const { c, at: pos } of cands) {
+      const end = pos + c.length;
+      if (unresolved.some(([s, e]) => pos >= s && end <= e)) continue;
+      const single = !c.includes(" ");
+      const lower = c.toLowerCase();
+      if (single && lower === opening && QUESTION_WORDS.has(lower)) continue;
+      const before = query.slice(0, pos);
+      if (ORIGIN_CUE.test(before)) continue;
+      if (/\p{Lu}[\p{L}\p{N}.'’-]*,\s*$/u.test(before)) continue;
+      const region = query.slice(end).match(/^,\s*(\p{Lu}[\p{L}.'’-]*(?:\s+\p{Lu}[\p{L}.'’-]*){0,3})/u)?.[1];
+      const guide = { fuzzy: false, source: "enwikivoyage" as const };
+      const id = (region ? await this.resolveTitle(`${c} (${region})`, guide) : null) ?? (await this.resolveTitle(c, guide));
+      if (id === null) {
+        if (!single && c.split(/\s+/).every((w) => /^\p{Lu}/u.test(w))) unresolved.push([pos, end]);
+        continue;
+      }
+      if (await this.isDisambiguationPage(id)) continue;
+      return id;
+    }
+    return null;
   }
 
   private async isRare(word: string, rare: Set<string>): Promise<boolean> {
