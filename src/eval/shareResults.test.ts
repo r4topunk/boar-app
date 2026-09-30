@@ -45,6 +45,11 @@ describe("buildSubmission", () => {
     expect(run).toMatchObject({ soc: undefined, hardware: "mt6897", cpuCores: 8, cpuFeatures: ["i8mm"], coreMaxFreqKHz: [2200000, 3350000], apiLevel: 35 });
   });
 
+  it("leaves out an empty CPU feature list (iOS), so the server stores unknown rather than none", () => {
+    expect(buildSubmission([row("a")], { platform: "ios", cpuFeatures: [] }, "1").run.cpuFeatures).toBeUndefined();
+    expect(buildSubmission([row("a")], { platform: "android", cpuFeatures: ["asimddp"] }, "1").run.cpuFeatures).toEqual(["asimddp"]);
+  });
+
   it("leaves out a RAM figure the device couldn't read", () => {
     expect(buildSubmission([row("a")], { platform: "android", ramBytes: 0 }, "1").run.ramBytes).toBeUndefined();
   });

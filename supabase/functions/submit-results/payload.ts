@@ -16,9 +16,13 @@ const posInt = (v: unknown, max: number): number | null => {
   return n !== null && n > 0 && n <= max ? n : null;
 };
 const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
-/** Short lowercase CPU flags like "i8mm" or "asimddp", at most 100 of them. */
-const cpuFlags = (v: unknown): string[] | null =>
-  Array.isArray(v) ? v.filter((f) => typeof f === "string" && /^[a-z0-9_]{1,32}$/.test(f)).slice(0, 100) : null;
+/** Short lowercase CPU flags like "i8mm" or "asimddp", at most 100 of them. None (iOS reports no
+ * flags) is unknown, not "no i8mm or dotprod", so it's stored as null. */
+const cpuFlags = (v: unknown): string[] | null => {
+  if (!Array.isArray(v)) return null;
+  const flags = v.filter((f) => typeof f === "string" && /^[a-z0-9_]{1,32}$/.test(f)).slice(0, 100);
+  return flags.length > 0 ? flags : null;
+};
 /** Core frequencies in kHz (0 = unknown), at most 64 cores. */
 const freqs = (v: unknown): number[] | null =>
   Array.isArray(v) && v.length <= 64 && v.every((f) => Number.isInteger(f) && f >= 0 && f < 10_000_000) ? v : null;

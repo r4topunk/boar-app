@@ -72,7 +72,8 @@ export function buildSubmission(
       hardware: device.hardware || undefined,
       ramBytes: device.ramBytes && device.ramBytes > 0 ? device.ramBytes : undefined,
       cpuCores: device.cpuCores,
-      cpuFeatures: device.cpuFeatures,
+      // iOS reports no CPU flags: an empty list means unknown, not "no i8mm or dotprod".
+      cpuFeatures: device.cpuFeatures && device.cpuFeatures.length > 0 ? device.cpuFeatures : undefined,
       coreMaxFreqKHz: device.coreMaxFreqKHz,
     },
     rows,
