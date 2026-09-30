@@ -1,0 +1,346 @@
+{
+  "pack": "boar-wikivoyage-en.sqlite",
+  "n": 30,
+  "passed": 30,
+  "measuredAt": "2026-09-30T16:52:29.326Z",
+  "rows": [
+    {
+      "id": "adv-01",
+      "group": "two-place",
+      "query": "Do I need a visa for Japan if I live in the United States?",
+      "first": "Japan",
+      "named": [
+        "Japan"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-02",
+      "group": "two-place",
+      "query": "Do I need a visa for Japan as a citizen of New Zealand?",
+      "first": "Japan",
+      "named": [
+        "Japan"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-03",
+      "group": "two-place",
+      "query": "I live in Brazil: do I need a visa for Japan?",
+      "first": "Japan",
+      "named": [
+        "Japan"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-04",
+      "group": "two-place",
+      "query": "Is Japan cheaper to visit compared to the United Kingdom?",
+      "first": "Japan",
+      "named": [
+        "Japan"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-05",
+      "group": "two-place",
+      "query": "How do I get to Kyoto from Tokyo Station?",
+      "first": "Kyoto",
+      "named": [
+        "Kyoto"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-06",
+      "group": "two-place",
+      "query": "Where do tourists stay in Victoria, British Columbia?",
+      "first": "Victoria (British Columbia)",
+      "named": [
+        "Victoria (British Columbia)"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-07",
+      "group": "opening-word",
+      "query": "Camping in Norway: is it allowed for tourists?",
+      "first": "Norway",
+      "named": [
+        "Norway"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-08",
+      "group": "opening-word",
+      "query": "Hotels in Tokyo: which area is best for tourists?",
+      "first": "Tokyo",
+      "named": [
+        "Tokyo"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-09",
+      "group": "opening-word",
+      "query": "Backpacking in Thailand: do I need a visa?",
+      "first": "Thailand",
+      "named": [
+        "Thailand"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-10",
+      "group": "opening-word",
+      "query": "Flights from Japan to Brazil: do I need a visa for Brazil?",
+      "first": "Brazil",
+      "named": [
+        "Brazil"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-11",
+      "group": "opening-word",
+      "query": "Moro em Lisboa, preciso de visto para o Brasil?",
+      "first": "Brazil",
+      "named": [
+        "Brazil"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-12",
+      "group": "ambiguous-name",
+      "query": "Is Nice worth visiting in winter?",
+      "first": "Nice",
+      "named": [
+        "Nice"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-13",
+      "group": "ambiguous-name",
+      "query": "What are nice things to do in Paris?",
+      "first": "Paris",
+      "named": [
+        "Paris"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-14",
+      "group": "two-place",
+      "query": "How do I get to Porto from Lisbon?",
+      "first": "Porto",
+      "named": [
+        "Porto"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-15",
+      "group": "ambiguous-name",
+      "query": "What is there to do in Paris, Texas?",
+      "first": "Paris (Texas)",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-16",
+      "group": "ambiguous-name",
+      "query": "What are the best things to do in Cambridge, Massachusetts?",
+      "first": "Cambridge (Massachusetts)",
+      "named": [
+        "Cambridge (Massachusetts)"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-17",
+      "group": "ambiguous-name",
+      "query": "Which hotels are good in Portland, Maine?",
+      "first": "Portland (Maine)",
+      "named": [
+        "Portland (Maine)"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-18",
+      "group": "disambiguation",
+      "query": "Is tap water safe to drink in Georgia?",
+      "first": "Georgia (country)",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-19",
+      "group": "disambiguation",
+      "query": "Do I need a visa for Georgia?",
+      "first": "South Georgia Island",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-20",
+      "group": "non-travel",
+      "query": "Where did Charles Darwin travel on the Beagle?",
+      "first": "Cricket",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-21",
+      "group": "non-travel",
+      "query": "When did Darwin publish his theory?",
+      "first": "London/South",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-22",
+      "group": "non-travel",
+      "query": "Why did Napoleon invade Egypt?",
+      "first": "Ancient Egypt",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": true,
+      "note": "borderline: a history question about a country"
+    },
+    {
+      "id": "adv-23",
+      "group": "non-travel",
+      "query": "Who was Jack London?",
+      "first": "Yagodnoye",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-24",
+      "group": "non-travel",
+      "query": "Who was Florence Nightingale?",
+      "first": null,
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-25",
+      "group": "non-travel",
+      "query": "Is there malaria in Kenya?",
+      "first": "Malaria",
+      "named": [
+        "Malaria"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": true,
+      "note": "borderline: travel health; the Malaria topic guide is named by the older named-title rule, as on main"
+    },
+    {
+      "id": "adv-26",
+      "group": "pt-holiday",
+      "query": "Preciso de visto para visitar a Argentina no Natal?",
+      "first": "Argentina",
+      "named": [
+        "Argentina"
+      ],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-27",
+      "group": "non-travel",
+      "query": "Como tratar uma queimadura?",
+      "first": "Punakha",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-28",
+      "group": "non-travel",
+      "query": "When did Brazil change its currency to the real?",
+      "first": "Brazil",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-29",
+      "group": "non-travel",
+      "query": "How long can Jordan stay in the air when he dunks?",
+      "first": "Petra",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    },
+    {
+      "id": "adv-30",
+      "group": "non-travel",
+      "query": "Why are New York taxis yellow?",
+      "first": "Red Bank",
+      "named": [],
+      "pass": true,
+      "fails": [],
+      "borderline": false
+    }
+  ]
+}

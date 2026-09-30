@@ -1,0 +1,64 @@
+{
+  "pack": "boar-wikivoyage-en.sqlite",
+  "packMeta": {
+    "format": "boar-knowledge-pack",
+    "formatVersion": "2",
+    "dims": "384",
+    "embeddingModelSha256": "ec38e8da142596baa913124ae50550de284b6916bf59577ef2f0cb9660c2f514",
+    "sources": "{\"enwiki\":{\"dataset\":\"HuggingFaceFW/finewiki (enwiki, Enterprise HTML dumps of August 2025)\",\"shards\":[\"none.jsonl\"],\"articles\":0},\"enwikivoyage\":{\"dump\":\"enwikivoyage-latest-pages-articles.xml.bz2\",\"articles\":34002}}",
+    "license": "CC BY-SA 4.0 (Wikipedia, Wikivoyage)",
+    "name": "English Wikivoyage",
+    "articles": "34002",
+    "chunks": "548051",
+    "indexedChunks": "548005",
+    "dfMin": "2000",
+    "params": "{\"fullTop\":1000000,\"leadChars\":2500,\"chunkChars\":1000,\"blockKb\":64,\"zlevel\":12,\"limit\":0,\"embedTop\":0}",
+    "builtAt": "2026-09-27T00:08:28.414Z"
+  },
+  "questions": "eval/retrieval/questions.travel.v2.jsonl",
+  "n": 16,
+  "measuredAt": "2026-09-30T16:52:30.983Z",
+  "results": {
+    "full (named titles first)": {
+      "all": {
+        "n": 16,
+        "recall@1": 0.813,
+        "recall@3": 0.938,
+        "recall@6": 1,
+        "mrr10": 0.891,
+        "p50ms": 48.1,
+        "p95ms": 63.6
+      },
+      "dev": {
+        "n": 8,
+        "recall@1": 0.875,
+        "recall@3": 1,
+        "recall@6": 1,
+        "mrr10": 0.938,
+        "p50ms": 55.3,
+        "p95ms": 63.6
+      },
+      "test": {
+        "n": 8,
+        "recall@1": 0.75,
+        "recall@3": 0.875,
+        "recall@6": 1,
+        "mrr10": 0.844,
+        "p50ms": 48.1,
+        "p95ms": 59.3
+      },
+      "byCategory": {
+        "travel-practical": {
+          "n": 16,
+          "recall@1": 0.813,
+          "recall@3": 0.938,
+          "recall@6": 1,
+          "mrr10": 0.891,
+          "p50ms": 48.1,
+          "p95ms": 63.6
+        }
+      },
+      "misses": []
+    }
+  }
+}

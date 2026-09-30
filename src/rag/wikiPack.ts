@@ -185,6 +185,43 @@ export function sectionKind(section: string): "action" | "action-sub" | "backgro
 
 const TRAVEL_INTENT = /\b(visit|visiting|things to (see|do)|what (can|should) (i|we) (see|do)|see and do|travel|trip|get (to|there|around)|getting (to|around)|stay|hotel|hostel|eat|restaurants?|sights?|tourists?|itinerary|by (train|bus|car|ferry)|airport)\b/i;
 
+/**
+ * Practical travel questions TRAVEL_INTENT doesn't word as a trip ("What plug type does Brazil use?", "Is tap
+ * water safe in Mexico City?", "How do I say thank you in Thai?"), EN and PT. With TRAVEL_INTENT, the only
+ * questions whose capitalized destination goes first (see titlesInQuestion). Specific phrases only: a bare
+ * generic word makes other questions look like travel ("Em que época Roma caiu?", "Tips for learning Rust").
+ */
+const TRAVEL_PRACTICAL =
+  /\b(plugs?|plug types?|voltage|what currency|currency (is )?used|atms?|pay (by|with) (a )?card|tipping|tap water|drinking water|emergency numbers?|visas?|driving licen[cs]e|drive on the (left|right)|ride-?hailing|say .+ in|phrasebook|best time to (visit|go|travel)|tomadas?|voltagem|moeda|pagar com cart[aã]o|gorjetas?|[aá]gua da torneira|preciso de visto|visto de turista|como (se )?diz|melhor [eé]poca para)\b/i;
+/** Trip-specific TRAVEL_INTENT phrases; not bare travel/trip/stay/eat ("Where did Darwin travel on the Beagle?"). */
+const TRIP_INTENT = /\b(visit|visiting|things to (see|do)|see and do|get (to|there|around)|getting (to|around)|hotels?|hostels?|airports?|tourists?|itinerary|sightseeing)\b/i;
+
+/**
+ * A travel question: the only kind whose capitalized Wikivoyage destination goes first. Narrower than
+ * TRAVEL_INTENT, which only orders sources (the guide before the encyclopedia article).
+ */
+export function isTravelQuestion(query: string): boolean {
+  return TRIP_INTENT.test(query) || TRAVEL_PRACTICAL.test(query);
+}
+
+/** Words right before a place that make it where the traveller comes from, not where they go (EN, PT). */
+const ORIGIN_CUE =
+  /\b(from|live in|living in|lives in|resident of|citizens? of|passport holders? of|compared (to|with)|saindo de|vindo de|partindo de|morando em|moro em|cidad[ãa]os? d[aeo]s?|comparad[oa] (a|com))\s+(the\s+|a\s+|an\s+|o\s+|os\s+|as\s+)?$/i;
+
+/**
+ * Words right before a place that make it where the question goes (EN, PT): "in Norway", "a visa for Japan",
+ * "visit Chiang Mai", "does Brazil use", "para o Brasil". A destination needs one, so the capitalized opening
+ * word ("Camping in Norway…", "Hotels in Tokyo…", "Moro em Lisboa…") never is one.
+ */
+const PLACE_CUE =
+  /\b(in|to|for|at|around|near|into|across|visit|visiting|does|do|is|are|em|para|pra|no|na|nos|nas|[àa]|ao|aos|[àa]s|visitar|conhecer)\s+(the\s+|a\s+|an\s+|o\s+|os\s+|as\s+)?$/i;
+
+/** Question words that open an EN or PT question: capitalized there, never a destination ("Como tratar…"). */
+const QUESTION_WORDS = new Set([
+  "what", "when", "where", "why", "how", "who", "which", "whose", "is", "are", "can", "do", "does", "did", "should", "tell",
+  "como", "quando", "onde", "porque", "por", "qual", "quais", "quem", "quanto", "quantos", "o", "a", "os", "as", "é", "existe",
+]);
+
 /** Cosine (bge-small) of a lead that's about the question even without its words. */
 export const SEMANTIC_KEEP = 0.7;
 
@@ -218,12 +255,34 @@ const ARTICLE_CACHE = 16;
 /** Heading path in force at UTF-16 offset `start` of an article's text (chunks store offsets only). */
 export function sectionAt(text: string, start: number): string {
   const path: string[] = [];
-  for (const m of text.slice(0, start).matchAll(HEADING)) {
-    const level = m[1].length;
+  // Same result as matching HEADING over text.slice(0, start), from a heading index built once per text:
+  // articlePassages asks this for every chunk of an article (and pairs of them), which rescanned a big
+  // Wikivoyage guide from the top each time (Thailand, 257 chunks: 1.8 s on an M1).
+  for (const h of headingsOf(text)) {
+    if (h.at >= start) break;
+    const level = h.level;
     path.length = level - 1;
-    path[level - 1] = m[2].trim();
+    // A heading line cut by `start` reads as far as `start`, as the sliced match did.
+    path[level - 1] = (h.lineEnd > start ? text.slice(h.titleAt, start) : h.title).trim();
   }
   return path.slice(1).filter(Boolean).join(" > ");
+}
+
+let headingsText: string | null = null;
+let headingsCache: Array<{ at: number; level: number; titleAt: number; lineEnd: number; title: string }> = [];
+
+/** Every heading of `text` in order; the last text's index is kept (articlePassages works one article at a time). */
+function headingsOf(text: string) {
+  if (text === headingsText) return headingsCache;
+  const out: typeof headingsCache = [];
+  for (const m of text.matchAll(HEADING)) {
+    const at = m.index!;
+    const lineEnd = at + m[0].length;
+    out.push({ at, level: m[1].length, titleAt: lineEnd - m[2].length, lineEnd, title: m[2] });
+  }
+  headingsText = text;
+  headingsCache = out;
+  return out;
 }
 
 /**
@@ -550,22 +609,29 @@ export class WikiPack {
     const scored = rows
       .filter((r) => r !== lead)
       .map((r) => {
+        // The section is read once per chunk here: the one-per-section filter below compared it for every pair.
+        const sec = sectionAt(a.text, r.start);
         const s = this.passageScore(a.text, r.start, r.end, stems);
-        if (!action) return { r, s };
+        if (!action) return { r, s, sec };
         // A what-to-do question wants the article's Treatment/First aid/During section, not its Prevention or History.
-        const kind = sectionKind(sectionAt(a.text, r.start));
-        if (kind === "background") return { r, s: s * 0.3 };
+        const kind = sectionKind(sec);
+        if (kind === "background") return { r, s: s * 0.3, sec };
         // Among what-to-do sections, the one that gives steps ("Stay indoors. Get down… Hold on…") over context; a
         // neutral heading whose text is mostly steps counts as a what-to-do section.
         const share = instructionShare(a.text.slice(r.start, r.end));
-        if (kind === "other") return { r, s: share >= STEPS_SHARE ? s + 0.5 + 0.4 * share : s };
-        return { r, s: s + (kind === "action" ? 0.5 : 0.25) + 0.4 * share };
+        if (kind === "other") return { r, s: share >= STEPS_SHARE ? s + 0.5 + 0.4 * share : s, sec };
+        return { r, s: s + (kind === "action" ? 0.5 : 0.25) + 0.4 * share, sec };
       })
       .sort((x, y) => y.s - x.s || y.r.start - x.r.start)
       // One passage per section (the best-scored, first after the sort): two chunks of "Intravenous fluids" would
       // crowd out another section.
-      .filter((x, i, all) => all.findIndex((y) => sectionAt(a.text, y.r.start) === sectionAt(a.text, x.r.start)) === i);
-    const ordered = action ? stepsFirst(scored, (x) => sectionAt(a.text, x.r.start)) : scored;
+      .filter(
+        (
+          (seen) => (x: { sec: string }) =>
+            !seen.has(x.sec) && (seen.add(x.sec), true)
+        )(new Set<string>())
+      );
+    const ordered = action ? stepsFirst(scored, (x) => x.sec) : scored;
     const picked = ordered.slice(0, nSections).filter((x) => x.s > 0.15);
     const leadHit = () => this.hit(articleId, lead.id, lead.start, lead.end, 1, "title", true);
     if (explain) {
@@ -618,6 +684,11 @@ export class WikiPack {
     return this.hit(c.articleId, c.chunkId, c.start, c.end, c.score, "bm25");
   }
 
+  private async isDisambiguationPage(id: number): Promise<boolean> {
+    const row = await this.db.getFirstAsync<{ title: string }>("SELECT title FROM articles WHERE id = ?", [id]);
+    return !!row && /\(disambiguation\)$/i.test(row.title);
+  }
+
   /**
    * Articles named by the question itself: its longest n-grams that are
    * titles or redirects, in Wikipedia and in Wikivoyage (the guide first when
@@ -639,22 +710,44 @@ export class WikiPack {
     ];
     const found: Array<{ id: number; share: number }> = [];
     const used: string[] = [];
+    // A destination only counts in a travel question (#34: "When did Darwin publish…" -> Darwin, Australia), and
+    // the opening question word is never a name ("Como tratar uma queimadura?" -> Como, Italy).
+    const travel = isTravelQuestion(query);
+    const opening = (query.match(/[\p{L}\p{N}]+/u)?.[0] ?? "").toLowerCase();
+    // Capitalized multi-word names that resolved to nothing ("Charles Darwin" in a Wikivoyage-only pack):
+    // their inner words are part of a person's or thing's name, never a destination.
+    const unresolvedNames: string[][] = [];
+    // A travel question's destination goes first even though its name is common across the guides (low idf):
+    // "plug type in Brazil", "ride-hailing in Bangkok". One per question, chosen by its role (destinationOf).
+    const destination = travel ? await this.destinationOf(query, opening) : null;
     for (const cand of titleCandidates(query)) {
       if (used.length >= max) break;
       const lower = cand.toLowerCase();
       if (used.some((u) => u.includes(lower))) continue; // inside a longer title already found
       const single = !cand.includes(" ");
+      // The question's opening word is capitalized because it opens the sentence, not because it's a name:
+      // "Como funciona a fotossíntese?" never names Como (Lombardy), in any pack.
+      if (single && lower === opening && QUESTION_WORDS.has(lower)) continue;
       // A lone word only counts when it's capitalized in the question, rare in the index, or not in the index at all
       // (then only an exact title or alias can match it: "queimadura" -> Burn through its Portuguese alias).
       if (single && !/^\p{Lu}/u.test(cand) && !(await this.isRare(lower, rare)) && (await this.stems(lower)).length) continue;
       const ids: Array<{ id: number; primary: boolean }> = [];
+      // A word of a longer capitalized name that resolved to nothing is part of that name ("Darwin" in "Charles
+      // Darwin", "Jordan" in "Michael Jordan"): never an article of its own, destination or not.
+      if (single && unresolvedNames.some((words) => words.includes(lower))) continue;
       for (const source of sources) {
         const id =
           (await this.resolveTitle(cand, { fuzzy: false, source })) ??
           (singularTitle(cand) ? await this.resolveTitle(singularTitle(cand)!, { fuzzy: false, source }) : null);
+        // A disambiguation page ("Georgia" -> "Georgia (disambiguation)") is a list of links, never the subject.
+        if (id !== null && (await this.isDisambiguationPage(id))) continue;
         if (id !== null && !found.some((f) => f.id === id)) ids.push({ id, primary: this.topicSources.includes(source) });
       }
-      if (!ids.length) continue;
+      if (!ids.length) {
+        const words = lower.split(/\s+/);
+        if (words.length > 1 && cand.split(/\s+/).every((w) => /^\p{Lu}/u.test(w))) unresolvedNames.push(words);
+        continue;
+      }
       const own = await this.stems(cand);
       const words = new Set((lower.match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 1 && !STOPWORDS.has(w)));
       // A name with a word the index doesn't know ("ERC20", "sangramento nasal") can only have matched an exact
@@ -664,7 +757,52 @@ export class WikiPack {
       for (const { id, primary } of ids) found.push({ id, share: primary ? 1 : share });
       used.push(lower);
     }
+    if (destination) {
+      const at = found.findIndex((f) => f.id === destination);
+      if (at >= 0) found.splice(at, 1);
+      found.unshift({ id: destination, share: 1 });
+    }
     return found;
+  }
+
+  /**
+   * The destination of a travel question: the first place it names, in reading order, that is a Wikivoyage
+   * guide in the destination role, right after a place cue (PLACE_CUE: never the opening word). Not where the traveller comes from ("a visa for Japan if I live in the United
+   * States", "to Kyoto from Tokyo Station"), not a region qualifying the place before it ("Victoria, British
+   * Columbia", tried first as the guide "Victoria (British Columbia)"), not a word of a longer name that isn't
+   * a guide ("Charles Darwin"), not the opening question word, never a disambiguation page.
+   */
+  private async destinationOf(query: string, opening: string): Promise<number | null> {
+    const at = (c: string) => {
+      const m = new RegExp(`(^|[^\\p{L}\\p{N}])${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u").exec(query);
+      return m ? m.index + m[1].length : -1;
+    };
+    const cands = titleCandidates(query)
+      .filter((c) => /^\p{Lu}/u.test(c))
+      .map((c) => ({ c, at: at(c) }))
+      .filter((x) => x.at >= 0)
+      .sort((a, b) => a.at - b.at || b.c.length - a.c.length);
+    const unresolved: Array<[number, number]> = [];
+    for (const { c, at: pos } of cands) {
+      const end = pos + c.length;
+      if (unresolved.some(([s, e]) => pos >= s && end <= e)) continue;
+      const single = !c.includes(" ");
+      const lower = c.toLowerCase();
+      if (single && lower === opening && QUESTION_WORDS.has(lower)) continue;
+      const before = query.slice(0, pos);
+      if (ORIGIN_CUE.test(before) || !PLACE_CUE.test(before)) continue;
+      if (/\p{Lu}[\p{L}\p{N}.'’-]*,\s*$/u.test(before)) continue;
+      const region = query.slice(end).match(/^,\s*(\p{Lu}[\p{L}.'’-]*(?:\s+\p{Lu}[\p{L}.'’-]*){0,3})/u)?.[1];
+      const guide = { fuzzy: false, source: "enwikivoyage" as const };
+      const id = (region ? await this.resolveTitle(`${c} (${region})`, guide) : null) ?? (await this.resolveTitle(c, guide));
+      if (id === null) {
+        if (!single && c.split(/\s+/).every((w) => /^\p{Lu}/u.test(w))) unresolved.push([pos, end]);
+        continue;
+      }
+      if (await this.isDisambiguationPage(id)) continue;
+      return id;
+    }
+    return null;
   }
 
   private async isRare(word: string, rare: Set<string>): Promise<boolean> {
