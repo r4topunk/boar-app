@@ -74,7 +74,7 @@ import { isSnakebiteFirstAid, snakebiteFirstAidCard } from "./firstAidCards";
 import type { LoadFailureKind } from "../inference/loadError";
 import { DepthModel, planAnswer, resolveDeepModel, AnswerPlan, deepAutoIneligibility } from "./depth";
 import { isCompactModel, pickDefaultAnswerModel, tooBigForLowRam } from "./defaultModel";
-import { O2_COMPACT, o2Decide, o2Message } from "./o2WeakSupport";
+import { o2Decide, o2Enabled, o2Message } from "./o2WeakSupport";
 import { buildVerificationInput, parseVerificationVerdict, VERIFICATION_INSTRUCTION } from "./verify";
 import { taskRequest } from "../inference/format";
 import {
@@ -181,7 +181,7 @@ export interface AnswerDeps {
    * sources against them; without them a PT question never names an English title.
    */
   englishNames?(query: string): string[];
-  /** O2 off-subject decline on the compact tier (src/routing/o2WeakSupport.ts); defaults to the O2_COMPACT build flag. */
+  /** O2 off-subject decline on the compact tier (src/routing/o2WeakSupport.ts); defaults to o2Enabled(). */
   o2Compact?: boolean;
   /**
    * Persists one execution record (src/services/executionTelemetry.ts recordExecution) at the end of
@@ -963,7 +963,7 @@ export function createAnswerer(deps: AnswerDeps) {
       // O2 (exp-03, rnd/lantern/o2-weak-support-spec.md): on the compact tier, a numeric/superlative/comparative/list
       // question whose passages are all about something else (Kantō region for Japan, Moose for "the tallest animal") is
       // declined before prefill. The default tier is left alone: it answers these from memory, right 8 of 9 times.
-      if ((deps.o2Compact ?? O2_COMPACT) && !health && gen?.mode !== "multipass" && genLlm && isCompactModel(genLlm) && !req.answerAnyway && sources.length) {
+      if ((deps.o2Compact ?? o2Enabled()) && !health && gen?.mode !== "multipass" && genLlm && isCompactModel(genLlm) && !req.answerAnyway && sources.length) {
         const o2 = o2Decide(req.query, sources.map((c) => ({ title: c.title, text: c.body })), { pt, englishNames: names });
         if (o2.action === "refuse") {
           reasonCodes.push("grounding:o2-off-subject");

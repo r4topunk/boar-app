@@ -26,6 +26,8 @@ export interface EvalRequest {
   /** Pipeline "answer" only: the questions to ask (any dataset). EVAL_SET when absent. */
   questions?: EvalQuestion[];
   /** Pipeline "answer" only: re-ask a declined answer with answerAnyway ("Answer anyway"). */
+  /** Pipeline "answer" only: the O2 off-subject decline on or off for this run (the A/B's arm); the build's default after. */
+  o2Compact?: boolean;
   answerAnyway?: boolean;
   /** Pipeline "answer" only: dataset label recorded on every row (e.g. "dataset-v2"). */
   evalSetVersion?: string;
@@ -79,10 +81,11 @@ export function parseEvalRequest(json: string): EvalRequest {
   if (raw.pipeline !== undefined && raw.pipeline !== "legacy" && raw.pipeline !== "answer") {
     throw new Error('"pipeline" must be "legacy" or "answer"');
   }
-  const answerOnly = ["questions", "answerAnyway", "evalSetVersion", "install", "answerSettings", "confirmLargeModels"].filter((k) => raw[k] !== undefined);
+  const answerOnly = ["questions", "answerAnyway", "evalSetVersion", "install", "answerSettings", "confirmLargeModels", "o2Compact"].filter((k) => raw[k] !== undefined);
   if (raw.confirmLargeModels !== undefined && typeof raw.confirmLargeModels !== "boolean") throw new Error('"confirmLargeModels" must be a boolean');
   if (raw.pipeline !== "answer" && answerOnly.length) throw new Error(`${answerOnly.join(", ")} need "pipeline": "answer"`);
   if (raw.answerAnyway !== undefined && typeof raw.answerAnyway !== "boolean") throw new Error('"answerAnyway" must be a boolean');
+  if (raw.o2Compact !== undefined && typeof raw.o2Compact !== "boolean") throw new Error('"o2Compact" must be a boolean');
   if (raw.evalSetVersion !== undefined && (typeof raw.evalSetVersion !== "string" || !/^[\w.-]{1,64}$/.test(raw.evalSetVersion))) {
     throw new Error('"evalSetVersion" must be 1-64 letters, digits, dots, dashes or underscores');
   }
@@ -110,6 +113,7 @@ export function parseEvalRequest(json: string): EvalRequest {
     questions: parseQuestions(raw.questions),
     answerAnyway: raw.answerAnyway,
     evalSetVersion: raw.evalSetVersion,
+    o2Compact: raw.o2Compact,
   };
 }
 
@@ -193,7 +197,7 @@ export function resolveAnswerRequest(request: EvalRequest, installed: CatalogMod
 }
 
 /** Every request field this build reads; echoed in the status so a CLI can spot a build older than its flags. */
-export const UNDERSTOOD_FIELDS = ["requestId", "models", "adaptive", "queries", "pipeline", "questions", "answerAnyway", "evalSetVersion", "install", "answerSettings", "confirmLargeModels"];
+export const UNDERSTOOD_FIELDS = ["requestId", "models", "adaptive", "queries", "pipeline", "questions", "answerAnyway", "evalSetVersion", "install", "answerSettings", "confirmLargeModels", "o2Compact"];
 
 /**
  * Requested models answer() would silently replace (selectAnswerModel): too big for a low-RAM phone and not

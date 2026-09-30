@@ -22,6 +22,7 @@
 //   --install-places-from-questions   ...every city named by a question's grading.city (v2 food items)
 //   --install-assets <ids>  download catalog packs first (e.g. boar-crypto,boar-wikivoyage-en)
 //   --quick-first on|off    answer setting for this run only   --always-complete on|off   (device's restored after)
+//   --o2 on|off             O2 off-subject decline for this run (the A/B's arm; the build's default after)
 //   --no-launch             don't (re)launch the app; it must already be in the foreground
 //   --timeout-min <n>       give up after n minutes (default 180)
 //   --request-id <id>       reuse a request id: a run the OS killed resumes from its last answered question
@@ -61,6 +62,11 @@ function parseArgs(argv) {
       const v = next();
       if (v !== "on" && v !== "off") throw new Error(`${a} takes on|off`);
       (o.answerSettings ??= {})[a === "--quick-first" ? "quickFirst" : "alwaysComplete"] = v === "on";
+    }
+    else if (a === "--o2") {
+      const v = next();
+      if (v !== "on" && v !== "off") throw new Error("--o2 takes on|off");
+      o.o2Compact = v === "on";
     }
     else if (a === "--timeout-min") o.timeoutMin = Number(next());
     else if (a === "--request-id") o.requestId = next();
@@ -194,6 +200,7 @@ async function main() {
     ...(install ? { install } : {}),
     ...(o.answerSettings ? { answerSettings: o.answerSettings } : {}),
     ...(o.confirmLarge ? { confirmLargeModels: true } : {}),
+    ...(o.o2Compact !== undefined ? { o2Compact: o.o2Compact } : {}),
   };
   if (install) console.log(`  install first: ${JSON.stringify(install)}`);
   const reqFile = join(out, "request.json");

@@ -152,6 +152,11 @@ npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyw
   with ≤ 4.5 GB unless confirmed, or one that crashed the app on its last load)
   fails the request instead of silently answering with another model. Pass
   `--confirm-large-models` to confirm the RAM case, as the app's "run it anyway" does.
+- **O2 A/B:** `--o2 on|off` (request field `o2Compact`) turns the compact tier's
+  off-subject decline (`src/routing/o2WeakSupport.ts`) on or off for this run,
+  so one build runs both arms. After the run, the build's default applies again
+  (`EXPO_PUBLIC_O2_COMPACT`, off). Each row's `answerSettings.o2Compact` records
+  the arm, and a decline shows `grounding:o2-off-subject` in the receipt.
 - One row per answer, in the eval/ judge format, plus: `stages` (every stage
   event with ms since `answer()`), `firstSourcesMs`, `instantMs`, `firstTokenMs`,
   `placesMs`, `places` (count, coverage), `declined`, `answeredAnyway`,

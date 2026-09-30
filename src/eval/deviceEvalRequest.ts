@@ -187,6 +187,7 @@ async function runAnswerRequest(
   try {
     const run = await runAnswerEvaluation({
       answerSettings: request.answerSettings,
+      o2Compact: request.o2Compact,
       // A re-sent request (same id) resumes where a killed run stopped.
       resumeKey: requestId,
       questions: resolved.questions,

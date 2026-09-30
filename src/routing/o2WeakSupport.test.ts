@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { o2Decide, o2Kind, o2Message, type O2Passage } from "./o2WeakSupport";
+import { O2_COMPACT, o2Decide, o2Enabled, o2Kind, o2Message, setO2Override, type O2Passage } from "./o2WeakSupport";
 
 // Lantern's O2 test set (rnd/lantern/o2/o2-testset.jsonl): question, the titles of the passages that went into the
 // prompt, the bucket and the expected decision, plus what the Python reference decides (`reference`). The one case
@@ -83,5 +83,16 @@ describe("O2 rules", () => {
     expect(o2Message(false, { questionSubject: "Japan", passageSubject: "Kantō region" })).toBe("The passages found are about Kantō region, not Japan.");
     expect(o2Message(true, { questionSubject: "Japan", passageSubject: "Kantō region" })).toBe("Os trechos encontrados falam de Kantō region, não de Japan.");
     expect(o2Message(false, { passageSubject: "Moose" })).toBe("The passages found don't support this answer.");
+  });
+});
+
+describe("O2 switch", () => {
+  it("is off unless the build turns it on; an evaluation run's arm overrides it until reset", () => {
+    expect(O2_COMPACT).toBe(false);
+    expect(o2Enabled()).toBe(false);
+    setO2Override(true);
+    expect(o2Enabled()).toBe(true);
+    setO2Override(undefined);
+    expect(o2Enabled()).toBe(false);
   });
 });

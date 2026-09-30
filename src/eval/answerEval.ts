@@ -9,6 +9,7 @@
  * runs on different days or devices are comparable; the answer settings
  * (quick first / always complete) are the device's and recorded on every row.
  */
+import { o2Enabled, setO2Override } from "../routing/o2WeakSupport";
 import * as FileSystem from "expo-file-system/legacy";
 import { answer } from "../routing/answerService";
 import type { AnswerEvent, AnswerResult } from "../routing/events";
@@ -108,6 +109,8 @@ export interface RunAnswerEvaluationOptions {
   evalSetVersion?: string;
   /** Answer settings for this run only (quick first / always complete); the device's are restored after. */
   answerSettings?: { quickFirst?: boolean; alwaysComplete?: boolean };
+  /** The O2 off-subject decline on or off for this run (src/routing/o2WeakSupport.ts); the build's default after. */
+  o2Compact?: boolean;
   /**
    * The request id: results go to <resumeKey>.answer.jsonl, and a re-sent request with the same id
    * (e.g. after the OS killed the app mid-run) skips the questions that file already answers. The
@@ -165,6 +168,7 @@ export async function runAnswerEvaluation({
   answerAnyway = false,
   evalSetVersion = "custom",
   answerSettings: settingsOverride,
+  o2Compact,
   resumeKey,
   onProgress,
   onRow,
@@ -210,7 +214,9 @@ export async function runAnswerEvaluation({
   const savedModel = original.model;
   const savedSettings = original;
   if (settingsOverride) await setAnswerSettings(settingsOverride);
-  const answerSettings = { ...(await getAnswerSettings()) } as Record<string, unknown>;
+  if (o2Compact !== undefined) setO2Override(o2Compact);
+  // Each row records the O2 arm it ran with.
+  const answerSettings = { ...(await getAnswerSettings()), o2Compact: o2Enabled() } as Record<string, unknown>;
   let stopped = false;
 
   try {
@@ -258,6 +264,7 @@ export async function runAnswerEvaluation({
       }
     }
   } finally {
+    setO2Override(undefined);
     // A device request (restorePath) always puts back the restore point, whatever this request's flags: a
     // resumed or later run may carry none of the killed run's --models / answer settings (F2).
     if ((restorePath || models.length) && savedModel) await setActiveModelId("llm", savedModel).catch(() => {});

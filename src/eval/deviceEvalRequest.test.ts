@@ -10,6 +10,14 @@ const INSTELLA: CatalogModel = { ...PHI, id: "hf-amd-instella-moe-16b-a3b-q2_k",
 const installed = [PHI, QWEN, QWEN_7B, INSTELLA];
 
 describe("parseEvalRequest", () => {
+  it("takes o2Compact, the O2 A/B's arm, only as a boolean and only with the answer pipeline", () => {
+    const base = { requestId: "o2-ab", pipeline: "answer", questions: [{ id: "q1", query: "What is Japan's population?" }] };
+    expect(parseEvalRequest(JSON.stringify({ ...base, o2Compact: true })).o2Compact).toBe(true);
+    expect(parseEvalRequest(JSON.stringify(base)).o2Compact).toBeUndefined();
+    expect(() => parseEvalRequest(JSON.stringify({ ...base, o2Compact: "on" }))).toThrow(/o2Compact/);
+    expect(() => parseEvalRequest(JSON.stringify({ requestId: "o2-ab", o2Compact: true }))).toThrow(/pipeline/);
+  });
+
   it("accepts a well-formed request", () => {
     expect(parseEvalRequest('{"requestId":"req-1","models":["phi-3.5"],"adaptive":true,"queries":["greeting-1"]}')).toEqual({
       requestId: "req-1",

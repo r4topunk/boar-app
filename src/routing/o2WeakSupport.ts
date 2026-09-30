@@ -13,6 +13,15 @@
 /** Off until the blind iPhone A/B (exp-03 README §5) passes; EXPO_PUBLIC_O2_COMPACT=1 turns it on in a build. */
 export const O2_COMPACT = process.env.EXPO_PUBLIC_O2_COMPACT === "1";
 
+let override: boolean | undefined;
+/** An evaluation run's arm (src/eval/answerEval.ts, eval builds only); undefined goes back to the build flag. */
+export function setO2Override(on: boolean | undefined): void {
+  override = on;
+}
+export function o2Enabled(): boolean {
+  return override ?? O2_COMPACT;
+}
+
 export type O2Kind = "list" | "superlative" | "comparative" | "numeric";
 export type O2Passage = { title: string; text?: string | null };
 export type O2Decision = {
