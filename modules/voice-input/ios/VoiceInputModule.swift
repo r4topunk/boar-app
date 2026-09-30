@@ -19,7 +19,7 @@ public class VoiceInputModule: Module {
   private static let silenceSeconds: TimeInterval = 1.8
   private static let noSpeechSeconds: TimeInterval = 8
 
-  private static let log = OSLog(subsystem: "team.sopa.aoair", category: "voice")
+  private static let log = OSLog(subsystem: "team.sopa.boar", category: "voice")
   private let audioEngine = AVAudioEngine()
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?

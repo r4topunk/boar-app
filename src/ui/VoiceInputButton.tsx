@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconButton, Sheet, Button, Text, useAnnounce } from "./components";
-import { isVoiceInputAvailable, startListening, stopListening, type VoiceEvent } from "../voice/VoiceInput";
+import { getVoiceSupport, startListening, stopListening, type VoiceEvent } from "../voice/VoiceInput";
 
 interface Props {
   disabled?: boolean;
@@ -24,11 +24,18 @@ export function VoiceInputButton({ disabled, onListenStart, onTranscript }: Prop
   const { t } = useTranslation();
   const announce = useAnnounce();
   const [available, setAvailable] = useState<boolean | null>(null);
+  // The caveat is about the system speech service; on-device recognition never sends audio anywhere.
+  const [onDevice, setOnDevice] = useState(true);
   const [listening, setListening] = useState(false);
   const [caveatOpen, setCaveatOpen] = useState(false);
 
   useEffect(() => {
-    isVoiceInputAvailable().then(setAvailable).catch(() => setAvailable(false));
+    getVoiceSupport()
+      .then((s) => {
+        setAvailable(s.usable);
+        setOnDevice(s.reason === "on-device");
+      })
+      .catch(() => setAvailable(false));
   }, []);
 
   if (!available) return null;
@@ -55,7 +62,7 @@ export function VoiceInputButton({ disabled, onListenStart, onTranscript }: Prop
       setListening(false);
       return;
     }
-    if (!caveatShown) {
+    if (!caveatShown && !onDevice) {
       caveatShown = true;
       setCaveatOpen(true);
       return;
