@@ -24,6 +24,7 @@
 //   --quick-first on|off    answer setting for this run only   --always-complete on|off   (device's restored after)
 //   --no-launch             don't (re)launch the app; it must already be in the foreground
 //   --timeout-min <n>       give up after n minutes (default 180)
+//   --request-id <id>       reuse a request id: a run the OS killed resumes from its last answered question
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, openSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -61,6 +62,7 @@ function parseArgs(argv) {
       (o.answerSettings ??= {})[a === "--quick-first" ? "quickFirst" : "alwaysComplete"] = v === "on";
     }
     else if (a === "--timeout-min") o.timeoutMin = Number(next());
+    else if (a === "--request-id") o.requestId = next();
     else if (a === "--help" || a === "-h") o.help = true;
     else throw new Error(`unknown option ${a}`);
   }
@@ -173,7 +175,9 @@ async function main() {
   console.log(`✓ iPhone ${o.udid}, app ${o.bundle}, ${questions.length} questions (dataset ${dataset})`);
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const requestId = `req-${stamp.toLowerCase().replace(/[^a-z0-9-]/g, "")}`.slice(0, 64);
+  // A fixed id resumes: the app skips the questions its result file for that id already answers.
+  const requestId = o.requestId ?? `req-${stamp.toLowerCase().replace(/[^a-z0-9-]/g, "")}`.slice(0, 64);
+  if (o.requestId && !/^[a-z0-9][a-z0-9-]{0,63}$/.test(o.requestId)) fail("--request-id: 1-64 lowercase letters, digits or dashes");
   const out = o.out ?? join("eval-results", "iphone", stamp.slice(0, 10), requestId);
   mkdirSync(out, { recursive: true });
   const places = [...new Set([...(o.installPlaces ?? []), ...(o.placesFromQuestions ? rawQuestions.map((q) => q.grading?.city).filter(Boolean) : [])])];

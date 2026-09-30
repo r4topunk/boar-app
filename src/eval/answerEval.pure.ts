@@ -189,3 +189,35 @@ export function parseQuestions(value: unknown): EvalQuestion[] | undefined {
   if (ids.size !== value.length) throw new Error('"questions" ids must be unique');
   return value.map((q) => ({ id: q.id.trim(), query: q.query.trim(), category: q.category }));
 }
+
+/** One (config, question) pair of a run: what a resumed request skips when it's already answered. */
+export const resultKey = (configId: string, queryId: string) => `${configId}|${queryId}`;
+
+/** A result file's rows, skipping a line a crash cut short (the file is rewritten after every question). */
+export function parseResultRows(text: string): AnswerEvalRow[] {
+  const rows: AnswerEvalRow[] = [];
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const r = JSON.parse(line);
+      if (r && typeof r.queryId === "string" && typeof r.configId === "string") rows.push(r);
+    } catch {}
+  }
+  return rows;
+}
+
+/**
+ * The (config, question) pairs a previous run of the same request finished: an answer that wasn't
+ * declined, or a declined one plus its "Answer anyway" re-ask when the request asks for it.
+ */
+export function completedKeys(rows: AnswerEvalRow[], answerAnyway: boolean): Set<string> {
+  const byKey = new Map<string, AnswerEvalRow[]>();
+  for (const r of rows) byKey.set(resultKey(r.configId, r.queryId), [...(byKey.get(resultKey(r.configId, r.queryId)) ?? []), r]);
+  const done = new Set<string>();
+  for (const [key, rs] of byKey) {
+    const first = rs.find((r) => !r.answeredAnyway);
+    if (!first) continue;
+    if (!first.declined || !answerAnyway || rs.some((r) => r.answeredAnyway)) done.add(key);
+  }
+  return done;
+}

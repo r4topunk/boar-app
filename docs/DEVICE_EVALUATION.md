@@ -138,6 +138,13 @@ npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyw
   release build, serve production-mode JS with the flag:
   `EXPO_PUBLIC_DEVICE_EVAL=1 npx expo start --localhost --no-dev --minify`.
   `__DEV__` is then off and the flag keeps pickup on.
+- **Resume:** results go to `eval/<requestId>.answer.jsonl` and are rewritten
+  after every question. If the OS kills the app mid-run, send the **same
+  request (same `requestId`)** again (`eval-iphone.mjs --request-id <id>`). The
+  app skips the questions that file already answers, a declined answer
+  without its re-ask is redone, and at the end it restores the model and
+  answer settings from before the first run (`eval/<requestId>.restore.json`).
+  A new id starts over.
 - One row per answer, in the eval/ judge format, plus: `stages` (every stage
   event with ms since `answer()`), `firstSourcesMs`, `instantMs`, `firstTokenMs`,
   `placesMs`, `places` (count, coverage), `declined`, `answeredAnyway`,

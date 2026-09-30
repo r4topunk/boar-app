@@ -28,7 +28,7 @@ import { DEFAULT_PERSONALITY_ID, getPersonality } from "../constants/personaliti
 import { EVAL_RESULTS_DIR, EvalProgress } from "./evalHarness";
 import { EvalConfig, evalRowsToJsonl, newEvalRunId } from "./evalHarness.pure";
 import type { EvalCategory } from "./evalSet";
-import { AnswerEvalRow, buildAnswerEvalRow, EvalQuestion, TimedEvent } from "./answerEval.pure";
+import { AnswerEvalRow, buildAnswerEvalRow, completedKeys, EvalQuestion, parseResultRows, resultKey, TimedEvent } from "./answerEval.pure";
 
 export const ANSWER_TIMEOUT_MS = 240_000;
 /** Pause between questions: lets the engine's idle prefix refill run, as between two questions in the chat. */
@@ -106,6 +106,13 @@ export interface RunAnswerEvaluationOptions {
   evalSetVersion?: string;
   /** Answer settings for this run only (quick first / always complete); the device's are restored after. */
   answerSettings?: { quickFirst?: boolean; alwaysComplete?: boolean };
+  /**
+   * The request id: results go to <resumeKey>.answer.jsonl, and a re-sent request with the same id
+   * (e.g. after the OS killed the app mid-run) skips the questions that file already answers. The
+   * device's model and answer settings are kept in <resumeKey>.restore.json until the run ends, so a
+   * resumed run restores the originals, not the values the killed run had set.
+   */
+  resumeKey?: string;
   onProgress?: (p: EvalProgress) => void;
   onRow?: (row: AnswerEvalRow) => void;
   shouldStop?: () => boolean;
@@ -156,19 +163,38 @@ export async function runAnswerEvaluation({
   answerAnyway = false,
   evalSetVersion = "custom",
   answerSettings: settingsOverride,
+  resumeKey,
   onProgress,
   onRow,
   shouldStop,
 }: RunAnswerEvaluationOptions): Promise<AnswerEvaluationRun> {
-  const runId = newEvalRunId();
-  const rows: AnswerEvalRow[] = [];
   await FileSystem.makeDirectoryAsync(EVAL_RESULTS_DIR, { intermediates: true }).catch(() => {});
-  const savedPath = `${EVAL_RESULTS_DIR}${runId}.answer.jsonl`;
+  const readJson = async (path: string) =>
+    (await FileSystem.getInfoAsync(path)).exists ? await FileSystem.readAsStringAsync(path).catch(() => "") : "";
+  // Resume: the rows a killed run of this request already wrote (a declined answer without its re-ask is redone).
+  const savedPath = `${EVAL_RESULTS_DIR}${resumeKey ?? newEvalRunId()}.answer.jsonl`;
+  const previous = resumeKey ? parseResultRows(await readJson(savedPath)) : [];
+  const done = completedKeys(previous, answerAnyway);
+  const rows: AnswerEvalRow[] = previous.filter((r) => done.has(resultKey(r.configId, r.queryId)));
+  const runId = rows[0]?.runId ?? newEvalRunId();
+  for (const r of rows) onRow?.(r);
+  if (rows.length) console.log(`[EVAL] resuming ${resumeKey}: ${done.size} answers already in ${savedPath}`);
   const configs: EvalConfig[] = models.length
     ? models.map((m) => ({ kind: "model" as const, modelId: m.id, label: m.label }))
     : [{ kind: "adaptive", label: "current model" }];
-  const savedModel = await getActiveModelId("llm");
-  const savedSettings = await getAnswerSettings();
+  // The device's own model and settings, from before the first run of this request if it was killed.
+  const restorePath = resumeKey ? `${EVAL_RESULTS_DIR}${resumeKey}.restore.json` : null;
+  let original: { model: string | null; quickFirst: boolean; alwaysComplete: boolean } | null = null;
+  try {
+    original = restorePath ? JSON.parse((await readJson(restorePath)) || "null") : null;
+  } catch {}
+  if (!original) {
+    const current = await getAnswerSettings();
+    original = { model: await getActiveModelId("llm"), quickFirst: current.quickFirst, alwaysComplete: current.alwaysComplete };
+    if (restorePath) await FileSystem.writeAsStringAsync(restorePath, JSON.stringify(original));
+  }
+  const savedModel = original.model;
+  const savedSettings = original;
   if (settingsOverride) await setAnswerSettings(settingsOverride);
   const answerSettings = { ...(await getAnswerSettings()) } as Record<string, unknown>;
   let stopped = false;
@@ -182,6 +208,7 @@ export async function runAnswerEvaluation({
           stopped = true;
           break outer;
         }
+        if (done.has(resultKey(configId, q.id))) continue;
         onProgress?.({
           configIndex: ci,
           configCount: configs.length,
@@ -221,6 +248,7 @@ export async function runAnswerEvaluation({
     if (settingsOverride) {
       await setAnswerSettings({ quickFirst: savedSettings.quickFirst, alwaysComplete: savedSettings.alwaysComplete }).catch(() => {});
     }
+    if (restorePath) await FileSystem.deleteAsync(restorePath, { idempotent: true }).catch(() => {});
   }
   await FileSystem.writeAsStringAsync(savedPath, evalRowsToJsonl(rows));
   console.log(`[EVAL] answer run ${runId} ${stopped ? "stopped" : "done"} — ${rows.length} rows saved to ${savedPath}`);
