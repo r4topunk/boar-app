@@ -10,12 +10,15 @@
 //    - device: { platform: "android", attestation: [cert, ...] } or
 //      { platform: "ios", keyId, attestation: [attestationObject] } the first time (the key's
 //      attestation must carry this same challenge); afterwards { platform, id }.
+//      An Android phone whose secure hardware can't attest sends { platform: "android",
+//      attestation: [], publicKey, attestationError? }: its runs are stored for review, hidden.
 //
 // Once the key is checked, every answer also carries `device`, the id the app sends from then on.
 // Errors: 400 bad request · 401 bad key, signature or challenge · 403 banned · 409 already
 // shared · 412 unknown device (make a new key) · 429 { error, retryAt? }: rate_limited or cooldown
-// (this device), network_limited (this network) ·
-// 503 busy. The limits and the storing happen in submit_eval_run() in one transaction; see
+// (this device), network_limited (this network) · 503 busy or review_queue_full.
+// A 201 carries pendingReview: true for an unattested phone. The limits and the storing happen in
+// submit_eval_run() in one transaction; see
 // supabase/migrations/20260929200000_secure_sharing.sql.
 //
 // The publishable key is public (it ships in the APK), so it only keeps out random callers; the
@@ -119,7 +122,25 @@ Deno.serve(async (req) => {
   let spki: Uint8Array;
   let signCount = 0;
   try {
-    if (Array.isArray(device.attestation)) {
+    if (Array.isArray(device.attestation) && device.attestation.length === 0) {
+      // No attestation (some genuine phones can't): register the bare key, runs wait for review.
+      if (platform !== "android" || typeof device.publicKey !== "string" || device.publicKey.length > 400) {
+        return json(400, { error: "an unattested key needs platform android and its publicKey" });
+      }
+      const bare = b64decode(device.publicKey);
+      try {
+        await crypto.subtle.importKey("spki", bare as BufferSource, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+      } catch {
+        return json(400, { error: "publicKey must be a P-256 SubjectPublicKeyInfo" });
+      }
+      deviceId = await deviceIdFromSpki(bare);
+      const reason = typeof device.attestationError === "string" ? device.attestationError.slice(0, 200) : null;
+      const { error } = await db.from("eval_devices").upsert(
+        { id: deviceId, platform, public_key: b64encode(bare), attested: false, attestation: { attested: false, reason } },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
+      if (error) return json(500, { error: "could not save the device" });
+    } else if (Array.isArray(device.attestation)) {
       // First share from this key: check what the hardware says about it, then remember it.
       const attested = platform === "android"
         ? await verifyAndroid(device.attestation, challenge, { packageName: PACKAGE_NAME, certDigests })
@@ -173,7 +194,13 @@ Deno.serve(async (req) => {
   }
   switch (result.error) {
     case undefined:
-      return reply(201, { id: result.id, rows: parsed.rows.length, hidden: result.hidden, scores: result.scores });
+      return reply(201, {
+        id: result.id,
+        rows: parsed.rows.length,
+        hidden: result.hidden,
+        pendingReview: result.pending_review === true,
+        scores: result.scores,
+      });
     case "rate_limited":
     case "cooldown":
       return reply(429, { error: result.error, retryAt: result.retry_at ?? null });
@@ -186,7 +213,8 @@ Deno.serve(async (req) => {
     case "banned":
       return reply(403, { error: "banned" });
     case "busy":
-      return reply(503, { error: "busy" });
+    case "review_queue_full":
+      return reply(503, { error: result.error });
     default:
       return reply(400, { error: result.error });
   }
