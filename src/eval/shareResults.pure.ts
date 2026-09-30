@@ -1,6 +1,7 @@
 // Sharing an evaluation run with the BOAR project (supabase/functions/submit-results). Pure
 // parts: what gets sent, and what the server's answer means. The app never sends anything on
-// its own; the user presses "Share results" and confirms what is listed.
+// its own; the user presses "Share results" and confirms what is listed. The run is signed with
+// the phone's hardware key (modules/device-key); see shareResults.ts.
 import type { EvalResultRow } from "./evalHarness.pure";
 
 export interface ShareDevice {
@@ -22,8 +23,8 @@ export interface ShareDevice {
   coreMaxFreqKHz?: number[];
 }
 
+/** The signed payload: no install id or account, the device is the attested key. */
 export interface ShareSubmission {
-  installId: string;
   run: {
     runId: string;
     evalSetVersion: string;
@@ -53,12 +54,10 @@ export function submitResultsUrl(supabaseUrl: string | undefined, publishableKey
 export function buildSubmission(
   rows: EvalResultRow[],
   device: ShareDevice,
-  installId: string,
   appVersion: string
 ): ShareSubmission {
   const first = rows[0];
   return {
-    installId,
     run: {
       runId: first.runId,
       evalSetVersion: first.evalSetVersion,
@@ -80,16 +79,37 @@ export function buildSubmission(
   };
 }
 
-export type ShareResult = "shared" | "already-shared" | "rate-limited" | "rejected" | "failed";
+export type ShareResult =
+  | "shared"
+  | "already-shared"
+  | "rate-limited"
+  | "cooldown"
+  | "network-limited"
+  | "rejected"
+  | "failed";
 
-/** The HTTP status submit-results answers with, as something the screen can say. */
-export function shareResultFromStatus(status: number): ShareResult {
-  if (status === 201) return "shared";
-  if (status === 409) return "already-shared";
-  if (status === 429) return "rate-limited";
-  if (status >= 400 && status < 500) return "rejected";
-  return "failed";
+export interface ShareOutcome {
+  result: ShareResult;
+  /** When this phone may share again (rate-limited, cooldown), as the server's ISO time. */
+  retryAt?: string;
 }
+
+/** What submit-results answered, as something the screen can say. */
+export function shareOutcome(status: number, body?: { error?: unknown; retryAt?: unknown } | null): ShareOutcome {
+  if (status === 201) return { result: "shared" };
+  if (status === 409) return { result: "already-shared" };
+  if (status === 429) {
+    // Many phones on one network (shared Wi-Fi, mobile carrier) together hit a separate cap.
+    if (body?.error === "network_limited") return { result: "network-limited" };
+    const retryAt = typeof body?.retryAt === "string" && !Number.isNaN(Date.parse(body.retryAt)) ? body.retryAt : undefined;
+    return { result: body?.error === "cooldown" ? "cooldown" : "rate-limited", retryAt };
+  }
+  if (status >= 400 && status < 500) return { result: "rejected" };
+  return { result: "failed" };
+}
+
+/** The string the phone's key signs: the server's one-time challenge, then the exact payload. */
+export const signedMessage = (challenge: string, payload: string): string => `${challenge}.${payload}`;
 
 /** The Features line of /proc/cpuinfo as a list of flags. */
 export function parseCpuFeatures(line: string | undefined): string[] {

@@ -80,6 +80,24 @@ npx expo run:android                   # build + launch on a connected device
 prebuild can leave a stale `android/` project around with the old values baked in — that's
 what a plain `npm install` alone will never fix, since it never touches `android/` at all.
 
+### Testing result sharing
+
+Evaluation › Share results only works from a release build signed with BOAR's release key:
+the server checks the phone's hardware-key attestation, and development builds (signed with
+Expo's public debug key) are refused. Build and install a release APK:
+
+```bash
+make apk-downloader                                  # dist/boar-downloader-<version>-arm64.apk
+adb install dist/boar-downloader-<version>-arm64.apk # application id team.sopa.aoair
+```
+
+A development build made from this repo has the same application id but a different signing
+key, so Android won't install one over the other: uninstall the development build first, which
+deletes its downloaded models (copy them out and import them from files to avoid downloading
+them again).
+The share flow, limits and moderation: [RESULTS_SCORE.md](RESULTS_SCORE.md#how-a-share-works)
+and [supabase/README.md](../supabase/README.md).
+
 ### Blank/white screen or "Failed to connect to \<LAN IP\>" after `make start`
 
 This is a Wi-Fi network problem, not a build problem: some routers (and most phone

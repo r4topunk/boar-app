@@ -11,7 +11,7 @@ import { exportEvalResults, listInstalledEvalModels, runEvaluation, EvalProgress
 import { runDeviceEvalRequest } from "../eval/deviceEvalRequest";
 import type { EvalRequest } from "../eval/deviceEvalRequest.pure";
 import { resultsSharingAvailable, shareDevice, shareEvalRun } from "../eval/shareResults";
-import type { ShareDevice, ShareResult } from "../eval/shareResults.pure";
+import type { ShareDevice, ShareOutcome } from "../eval/shareResults.pure";
 import { SharePreview } from "./SharePreview";
 import appConfig from "../../app.json";
 import { Button, IconSlot, Progress, Screen, Section, Skeleton, Text, useOpticalLine, useToast } from "./components";
@@ -48,7 +48,7 @@ function outcomeColor(outcome: EvalResultRow["outcome"]): TextColor {
  * docs/EVAL_QUERIES.md for the workflow.
  */
 export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const tokens = useTokens();
   const bodyLine = useOpticalLine("body");
   const toast = useToast();
@@ -151,18 +151,29 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
     if (!run || sendingRef.current) return;
     sendingRef.current = true;
     setSharing(true);
-    let result: ShareResult = "failed";
+    let outcome: ShareOutcome = { result: "failed" };
     try {
-      result = await shareEvalRun(run.rows);
+      outcome = await shareEvalRun(run.rows);
     } catch {
-      // e.g. the install id couldn't be saved; reported as a failed share below.
+      // e.g. the device id couldn't be saved; reported as a failed share below.
     } finally {
       sendingRef.current = false;
       setSharing(false);
     }
     setPreviewDevice(null);
+    const { result, retryAt } = outcome;
     if (result === "shared" || result === "already-shared") setShared(run.runId);
-    toast({ message: t(`evaluation.shareResult.${result}`), tone: result === "shared" || result === "already-shared" ? "success" : "danger" });
+    // "You can share again at 14:05" (or "Tue 09:30" when that is another day).
+    const at = retryAt ? new Date(retryAt) : null;
+    const time = at
+      ? at.toLocaleString(i18n.language, {
+          ...(at.toDateString() === new Date().toDateString() ? {} : { weekday: "short" }),
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
+    const key = time && (result === "rate-limited" || result === "cooldown") ? `${result}At` : result;
+    toast({ message: t(`evaluation.shareResult.${key}`, { time }), tone: result === "shared" || result === "already-shared" ? "success" : "danger" });
   };
 
   const canRun = !running && !chatBusy && chosen.length > 0 && models !== null;

@@ -78,8 +78,12 @@
     "shareResult": {
       "shared": "Compartilhado. Obrigado!",
       "already-shared": "Esta avaliação já foi compartilhada.",
-      "rate-limited": "Muitas avaliações compartilhadas deste celular hoje. Tente amanhã.",
-      "rejected": "O servidor não aceitou esta avaliação. Atualize o app e tente de novo.",
+      "rate-limited": "Este celular já compartilhou 3 avaliações nas últimas 24 horas. Tente mais tarde.",
+      "rate-limitedAt": "Este celular já compartilhou 3 avaliações nas últimas 24 horas. Você pode compartilhar de novo às {{time}}.",
+      "cooldown": "É preciso esperar uma hora entre compartilhamentos do mesmo celular. Tente mais tarde.",
+      "cooldownAt": "É preciso esperar uma hora entre compartilhamentos do mesmo celular. Você pode compartilhar de novo às {{time}}.",
+      "network-limited": "Muitas avaliações foram compartilhadas desta rede hoje. Tente mais tarde ou por outra conexão.",
+      "rejected": "O servidor não aceitou esta avaliação. Só o app oficial do BOAR em um celular de verdade pode compartilhar; atualize e tente de novo.",
       "failed": "Não foi possível falar com o servidor. Verifique a internet e tente de novo."
     },
     "preview": {
@@ -106,7 +110,8 @@
       "formula": "Pontuação v{{version}}, de 0 a 100: {{speed}}% velocidade (mediana de tokens/s, nota máxima com {{reference}}), {{reliability}}% respostas concluídas, {{retrieval}}% fontes esperadas encontradas; 0 se menos da metade concluir. Mede velocidade e confiabilidade, não se as respostas estão certas. O servidor recalcula a partir das respostas.",
       "answers": "{{count}} perguntas e respostas (toque para ler)",
       "notSentSection": "Não é enviado",
-      "notSent": "Suas conversas, seus documentos, seu nome, sua localização, seus contatos. Este celular é identificado só por um número aleatório criado no app."
+      "notSent": "Suas conversas, seus documentos, seu nome, sua localização, seus contatos. Este celular é identificado só por uma chave de segurança que o hardware dele criou para o BOAR, sem ligação com você.",
+      "keyNote": "Assinado com uma chave guardada no hardware seguro deste celular, para que os resultados não possam ser falsificados de outro lugar. O primeiro envio também manda o certificado da chave, do fabricante, que mostra a atualização de segurança do Android e se o bootloader está desbloqueado."
     }
   },
   "ui": {

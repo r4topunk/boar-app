@@ -78,8 +78,12 @@
     "shareResult": {
       "shared": "Shared. Thank you!",
       "already-shared": "This run was already shared.",
-      "rate-limited": "Too many runs shared from this phone today. Try again tomorrow.",
-      "rejected": "The server didn't accept this run. Update the app and try again.",
+      "rate-limited": "This phone has shared 3 runs in the last 24 hours. Try again later.",
+      "rate-limitedAt": "This phone has shared 3 runs in the last 24 hours. You can share again at {{time}}.",
+      "cooldown": "Shares from one phone need an hour between them. Try again later.",
+      "cooldownAt": "Shares from one phone need an hour between them. You can share again at {{time}}.",
+      "network-limited": "Many runs were shared from this network today. Try again later or from another connection.",
+      "rejected": "The server didn't accept this run. Only the official BOAR app on a real phone can share; update it and try again.",
       "failed": "Couldn't reach the server. Check the internet connection and try again."
     },
     "preview": {
@@ -106,7 +110,8 @@
       "formula": "Score v{{version}}, 0 to 100: {{speed}}% speed (median tokens/s, full marks at {{reference}}), {{reliability}}% answers completed, {{retrieval}}% expected sources found; 0 if under half completed. It measures speed and reliability, not whether answers are correct. The server recomputes it from the answers.",
       "answers": "{{count}} questions and answers (tap to read)",
       "notSentSection": "Not sent",
-      "notSent": "Your chats, your documents, your name, your location, your contacts. This phone is identified only by a random number created in the app."
+      "notSent": "Your chats, your documents, your name, your location, your contacts. This phone is identified only by a security key its hardware made for BOAR, with no link to you.",
+      "keyNote": "Signed with a key kept in this phone's secure hardware, so results can't be faked from elsewhere. The first share also sends the key's certificate from the phone maker, which shows the Android security update and whether the bootloader is unlocked."
     }
   },
   "ui": {
