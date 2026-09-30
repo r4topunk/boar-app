@@ -92,3 +92,57 @@ Deno.test("the payload's platform must be the attested one", () => {
   assert(!("error" in android));
   assertEquals(android.run.cpu_features, ["asimddp"]);
 });
+
+Deno.test("a row keeps only the known fields, each checked", () => {
+  const parsed = parsePayload(
+    JSON.stringify({
+      run: { runId: "r", evalSetVersion: "1", appVersion: "1.0.0", platform: "android" },
+      rows: [{
+        queryId: "factual-1",
+        configId: "model:qwen",
+        outcome: "success",
+        configLabel: "Qwen2.5-1.5B-Instruct (Q4_K_M)",
+        answer: "x".repeat(10_000),
+        query: "the question text, which the server already has",
+        retrievedTitles: ["Black hole", 42, "y".repeat(500)],
+        modelResidency: "somewhere",
+        extra: "z".repeat(100_000),
+      }],
+    }),
+    "android",
+  );
+  assert(!("error" in parsed));
+  const data = parsed.rows[0].data as Record<string, unknown>;
+  assertEquals(data.extra, undefined);
+  assertEquals(data.query, undefined);
+  assertEquals((data.answer as string).length, 4000);
+  assertEquals(data.retrievedTitles, ["Black hole"]);
+  assertEquals(data.modelResidency, null);
+  assertEquals(data.configLabel, "Qwen2.5-1.5B-Instruct (Q4_K_M)");
+});
+
+Deno.test("public labels only take letters, digits and a few separators", () => {
+  const run = (deviceModel: string, configLabel: string) =>
+    parsePayload(
+      JSON.stringify({
+        run: { runId: "r", evalSetVersion: "1", appVersion: "1.0.0", platform: "android", deviceBrand: "POCO", deviceModel, soc: "SM8250" },
+        rows: [{ queryId: "q", configId: "m", outcome: "success", configLabel }],
+      }),
+      "android",
+    );
+  const ok = run("M2012K11AG", "Roteamento adaptativo (predefinição: equilibrado)");
+  assert(!("error" in ok));
+  assertEquals(ok.run.device_model, "M2012K11AG");
+  assertEquals((ok.rows[0].data as Record<string, unknown>).configLabel, "Roteamento adaptativo (predefinição: equilibrado)");
+  const bad = run("<img src=x onerror=alert(1)>", "Qwen‮gnp.exe");
+  assert(!("error" in bad));
+  assertEquals(bad.run.device_model, null);
+  assertEquals((bad.rows[0].data as Record<string, unknown>).configLabel, null);
+});
+
+Deno.test("a run holds at most 204 rows", () => {
+  const rows = Array.from({ length: 205 }, (_, i) => ({ queryId: `q${i}`, configId: "m", outcome: "success" }));
+  const body = (n: number) => JSON.stringify({ run: { runId: "r", evalSetVersion: "1", appVersion: "1", platform: "android" }, rows: rows.slice(0, n) });
+  assertEquals(parsePayload(body(205), "android"), { error: "rows must hold 1 to 204 items" });
+  assert(!("error" in parsePayload(body(204), "android")));
+});

@@ -37,7 +37,8 @@ import {
 } from "./attest.ts";
 import { parsePayload } from "./payload.ts";
 
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
+// The largest run payload.ts accepts (204 rows) is about 1 MB once signed and escaped.
+const MAX_BODY_BYTES = 1.5 * 1024 * 1024;
 const PACKAGE_NAME = "team.sopa.aoair";
 /** SHA-256 of BOAR's release signing certificate. Debug builds share Expo's public debug key, so
  * they can't share runs. More (comma-separated) in ANDROID_CERT_DIGESTS, e.g. after a key change. */
@@ -82,6 +83,8 @@ Deno.serve(async (req) => {
     return json(400, { error: "invalid JSON" });
   }
 
+  // Supabase's gateway replaces x-forwarded-for with the caller's address: checked on 2026-09-30
+  // by sending forged values (one address, a list, two headers), which all hashed the same as none.
   const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
   const ipHash = ip ? await sha256hex(`${secret}:${ip}`) : null;
 
