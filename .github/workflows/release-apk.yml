@@ -1,0 +1,124 @@
+name: Release APK
+
+# Builds both Android variants signed with BOAR's release key, checks each one
+# (scripts/check-release-apk.sh: package, versionCode, signer) and, when a tag is
+# given, creates a draft GitHub Release with the downloader APK as its first asset
+# (make setup installs the first .apk it finds). Nobody's laptop needs the key.
+#
+# The key lives only in the "release" environment's secrets (docs/RELEASING.md),
+# which can only be used from main, so a branch with an edited workflow can't
+# read them.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create as a draft (e.g. v1.1.0). Leave empty to only build."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 150
+    strategy:
+      fail-fast: true
+      matrix:
+        variant: [downloader, offline]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+
+      - name: Install the release key
+        env:
+          KEYSTORE_B64: ${{ secrets.BOAR_UPLOAD_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.BOAR_UPLOAD_KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.BOAR_UPLOAD_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.BOAR_UPLOAD_KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_B64 KEY_ALIAS STORE_PASSWORD KEY_PASSWORD; do
+            [ -n "${!v}" ] || { echo "the release environment is missing a signing secret ($v)"; exit 1; }
+          done
+          keystore="$RUNNER_TEMP/boar-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$keystore"
+          mkdir -p ~/.gradle
+          {
+            echo "BOAR_UPLOAD_STORE_FILE=$keystore"
+            echo "BOAR_UPLOAD_KEY_ALIAS=$KEY_ALIAS"
+            echo "BOAR_UPLOAD_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "BOAR_UPLOAD_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> ~/.gradle/gradle.properties
+
+      - name: Build and audit
+        env:
+          # Public by design (the publishable key); empty means no "Share results" button.
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: scripts/build-variant.sh ${{ matrix.variant }}
+
+      - name: Check package, versionCode and signer
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          RELEASE_VARIANT=${{ matrix.variant }} scripts/check-release-apk.sh "dist/boar-${{ matrix.variant }}-${version}-arm64.apk"
+
+      - name: Name it as the release does
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          if [ "${{ matrix.variant }}" = downloader ]; then name="boar-v${version}-arm64.apk"; else name="boar-offline-v${version}-arm64.apk"; fi
+          mkdir -p out
+          mv "dist/boar-${{ matrix.variant }}-${version}-arm64.apk" "out/$name"
+          (cd out && sha256sum "$name" > "$name.sha256" && cat "$name.sha256")
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/boar-release.jks" ~/.gradle/gradle.properties
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ matrix.variant }}
+          path: out/
+          if-no-files-found: error
+
+  publish:
+    name: Draft release
+    needs: build
+    if: inputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Create the draft, downloader APK first
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node -p "require('./app.json').expo.version")
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3"; exit 1; }
+          [ "$TAG" = "v$version" ] || { echo "tag $TAG doesn't match app.json's version $version"; exit 1; }
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "BOAR $TAG" --notes "Draft: write the notes before publishing."
+          # One at a time, in this order: make setup installs the first .apk.
+          for f in "boar-$TAG-arm64.apk" "boar-$TAG-arm64.apk.sha256" "boar-offline-$TAG-arm64.apk" "boar-offline-$TAG-arm64.apk.sha256"; do
+            gh release upload "$TAG" "out/$f"
+          done
+          gh release view "$TAG" --json assets --jq '.assets[].name'
