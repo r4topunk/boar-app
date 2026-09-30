@@ -1,6 +1,7 @@
 import AVFoundation
 import ExpoModulesCore
 import Speech
+import os
 
 /**
  * iOS counterpart of VoiceInputModule.kt: speech-to-text with
@@ -18,6 +19,7 @@ public class VoiceInputModule: Module {
   private static let silenceSeconds: TimeInterval = 1.8
   private static let noSpeechSeconds: TimeInterval = 8
 
+  private static let log = OSLog(subsystem: "team.sopa.boar", category: "voice")
   private let audioEngine = AVAudioEngine()
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?
@@ -35,7 +37,22 @@ public class VoiceInputModule: Module {
       return recognizer.isAvailable && recognizer.supportsOnDeviceRecognition
     }
 
-    AsyncFunction("startListening") { (promise: Promise) in
+    // Same contract as Android's getRecognitionMode. iOS only ever recognises on-device here
+    // (requiresOnDeviceRecognition), so there is no "system" mode: without this function the JS
+    // side treated every iPhone as "system", which needs a consent the iOS build never asks for,
+    // and the mic button stayed hidden.
+    AsyncFunction("getRecognitionMode") { () -> String in
+      let recognizer = Self.makeRecognizer()
+      let onDevice = recognizer?.isAvailable == true && recognizer?.supportsOnDeviceRecognition == true
+      let line = "voice: locale=\(recognizer?.locale.identifier ?? "none") available=\(recognizer?.isAvailable == true) onDevice=\(recognizer?.supportsOnDeviceRecognition == true)"
+      os_log("%{public}@", log: Self.log, type: .info, line)
+      return onDevice ? "on-device" : "unavailable"
+    }
+
+    // Same arguments as Android: the JS always passes requireOnDevice. iOS ignores it (it is always
+    // on-device), but Expo rejects a call with more arguments than the function declares, so without
+    // it the mic did nothing.
+    AsyncFunction("startListening") { (_ requireOnDevice: Bool, promise: Promise) in
       Self.requestPermissions { granted in
         guard granted else {
           promise.reject("E_PERMISSION_DENIED", "Microphone or speech recognition permission denied")

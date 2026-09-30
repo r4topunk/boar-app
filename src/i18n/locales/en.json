@@ -186,7 +186,7 @@
       "input": "Input",
       "voice": "Voice input",
       "voiceNotInBuild": "Not included in this offline version: BOAR has no access to the microphone.",
-      "voiceNote": "Uses your phone's speech recognition. On some phones it sends audio to an online service, so it is off by default.",
+      "voiceNote": "Uses your phone's on-device speech recognition, so the audio stays on the phone. If your phone can't recognise speech offline, the mic doesn't show.",
       "performance": "Performance",
       "about": "About BOAR",
       "recovery": "Recovery",

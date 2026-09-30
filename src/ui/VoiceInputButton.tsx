@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconButton, Sheet, Button, Text, useAnnounce } from "./components";
-import { isVoiceInputAvailable, startListening, stopListening, type VoiceEvent } from "../voice/VoiceInput";
+import { getVoiceSupport, startListening, stopListening, type VoiceEvent } from "../voice/VoiceInput";
 
 interface Props {
   disabled?: boolean;
+  /** Called when listening starts, so the caller can keep what was already typed. */
+  onListenStart?: () => void;
+  /** What was heard so far: each partial result as it arrives, then the final text. */
   onTranscript: (text: string) => void;
 }
 
@@ -17,15 +20,22 @@ let caveatShown = false;
  * on GrapheneOS / de-Googled builds: when it's missing the button isn't shown,
  * and the first use explains that it may not be offline.
  */
-export function VoiceInputButton({ disabled, onTranscript }: Props) {
+export function VoiceInputButton({ disabled, onListenStart, onTranscript }: Props) {
   const { t } = useTranslation();
   const announce = useAnnounce();
   const [available, setAvailable] = useState<boolean | null>(null);
+  // The caveat is about the system speech service; on-device recognition never sends audio anywhere.
+  const [onDevice, setOnDevice] = useState(true);
   const [listening, setListening] = useState(false);
   const [caveatOpen, setCaveatOpen] = useState(false);
 
   useEffect(() => {
-    isVoiceInputAvailable().then(setAvailable).catch(() => setAvailable(false));
+    getVoiceSupport()
+      .then((s) => {
+        setAvailable(s.usable);
+        setOnDevice(s.reason === "on-device");
+      })
+      .catch(() => setAvailable(false));
   }, []);
 
   if (!available) return null;
@@ -33,8 +43,10 @@ export function VoiceInputButton({ disabled, onTranscript }: Props) {
   const listen = async () => {
     setListening(true);
     announce(t("chat.announce.listening"));
+    onListenStart?.();
     try {
       const result = await startListening((event: VoiceEvent) => {
+        if (event.type === "partial") onTranscript(event.text);
         if (event.type === "error") setListening(false);
       });
       if (result) onTranscript(result);
@@ -50,7 +62,7 @@ export function VoiceInputButton({ disabled, onTranscript }: Props) {
       setListening(false);
       return;
     }
-    if (!caveatShown) {
+    if (!caveatShown && !onDevice) {
       caveatShown = true;
       setCaveatOpen(true);
       return;
