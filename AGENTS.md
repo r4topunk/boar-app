@@ -64,6 +64,9 @@ can be scripted if needed (e.g. `printf '2\n1\n' | node scripts/setup.mjs`).
 
 ## Release APK (no Metro needed)
 
+Published releases are built by GitHub Actions with the release key (`release-apk.yml`,
+see [docs/RELEASING.md](docs/RELEASING.md)). To build one locally:
+
 ```bash
 npx expo prebuild -p android --clean
 cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
