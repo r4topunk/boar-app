@@ -34,6 +34,7 @@ As the owner (the dashboard's SQL editor):
 - **Approve a run** (put it on the public scores): `update eval_scores set hidden = false where run = '<id>'`.
 - **Hide a run:** `update eval_scores set hidden = true where run = '<id>'`.
 - **Block a device's future runs:** `update eval_devices set banned = true where id = '<id>'`.
+- **Give a test phone more runs:** `update eval_devices set daily_limit = 20 where id = '<id>'` (1 to 100 a day, no hour between runs, no network cap; `null` puts it back on the normal limits).
 
 ### Phones that can't attest
 
