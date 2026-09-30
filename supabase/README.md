@@ -12,6 +12,7 @@ automatically, and the offline build has no network access at all.
 | Flooding | Per device: 3 runs in 24 hours, at least 1 hour apart. Per network: 6 a day. In total: 300 an hour. Checked in one transaction under a lock per device. |
 | Deleting or changing stored runs | `eval_runs`, `eval_rows`, `eval_scores` and `eval_devices` are append-only for every role but the owner, the secret key included (triggers and grants). |
 | Believable but impossible numbers | Rows must answer the eval set's own questions, once each. Impossible timings or memory keep the run's scores hidden for review. |
+| Oversized or junk runs, or markup in the public scores | A run holds at most 204 rows (12 models) in 1.5 MB. Each row is rebuilt from a fixed list of checked fields (answers cut at 4,000 characters). Phone, chip and model labels only take letters, digits and a few separators; anything else is stored as empty. |
 | Reading private data | RLS on every table. The publishable key reads only `eval_scores` rows that aren't hidden. |
 
 What it doesn't stop: someone with a real phone and the real app sharing real runs, or a
@@ -33,6 +34,7 @@ As the owner (the dashboard's SQL editor):
 - **Approve a run** (put it on the public scores): `update eval_scores set hidden = false where run = '<id>'`.
 - **Hide a run:** `update eval_scores set hidden = true where run = '<id>'`.
 - **Block a device's future runs:** `update eval_devices set banned = true where id = '<id>'`.
+- **Give a test phone more runs:** `update eval_devices set daily_limit = 20 where id = '<id>'` (1 to 100 a day, no hour between runs, no network cap; `null` puts it back on the normal limits).
 
 ### Phones that can't attest
 

@@ -1,8 +1,12 @@
 // The signed payload of a shared run: { run: {...}, rows: [<eval JSONL row>, ...] }, checked and
 // turned into what submit_eval_run() stores. Anything malformed is refused or dropped here; the
 // database then checks the questions, limits and plausibility.
-const MAX_ROWS = 1000;
-const MAX_ANSWER_CHARS = 8000;
+// A real run is 17 questions per model, about 2.6 KB a row (44 KB for one model). Room for 12
+// models; answers are capped at 512 tokens, about 2,500 characters.
+const MAX_ROWS = 204;
+const MAX_ANSWER_CHARS = 4000;
+/** Words shown on the public scores: letters, digits, spaces and a few separators, nothing else. */
+const LABEL = /^[\p{L}\p{N} ._+\-/(),:]+$/u;
 
 const str = (v: unknown, max: number): string | null =>
   typeof v === "string" && v.length > 0 && v.length <= max ? v : null;
@@ -16,6 +20,16 @@ const posInt = (v: unknown, max: number): number | null => {
   return n !== null && n > 0 && n <= max ? n : null;
 };
 const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+/** A short public label (phone, chip, model): bounded and limited to LABEL's characters. */
+const label = (v: unknown, max: number): string | null => {
+  const s = str(v, max);
+  return s !== null && LABEL.test(s) ? s : null;
+};
+/** Up to `n` strings of at most `max` characters; anything else is dropped. */
+const strs = (v: unknown, n: number, max: number): string[] | null =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length <= max).slice(0, n) : null;
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | null =>
+  typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : null;
 /** Short lowercase CPU flags like "i8mm" or "asimddp", at most 100 of them. None (iOS reports no
  * flags) is unknown, not "no i8mm or dotprod", so it's stored as null. */
 const cpuFlags = (v: unknown): string[] | null => {
@@ -45,7 +59,7 @@ export function parsePayload(payload: string, platform: "android" | "ios"): Pars
   const rows: unknown[] = Array.isArray(body?.rows) ? body.rows : [];
   const runId = str(run.runId, 100);
   const evalSetVersion = str(run.evalSetVersion, 20);
-  const appVersion = str(run.appVersion, 40);
+  const appVersion = label(run.appVersion, 40);
   if (!runId || !evalSetVersion || !appVersion) {
     return { error: "run.runId, run.evalSetVersion and run.appVersion are required" };
   }
@@ -60,16 +74,40 @@ export function parsePayload(payload: string, platform: "android" | "ios"): Pars
     const outcome = str(r?.outcome, 40);
     if (!queryId || !configId || !outcome) return { error: "each row needs queryId, configId and outcome" };
     if (r.runId !== undefined && r.runId !== runId) return { error: "rows belong to another run" };
-    const data = { ...r };
-    if (typeof data.answer === "string") data.answer = data.answer.slice(0, MAX_ANSWER_CHARS);
-    // The fields compute_eval_scores casts: anything malformed becomes null instead of failing the run
-    // (tokensGenerated becomes a Postgres int, so at most 2^31 - 1).
+    // Only these fields are stored, each checked, whatever else the row carries. The question text
+    // isn't kept: the server has it (eval_set_queries). compute_eval_scores casts tokensGenerated
+    // (a Postgres int, so at most 2^31 - 1), peakRssBytes, timedOut, expectedKbHit and configLabel.
     const tokens = int(r.tokensGenerated);
-    data.tokensGenerated = tokens !== null && tokens <= 2_147_483_647 ? tokens : null;
-    data.peakRssBytes = int(r.peakRssBytes);
-    data.timedOut = bool(r.timedOut);
-    data.expectedKbHit = bool(r.expectedKbHit);
-    data.configLabel = str(r.configLabel, 200);
+    const data = {
+      queryId,
+      configId,
+      outcome,
+      configLabel: label(r.configLabel, 120),
+      modelId: str(r.modelId, 200),
+      routingPreset: str(r.routingPreset, 40),
+      personalityId: str(r.personalityId, 40),
+      maxTokens: posInt(r.maxTokens, 100_000),
+      category: str(r.category, 40),
+      taskType: str(r.taskType, 40),
+      promptFormat: str(r.promptFormat, 40),
+      adaptiveRoutingUsed: bool(r.adaptiveRoutingUsed),
+      retrievalUsed: bool(r.retrievalUsed),
+      retrievedTitles: strs(r.retrievedTitles, 20, 200),
+      expectedKbTitles: strs(r.expectedKbTitles, 20, 200),
+      expectedKbHit: bool(r.expectedKbHit),
+      reasonCodes: strs(r.reasonCodes, 20, 100),
+      modelSwitches: int(r.modelSwitches),
+      crossMessageModelSwitch: bool(r.crossMessageModelSwitch),
+      modelResidency: oneOf(r.modelResidency, ["cold", "resident", "switched"] as const),
+      modelLoadMs: ms(r.modelLoadMs),
+      generationLatencyMs: ms(r.generationLatencyMs),
+      tokensGenerated: tokens !== null && tokens <= 2_147_483_647 ? tokens : null,
+      peakRssBytes: int(r.peakRssBytes),
+      timedOut: bool(r.timedOut),
+      errorMessage: str(r.errorMessage, 500),
+      answer: typeof r.answer === "string" ? r.answer.slice(0, MAX_ANSWER_CHARS) : null,
+      createdAt: int(r.createdAt),
+    };
     const tokPerSec = num(r.tokPerSec);
     records.push({
       query_id: queryId,
@@ -89,12 +127,12 @@ export function parsePayload(payload: string, platform: "android" | "ios"): Pars
       eval_set_version: evalSetVersion,
       app_version: appVersion,
       platform,
-      os_version: str(run.osVersion, 40),
-      device_brand: str(run.deviceBrand, 80),
-      device_model: str(run.deviceModel, 80),
-      soc: str(run.soc, 80),
-      soc_manufacturer: str(run.socManufacturer, 80),
-      hardware: str(run.hardware, 80),
+      os_version: label(run.osVersion, 40),
+      device_brand: label(run.deviceBrand, 80),
+      device_model: label(run.deviceModel, 80),
+      soc: label(run.soc, 80),
+      soc_manufacturer: label(run.socManufacturer, 80),
+      hardware: label(run.hardware, 80),
       api_level: posInt(run.apiLevel, 1000),
       ram_bytes: posInt(run.ramBytes, 2 ** 43),
       cpu_cores: posInt(run.cpuCores, 256),
