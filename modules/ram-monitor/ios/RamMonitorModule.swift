@@ -46,6 +46,43 @@ public class RamMonitorModule: Module {
     Function("getAvailableRamBytes") { () -> Double in
       return Double(os_proc_available_memory())
     }
+
+    // Same shape as Android's getHardwareInfo, for shared results. iOS exposes no chipset name or core
+    // frequencies: the model identifier (e.g. "iPhone16,2") stands in for the chipset in `hardware`, and
+    // coreMaxFreqKHz holds one 0 ("unknown") per core so the core count still travels. The CPU features
+    // llama.cpp uses come from sysctl, under the Linux names Android reports (asimddp = dotprod, i8mm).
+    Function("getHardwareInfo") { () -> [String: Any] in
+      return [
+        "socModel": "",
+        "socManufacturer": "Apple",
+        "hardware": Self.modelIdentifier(),
+        "apiLevel": 0,
+        "cpuFeatures": Self.cpuFeatures(),
+        "coreMaxFreqKHz": [Int](repeating: 0, count: ProcessInfo.processInfo.processorCount),
+      ]
+    }
+  }
+
+  private static func cpuFeatures() -> String {
+    let flags = [("hw.optional.arm.FEAT_DotProd", "asimddp"), ("hw.optional.arm.FEAT_I8MM", "i8mm")]
+    return flags.filter { sysctlFlag($0.0) }.map { $0.1 }.joined(separator: " ")
+  }
+
+  private static func sysctlFlag(_ name: String) -> Bool {
+    var value: Int32 = 0
+    var size = MemoryLayout<Int32>.size
+    return sysctlbyname(name, &value, &size, nil, 0) == 0 && value == 1
+  }
+
+  /// "iPhone16,2" on a device; the simulator reports the host's identifier through
+  /// SIMULATOR_MODEL_IDENTIFIER because utsname gives "arm64" there.
+  private static func modelIdentifier() -> String {
+    if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return simulated }
+    var system = utsname()
+    uname(&system)
+    return withUnsafePointer(to: &system.machine) {
+      $0.withMemoryRebound(to: CChar.self, capacity: Int(_SYS_NAMELEN)) { String(cString: $0) }
+    }
   }
 
   private func logThrottled(_ info: task_vm_info_data_t?) {

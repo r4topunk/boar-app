@@ -3,6 +3,7 @@ import {
   buildSubmission,
   describeChipset,
   describeCores,
+  deviceIdentity,
   inferenceFeatures,
   parseCpuFeatures,
   shareOutcome,
@@ -103,5 +104,29 @@ describe("hardware descriptions", () => {
     expect(inferenceFeatures(["fp", "asimddp", "i8mm"])).toEqual({ i8mm: true, dotprod: true });
     expect(inferenceFeatures(["fp", "asimd"])).toEqual({ i8mm: false, dotprod: false });
     expect(inferenceFeatures([])).toBeUndefined();
+  });
+});
+
+describe("deviceIdentity", () => {
+  it("names an iPhone by Apple and its model identifier, and drops unknown frequencies", () => {
+    expect(deviceIdentity("ios", {}, { hardware: "iPhone14,5", coreMaxFreqKHz: [0, 0, 0, 0, 0, 0] })).toEqual({
+      brand: "Apple",
+      model: "iPhone14,5",
+      cpuCores: 6,
+      coreMaxFreqKHz: undefined,
+    });
+  });
+
+  it("keeps Android's brand, model and known frequencies", () => {
+    expect(deviceIdentity("android", { Brand: "POCO", Model: "23049PCD8G" }, { hardware: "mt6897", coreMaxFreqKHz: [2000000, 3350000] })).toEqual({
+      brand: "POCO",
+      model: "23049PCD8G",
+      cpuCores: 2,
+      coreMaxFreqKHz: [2000000, 3350000],
+    });
+  });
+
+  it("leaves the cores out when the native build reports none", () => {
+    expect(deviceIdentity("android", { Brand: "X" }, null)).toEqual({ brand: "X", model: undefined, cpuCores: undefined, coreMaxFreqKHz: undefined });
   });
 });

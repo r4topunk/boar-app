@@ -139,3 +139,24 @@ export function inferenceFeatures(features: string[] | undefined): { i8mm: boole
   if (!features || features.length === 0) return undefined;
   return { i8mm: features.includes("i8mm"), dotprod: features.includes("asimddp") };
 }
+
+/**
+ * Who made the phone and what it is, plus its cores, for a shared run. iOS reports no brand or model through
+ * React Native, and no core frequencies: an iPhone is "Apple" with its model identifier (e.g. "iPhone14,5"),
+ * and a list of unknown (0) frequencies is left out, so the public scores show no "0 MHz" CPU. The core count
+ * still comes from that list's length.
+ */
+export function deviceIdentity(
+  platform: "android" | "ios",
+  constants: { Brand?: string; Model?: string },
+  hw: { hardware?: string; coreMaxFreqKHz?: number[] } | null
+): Pick<ShareDevice, "brand" | "model" | "cpuCores" | "coreMaxFreqKHz"> {
+  const cores = hw?.coreMaxFreqKHz ?? [];
+  const ios = platform === "ios";
+  return {
+    brand: ios ? "Apple" : constants.Brand,
+    model: ios ? hw?.hardware || constants.Model : constants.Model,
+    cpuCores: cores.length > 0 ? cores.length : undefined,
+    coreMaxFreqKHz: cores.some((f) => f > 0) ? cores : undefined,
+  };
+}
