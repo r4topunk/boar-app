@@ -17,7 +17,7 @@
 # each fresh install so the app starts on the chat instead of setup.
 set -euo pipefail
 DEV="${1:?simulator udid}"; APP="${2:?path to the .app}"; RUNS="${3:-3}"
-BUNDLE=team.sopa.aoair
+BUNDLE=team.sopa.boar
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
 run() {  # run <cold|warm> <n>

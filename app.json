@@ -8,7 +8,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "team.sopa.aoair",
+      "bundleIdentifier": "team.sopa.boar",
       "buildNumber": "1",
       "icon": "./assets/icon-ios.png",
       "infoPlist": {

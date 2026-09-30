@@ -25,13 +25,13 @@ tap_text() { local xy; xy=$(find_text "$1") && { tap "$xy" "${3:-1.8}"; return 0
 scroll() { maestri portal scroll "$P" "$1" "${2:-300}" >/dev/null; sleep 1; }
 scroll_to() { for _ in $(seq 1 12); do xy=$(find_text "$1") && { y=${xy#*,}; (( y > 90 && y < 560 )) && return 0; }; scroll "${2:-down}" 250; done; return 1; }
 install() {
-  xcrun simctl terminate "$SE" team.sopa.aoair 2>/dev/null; xcrun simctl uninstall "$SE" team.sopa.aoair 2>/dev/null
+  xcrun simctl terminate "$SE" team.sopa.boar 2>/dev/null; xcrun simctl uninstall "$SE" team.sopa.boar 2>/dev/null
   xcrun simctl install "$SE" "$APP"
   if [[ "$1" == models ]]; then
-    local d; d="$(xcrun simctl get_app_container "$SE" team.sopa.aoair data)/Documents/models"; mkdir -p "$d"
+    local d; d="$(xcrun simctl get_app_container "$SE" team.sopa.boar data)/Documents/models"; mkdir -p "$d"
     cp -c "$M/bge-small-en-v1.5-q8_0.gguf" "$d/embedding.gguf"; cp -c "$M/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf" "$d/qwen2.5-1.5b-instruct-q4km.gguf"
   fi
-  maestri portal launch "$P" team.sopa.aoair >/dev/null 2>&1
+  maestri portal launch "$P" team.sopa.boar >/dev/null 2>&1
 }
 for spec in "$@"; do
   tag=${spec%%:*}; size=${spec#*:}; echo "== $tag ($size)"

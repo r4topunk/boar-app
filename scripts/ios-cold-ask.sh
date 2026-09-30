@@ -14,7 +14,7 @@ set -euo pipefail
 DEV="${1:?udid}"; APP="${2:?app}"; OUT="${3:?out dir}"; Q="${4:-What causes the monsoon?}"
 PORTAL="${IOS_FIDELITY_PORTAL:-Harbor Fidelity 2}"
 MODELS="${IOS_MODELS_DIR:-/Users/r4to/Script/boar/shared-models}"
-BUNDLE=team.sopa.aoair
+BUNDLE=team.sopa.boar
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$OUT"
 now() { python3 -c 'import time; print(time.time())'; }

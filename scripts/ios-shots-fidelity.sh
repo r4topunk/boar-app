@@ -30,7 +30,7 @@ SRC="${IOS_FIDELITY_SRC:-$B/builds/ios/src}"
 MODELS="${IOS_MODELS_DIR:-$B/shared-models}"
 PORTAL="${IOS_FIDELITY_PORTAL:-Harbor Fidelity}"
 SCREENS="$B/review/ui-ref/screens"
-BUNDLE=team.sopa.aoair
+BUNDLE=team.sopa.boar
 QUESTION="What causes the monsoon?"
 # The mockup's generating-screen question (review/ui-ref/template.html).
 GEN_QUESTION="I'm trekking in a high-altitude arid environment. Synthesize methods for off-grid water purification, compare chemical treatment vs. microfiltration, and outline altitude sickness management protocols."

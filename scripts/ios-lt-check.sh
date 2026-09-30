@@ -13,7 +13,7 @@ B=/Users/r4to/Script/boar
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEV="${IOS_FIDELITY_DEVICE:-$(xcrun simctl list devices | grep 'BOAR Fidelity iPhone 16' | grep -oE '[0-9A-F-]{36}' | head -1)}"
 MODELS="${IOS_MODELS_DIR:-$B/shared-models}"
-BUNDLE=team.sopa.aoair
+BUNDLE=team.sopa.boar
 HASH=$(git -C "$REPO" rev-parse --short "$REF")
 PORTAL="Harbor LT $(date +%H%M%S)"
 
