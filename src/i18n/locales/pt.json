@@ -269,7 +269,7 @@
       "saveFailed": "Não foi possível salvar essa mudança. Tente de novo.",
       "resetFailed": "Não foi possível apagar os dados: {{error}}",
       "quickFirstHint": "Mostra um trecho das fontes em até 1 segundo.",
-      "alwaysCompleteHint": "Pesquisa cada parte da pergunta. Mais lento.",
+      "alwaysCompleteHint": "Pesquisa cada parte. Bem mais lento e, em celulares de 4 GB, não melhora a resposta.",
       "palette": "Cores",
       "paletteFogueira": "Fogueira",
       "paletteLuar": "Luar",
