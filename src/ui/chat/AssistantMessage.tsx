@@ -25,7 +25,7 @@ import { useSmoothText } from "./useSmoothText";
 import { answerStillShowing, isDraining } from "./streamReveal";
 import { Swap } from "./Swap";
 import { useMotion } from "../theme/motion";
-import { deepSectionLabeled, deepSourcesFrom, emptyTimeline, foldTimeline, researchPhase, summaryItems, timelinePillStep, type Timeline } from "./liveResearch";
+import { deepFromFor, deepSectionLabeled, foldAttempt, researchPhase, summaryItems, timelinePillStep, type AttemptTimeline, type Timeline } from "./liveResearch";
 import { ResearchPanel } from "./ResearchCard";
 
 export interface AssistantMessageProps {
@@ -69,10 +69,11 @@ export interface AssistantMessageProps {
  * after, it stays as it was, for the pill. Null for answers that never researched in this mount (history).
  * `foldTimeline` returns the same object when nothing changed, so the panel's memo holds while text streams.
  */
-function useTimeline(on: boolean, sources: AnswerState["sources"], from: number, detail: unknown, searching: boolean): Timeline | null {
-  const ref = useRef<Timeline | null>(null);
-  if (on) ref.current = foldTimeline(ref.current ?? emptyTimeline(), { sources: from > 0 ? sources.slice(from) : sources, detail, searching });
-  return ref.current;
+function useTimeline(attempt: string, on: boolean, sources: AnswerState["sources"], from: number, detail: unknown, searching: boolean): Timeline | null {
+  // Keyed by the attempt: Retry reuses this message (and this ref) for a new answer() id (foldAttempt).
+  const ref = useRef<AttemptTimeline | null>(null);
+  ref.current = foldAttempt(ref.current, attempt, on, { sources: from > 0 ? sources.slice(from) : sources, detail, searching });
+  return ref.current?.timeline ?? null;
 }
 
 function useElapsedSeconds(running: boolean): number {
@@ -991,7 +992,11 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
   // each render while it runs, then kept for the pill. Not for places (its sources are places).
   const rPhase = researchPhase(phase);
   const noArticle = !!answer.weakSources && answer.sources.length === 0;
+  // The attempt each timeline folds: the first answer() id (a Retry replaces it), and the last one for a Deepen.
+  const firstAttempt = answer.answerIds[0] ?? "";
+  const lastAttempt = answer.answerIds[answer.answerIds.length - 1] ?? "";
   const fastTl = useTimeline(
+    firstAttempt,
     running && !stopping && !isDeepen && !answer.places && !props.waitingLibrary && !firstTier?.outcome,
     answer.sources,
     0,
@@ -999,16 +1004,18 @@ export const AssistantMessage = memo(function AssistantMessage(props: AssistantM
     rPhase === "searching"
   );
   // A Deepen's timeline lists what its own search appends (the first answer's articles are in its sources card).
-  const deepFrom = useRef<number | null>(null);
-  deepFrom.current = deepSourcesFrom(deepFrom.current, isDeepen && !answer.deep?.outcome, answer.sources.length);
-  const deepTl = useTimeline(running && !stopping && isDeepen && !answer.deep?.outcome, answer.sources, deepFrom.current ?? 0, answer.deep?.detail, rPhase === "searching");
+  const deepFrom = useRef<{ key: string; from: number | null } | null>(null);
+  deepFrom.current = deepFromFor(deepFrom.current, lastAttempt, isDeepen && !answer.deep?.outcome, answer.sources.length);
+  const deepTl = useTimeline(lastAttempt, running && !stopping && isDeepen && !answer.deep?.outcome, answer.sources, deepFrom.current.from ?? 0, answer.deep?.detail, rPhase === "searching");
   // The pill keeps its last step until it becomes the receipt (one swap, not two). It follows the card: a Deep
   // Research part past its search reads "Reading…", not "Searching…" for the whole research (iPhone, r4to).
   const tlStep = timelinePillStep(isDeepen ? deepTl : fastTl, rPhase);
   const currentStep = tlStep && steps ? tr(tlStep) : steps?.find((x) => x.status === "active")?.short;
-  const lastStep = useRef<string | undefined>(undefined);
-  if (currentStep) lastStep.current = currentStep;
-  const shownStep = pillStep(currentStep, lastStep.current);
+  // Per attempt too: a retry's pill never starts from the previous attempt's last step.
+  const lastStep = useRef<{ key: string; step?: string }>({ key: lastAttempt });
+  if (lastStep.current.key !== lastAttempt) lastStep.current = { key: lastAttempt };
+  if (currentStep) lastStep.current.step = currentStep;
+  const shownStep = pillStep(currentStep, lastStep.current.step);
   // The pill only where a model answered: an extractive-only answer shows its passage, not "1 article".
   const fastPill = !!fastTl && !fastSteps && !!firstTier && summaryItems(fastTl) != null;
   const deepPill = !!deepTl && !deepLive && summaryItems(deepTl) != null;

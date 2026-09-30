@@ -309,3 +309,34 @@ export function researchPhase(phase: string): ResearchPhase | null {
       return null;
   }
 }
+
+/** A timeline and the attempt it belongs to (the answer() id whose events it folds). */
+export interface AttemptTimeline {
+  key: string;
+  timeline: Timeline;
+}
+
+/**
+ * foldTimeline for one attempt. Retry keeps the same chat message (and so the same component and refs) but
+ * starts a new answer() with a new id (ChatScreen followUp resets answerIds): a timeline kept under another
+ * key is the previous attempt's and is dropped, never folded into (a retried answer showed the first
+ * attempt's parts and articles, and "Researching part 3 of 3" after a plain retry). Not running: the
+ * attempt's timeline as it was, or none for a new attempt. Returns `prev` when nothing changed.
+ */
+export function foldAttempt(
+  prev: AttemptTimeline | null,
+  key: string,
+  on: boolean,
+  input: { sources: readonly Chunk[]; detail?: unknown; searching: boolean }
+): AttemptTimeline | null {
+  const own = prev && prev.key === key ? prev : null;
+  if (!on) return own;
+  const timeline = foldTimeline(own?.timeline ?? emptyTimeline(), input);
+  return own && own.timeline === timeline ? own : { key, timeline };
+}
+
+/** deepSourcesFrom for one attempt: a retry's Deepen measures from its own start, not the old one's. */
+export function deepFromFor(prev: { key: string; from: number | null } | null, key: string, deepRunning: boolean, sourceCount: number): { key: string; from: number | null } {
+  const held = prev && prev.key === key ? prev.from : null;
+  return { key, from: deepSourcesFrom(held, deepRunning, sourceCount) };
+}
