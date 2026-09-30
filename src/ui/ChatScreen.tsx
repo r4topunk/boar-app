@@ -51,6 +51,7 @@ import type { RootStackParamList } from "./navigation/types";
 import { publishChatBridge } from "./navigation/chatBridge";
 import { EvaluationScreen } from "./EvaluationScreen";
 import { takePendingEvalRequest } from "../eval/deviceEvalRequest";
+import { DEVICE_EVAL_ON } from "../eval/deviceEvalGate";
 import type { EvalRequest } from "../eval/deviceEvalRequest.pure";
 import { ChatHeader } from "./ChatHeader";
 import { Banner, Button, IconButton, Progress, Screen, Sheet, Text, useAnnounce, useToast } from "./components";
@@ -435,9 +436,11 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
     });
   }, [t, toast]);
 
-  // Development builds only: an evaluation request written over adb by scripts/eval-device.mjs.
+  // An evaluation request written into the app's private storage by a development machine
+  // (scripts/eval-iphone.mjs over devicectl, adb run-as on Android): development builds and builds made
+  // with EXPO_PUBLIC_DEVICE_EVAL=1 only (src/eval/deviceEvalGate.ts). A shipped build never polls.
   useEffect(() => {
-    if (!__DEV__ || !ready || deviceEvalRequest) return;
+    if (!DEVICE_EVAL_ON || !ready || deviceEvalRequest) return;
     let cancelled = false;
     const check = async () => {
       if (cancelled || activeRef.current) return;
