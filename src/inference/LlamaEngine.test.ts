@@ -8,7 +8,7 @@ type FakeContext = {
   stopCompletion: () => Promise<void> | undefined;
   releasedWhileGenerating: boolean;
 };
-/** llama.rn 0.13.0-rc.6: the JSI stopCompletion returns undefined instead of a promise. */
+/** llama.rn's JSI stopCompletion returns undefined instead of a promise (rc.4 and rc.6 alike). */
 let stopReturnsNothing = false;
 const created: FakeContext[] = [];
 const initParams: Record<string, unknown>[] = [];
@@ -203,7 +203,7 @@ describe("LlamaEngine load/unload", () => {
     expect(engine.getModelInfo()?.filename).toBe("models/b.gguf");
   });
 
-  it("switches models twice mid-generation with rc.6's stopCompletion (no promise) and keeps one context loaded", async () => {
+  it("switches models twice mid-generation with a stopCompletion that returns no promise and keeps one context loaded", async () => {
     stopReturnsNothing = true;
     const engine = new LlamaEngine();
     await engine.load("models/a.gguf");
