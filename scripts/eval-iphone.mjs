@@ -150,8 +150,7 @@ async function main() {
     fail(e.message);
   }
   if (o.help || !o.questions) {
-    console.log(readFileSync(new URL(import.meta.url), "utf8").split("
-").slice(1).filter((l, i, a) => a.slice(0, i + 1).every((x) => x.startsWith("//"))).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+    console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1).filter((l, i, a) => a.slice(0, i + 1).every((x) => x.startsWith("//"))).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
     process.exit(o.help ? 0 : 1);
   }
   const rawQuestions = readFileSync(o.questions, "utf8")
