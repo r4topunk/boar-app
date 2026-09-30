@@ -15,6 +15,8 @@ interface Props {
   sending: boolean;
   onCancel: () => void;
   onShare: () => void;
+  /** Once the user pressed Share: the progress screen, shown in place of the preview. */
+  progress?: React.ReactElement | null;
 }
 
 const gb = (bytes: number | undefined) => (bytes && bytes > 0 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : "—");
@@ -26,7 +28,7 @@ const pct = (x: number | undefined) => (x == null ? "—" : `${Math.round(x * 10
  * model's score with the raw numbers behind it, and every question and answer. The score shown
  * here is the app's copy of the formula (src/eval/score.pure.ts); the server recomputes it.
  */
-export function SharePreview({ visible, rows, device, appVersion, sending, onCancel, onShare }: Props) {
+export function SharePreview({ visible, rows, device, appVersion, sending, onCancel, onShare, progress }: Props) {
   const { t } = useTranslation();
   const tokens = useTokens();
   const [showAnswers, setShowAnswers] = useState(false);
@@ -39,6 +41,15 @@ export function SharePreview({ visible, rows, device, appVersion, sending, onCan
   const os = device.osVersion
     ? `${device.platform === "ios" ? "iOS" : "Android"} ${device.osVersion}${device.apiLevel ? ` (API ${device.apiLevel})` : ""}`
     : "—";
+
+  if (progress) {
+    // Back does nothing while sending (the progress screen's own buttons end it).
+    return (
+      <Modal visible={visible} animationType="slide" onRequestClose={sending ? () => {} : onCancel}>
+        {progress}
+      </Modal>
+    );
+  }
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>

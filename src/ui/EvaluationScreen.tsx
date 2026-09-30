@@ -11,8 +11,17 @@ import { exportEvalResults, listInstalledEvalModels, runEvaluation, EvalProgress
 import { runDeviceEvalRequest } from "../eval/deviceEvalRequest";
 import type { EvalRequest } from "../eval/deviceEvalRequest.pure";
 import { resultsSharingAvailable, shareDevice, shareEvalRun } from "../eval/shareResults";
-import type { ShareDevice, ShareOutcome } from "../eval/shareResults.pure";
+import {
+  SHARE_MIN_MS,
+  shareSucceeded,
+  STEP_MIN_MS,
+  type ShareDevice,
+  type ShareOutcome,
+  type ShareStep,
+  type ShareStepInfo,
+} from "../eval/shareResults.pure";
 import { SharePreview } from "./SharePreview";
+import { ShareProgress, type ShareLogLine } from "./ShareProgress";
 import appConfig from "../../app.json";
 import { Button, IconSlot, Progress, Screen, Section, Skeleton, Text, useOpticalLine, useToast } from "./components";
 import { ScreenTitle } from "./flows/ScreenTitle";
@@ -147,34 +156,59 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
 
   // A second tap before the button re-renders disabled must not send the run again.
   const sendingRef = useRef(false);
+  const [shareUi, setShareUi] = useState<{ step: ShareStep | null; log: ShareLogLine[]; outcome: ShareOutcome | null } | null>(null);
+  const logLine = (step: ShareStep, info?: ShareStepInfo): string => {
+    if (step === "challenge" && info?.challenge) return t("evaluation.shareProgress.log.challengeGot", { code: info.challenge });
+    if (step === "key" && info?.key) return t(`evaluation.shareProgress.log.key-${info.key}`);
+    if (step === "send") return t("evaluation.shareProgress.log.send", { size: `${Math.max(1, Math.round((info?.bytes ?? 0) / 1024))} KB`, count: info?.rows ?? 0 });
+    return t(`evaluation.shareProgress.log.${step}`, { count: info?.rows ?? 0 });
+  };
   const confirmShare = async () => {
     if (!run || sendingRef.current) return;
     sendingRef.current = true;
     setSharing(true);
+    impact(ImpactFeedbackStyle.Light);
+    const started = Date.now();
+    setShareUi({ step: "prepare", log: [], outcome: null });
+    // Steps reach the screen one at a time, each for at least STEP_MIN_MS.
+    let shown = Promise.resolve();
+    const onStep = (step: ShareStep, info?: ShareStepInfo) => {
+      shown = shown.then(async () => {
+        setShareUi((s) => s && { ...s, step, log: [...s.log, { key: `${s.log.length}`, text: logLine(step, info) }] });
+        await new Promise((r) => setTimeout(r, STEP_MIN_MS));
+      });
+    };
     let outcome: ShareOutcome = { result: "failed" };
     try {
-      outcome = await shareEvalRun(run.rows);
-    } catch {
-      // e.g. the device id couldn't be saved; reported as a failed share below.
-    } finally {
-      sendingRef.current = false;
-      setSharing(false);
+      outcome = await shareEvalRun(run.rows, onStep);
+    } catch (e) {
+      outcome = { result: "failed", detail: String((e as Error)?.message ?? e) };
     }
+    await shown;
+    const wait = SHARE_MIN_MS - (Date.now() - started);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    sendingRef.current = false;
+    setSharing(false);
+    if (shareSucceeded(outcome.result)) setShared(run.runId);
+    const status = outcome.status ? t("evaluation.shareProgress.log.status", { status: outcome.status }) : null;
+    setShareUi((s) => s && { step: null, outcome, log: status ? [...s.log, { key: `${s.log.length}`, text: status }] : s.log });
+    impact(shareSucceeded(outcome.result) ? ImpactFeedbackStyle.Medium : ImpactFeedbackStyle.Light);
+  };
+  const closeShare = () => {
+    setShareUi(null);
     setPreviewDevice(null);
-    const { result, retryAt } = outcome;
-    if (result === "shared" || result === "already-shared") setShared(run.runId);
-    // "You can share again at 14:05" (or "Tue 09:30" when that is another day).
-    const at = retryAt ? new Date(retryAt) : null;
-    const time = at
+  };
+  // "You can share again at 14:05" (or "Tue 09:30" when that is another day).
+  const retryAtText = (() => {
+    const at = shareUi?.outcome?.retryAt ? new Date(shareUi.outcome.retryAt) : null;
+    return at
       ? at.toLocaleString(i18n.language, {
           ...(at.toDateString() === new Date().toDateString() ? {} : { weekday: "short" }),
           hour: "2-digit",
           minute: "2-digit",
         })
       : null;
-    const key = time && (result === "rate-limited" || result === "cooldown") ? `${result}At` : result;
-    toast({ message: t(`evaluation.shareResult.${key}`, { time }), tone: result === "shared" || result === "already-shared" ? "success" : "danger" });
-  };
+  })();
 
   const canRun = !running && !chatBusy && chosen.length > 0 && models !== null;
 
@@ -358,8 +392,21 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
           device={previewDevice}
           appVersion={appConfig.expo.version}
           sending={sharing}
-          onCancel={() => setPreviewDevice(null)}
+          onCancel={closeShare}
           onShare={confirmShare}
+          progress={
+            shareUi ? (
+              <ShareProgress
+                step={shareUi.step}
+                log={shareUi.log}
+                outcome={shareUi.outcome}
+                retryAtText={retryAtText}
+                onDone={closeShare}
+                onRetry={confirmShare}
+                onExport={handleExport}
+              />
+            ) : null
+          }
         />
       )}
     </Screen>

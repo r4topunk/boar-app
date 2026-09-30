@@ -17,6 +17,7 @@ interface DeviceKeyNativeModule {
   isSupported?(): boolean;
   hasKey(): boolean;
   createKey(challenge: string): Promise<CreatedKey>;
+  createUnattestedKey?(): Promise<CreatedKey>;
   sign(data: string): Promise<string>;
   deleteKey(): void;
 }
@@ -35,6 +36,16 @@ export const hasDeviceKey = (): boolean => native?.hasKey() ?? false;
 export function createDeviceKey(challenge: string): Promise<CreatedKey> {
   if (!native) return Promise.reject(new Error("device-key module missing"));
   return native.createKey(challenge);
+}
+
+/**
+ * Android only: a key without attestation, for a phone whose secure hardware refused to attest
+ * (createDeviceKey rejected with code ERR_DEVICE_KEY_ATTESTATION). Runs signed with it are stored
+ * for review instead of going straight to the public scores.
+ */
+export function createUnattestedDeviceKey(): Promise<CreatedKey> {
+  if (!native?.createUnattestedKey) return Promise.reject(new Error("unattested keys aren't available here"));
+  return native.createUnattestedKey();
 }
 
 /** Android: DER ECDSA signature. iOS: App Attest assertion. Base64 either way. */

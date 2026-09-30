@@ -26,10 +26,22 @@ clearing the app's data makes a new one; the per-network limit still applies.
 
 ## Moderating
 
-As the owner (the dashboard's SQL editor): hide a run's scores with
-`update eval_scores set hidden = true where run = '<id>'`, or refuse a device's future runs
-with `update eval_devices set banned = true where id = '<id>'`. Flagged runs:
-`select id, flags from eval_runs where cardinality(flags) > 0`.
+As the owner (the dashboard's SQL editor):
+
+- **The review list:** `select * from eval_review_queue` shows every run whose scores are hidden,
+  with its flags (`unattested`, `implausible_timing`, `rss_above_ram`), the phone and its scores.
+- **Approve a run** (put it on the public scores): `update eval_scores set hidden = false where run = '<id>'`.
+- **Hide a run:** `update eval_scores set hidden = true where run = '<id>'`.
+- **Block a device's future runs:** `update eval_devices set banned = true where id = '<id>'`.
+
+### Phones that can't attest
+
+Some genuine phones can't attest a key: their secure hardware lacks, or lost, its factory
+attestation keys (seen on a stock, locked POCO F3 as Keymaster error -10003). The app then makes
+a plain key and sends only its public key. The server registers it as unattested and still
+checks every signature, but nothing proves the key is in a real phone running BOAR, so each of its
+runs is flagged `unattested` and waits in the review list. A script can make such keys too, so
+there's room for at most 100 unattested runs a day in total, on top of the usual limits.
 
 ## Using your own project
 
