@@ -58,9 +58,9 @@ and debug builds are refused: they are signed with Expo's debug key, which anyon
 so a modified app could pass as BOAR. The offline build has no network permission. iOS sharing
 opens once the function's `APPLE_APP_ID` is set.
 
-A release build installs as its own app (`team.sopa.aoair`) next to a development build
-(`team.sopa.aoair.dev`), with its own storage: import the models from files instead of
-downloading them again.
+A release build and a development build share the application id `team.sopa.aoair` but not the
+signing key, so one can't be installed over the other: uninstall the development build first
+(its downloaded models go with it; import them from files to avoid downloading again).
 
 ## What is public
 

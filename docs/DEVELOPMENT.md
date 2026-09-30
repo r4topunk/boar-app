@@ -84,14 +84,17 @@ what a plain `npm install` alone will never fix, since it never touches `android
 
 Evaluation › Share results only works from a release build signed with BOAR's release key:
 the server checks the phone's hardware-key attestation, and development builds (signed with
-Expo's public debug key) are refused. Build and install one next to your development build:
+Expo's public debug key) are refused. Build and install a release APK:
 
 ```bash
 make apk-downloader                                  # dist/boar-downloader-<version>-arm64.apk
-adb install dist/boar-downloader-<version>-arm64.apk # installs as team.sopa.aoair
+adb install dist/boar-downloader-<version>-arm64.apk # application id team.sopa.aoair
 ```
 
-It has its own storage, so import the models from files rather than downloading them again.
+A development build made from this repo has the same application id but a different signing
+key, so Android won't install one over the other: uninstall the development build first, which
+deletes its downloaded models (copy them out and import them from files to avoid downloading
+them again).
 The share flow, limits and moderation: [RESULTS_SCORE.md](RESULTS_SCORE.md#how-a-share-works)
 and [supabase/README.md](../supabase/README.md).
 
