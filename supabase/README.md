@@ -43,6 +43,43 @@ checks every signature, but nothing proves the key is in a real phone running BO
 runs is flagged `unattested` and waits in the review list. A script can make such keys too, so
 there's room for at most 100 unattested runs a day in total, on top of the usual limits.
 
+## The public copy on Hugging Face (optional, off)
+
+Off until `HF_DATASET` is set. Before turning it on, add the Hugging Face dataset to `PRIVACY.md`
+(sections 2.3, 5 and 6) and `TERMS.md` (sections 4 and 6).
+
+`.github/workflows/mirror-scores.yml` runs `scripts/mirror-scores-hf.mjs` once a day. It reads the
+public scores with the publishable key, so it only ever sees approved `eval_scores` rows, and
+commits `scores.csv`, `scores.jsonl` and a dataset card to the Hugging Face dataset named by the
+`HF_DATASET` repository variable (CC BY 4.0). Nothing is committed on a day with no change.
+
+Setup, once: create the dataset on Hugging Face, make a fine-grained token with write access to
+it only, then in the GitHub repository set the `HF_TOKEN` secret and the `HF_DATASET`,
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` variables. The job does nothing until `HF_DATASET` is
+set. Try it locally with `npm run scores:mirror -- --dry-run` (writes the files to
+`build/hf-mirror/`).
+
+## Deletion requests
+
+A person asks by email with the run's id (the app shows it in the Evaluation screen's "Saved to"
+line, `eval-<date and time>`), the phone's model and roughly when they shared it. As the owner, find
+the run, then delete it and everything else from that phone:
+
+```sql
+select id, device, received_at, device_model from eval_runs
+where run_id = '<run id>' and device_model = '<phone model>';
+
+begin;
+delete from eval_runs where device = '<device from above>';   -- cascades to eval_rows and eval_scores
+delete from eval_devices where id = '<device from above>';
+commit;
+```
+
+If the Hugging Face copy is on, the next daily copy drops those rows from the dataset, but its git history still
+has them. Remove them from the history too: after the copy, squash the dataset's history on
+the dataset's Settings page, or with
+`curl -X POST -H "Authorization: Bearer $HF_TOKEN" https://huggingface.co/api/datasets/$HF_DATASET/super-squash/main`.
+
 ## Using your own project
 
 ```bash
