@@ -92,6 +92,12 @@ describe("attributeCitations (the inverse of CT-1)", () => {
     expect(r.added).toEqual([]);
   });
 
+  it("never cites a heading or a bold title line, only the sentences under it", () => {
+    const r = attributeCitations("## Greenhouse gases trap heat in the atmosphere\n\n**Greenhouse gases trap heat in the atmosphere**\n\nGreenhouse gases trap heat in the atmosphere.", [GREEN]);
+    expect(r.text).toBe("## Greenhouse gases trap heat in the atmosphere\n\n**Greenhouse gases trap heat in the atmosphere**\n\nGreenhouse gases trap heat in the atmosphere [1].");
+    expect(r.added).toEqual([1]);
+  });
+
   it("never without support, never to a short sentence, never twice", () => {
     expect(attributeCitations("Ice cream is sold on beaches.", [MONSOON]).added).toEqual([]);
     expect(attributeCitations("Monsoon.", [MONSOON]).added).toEqual([]);
