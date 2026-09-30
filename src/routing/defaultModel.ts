@@ -20,9 +20,19 @@ export const COMPACT_ONLY_MAX_RAM_BYTES = 4.5 * 1024 ** 3;
 /**
  * On a phone with at most COMPACT_ONLY_MAX_RAM_BYTES, nothing bigger than the
  * compact model is chosen automatically (Piston, CR-1: the 4B on 3.8 GB was
- * OOM-killed). The compact 1.5B is ~1.1 GB; this leaves margin for its peers.
+ * OOM-killed). The compact 1.5B is ~1.0 GB. Measured on an iPhone 13 (4 GB,
+ * 2026-09-30): ~1.5 GB models (MiniCPM5-2B, LFM2.5-2.6B Q4_0) load but thrash
+ * mmap and decode at ~0.35 tok/s, so the cap sits just above the 1.5B.
  */
-export const LOW_RAM_MAX_MODEL_BYTES = 1.6e9;
+export const LOW_RAM_MAX_MODEL_BYTES = 1.1e9;
+
+/**
+ * Untiered models up to this size count as compact: too small to answer from
+ * memory unasked (a weak-sources answer is declined, "Answer anyway" offered).
+ * Kept at the previous 1.6e9 so lowering the low-RAM cap above doesn't change
+ * which models decline.
+ */
+export const COMPACT_MAX_MODEL_BYTES = 1.6e9;
 
 /** True when a model may not be picked automatically on this device (only after the user confirms it). */
 export function tooBigForLowRam(m: { answerTier?: "default" | "compact"; sizeBytes?: number }, totalRamBytes: number): boolean {
@@ -34,7 +44,7 @@ export function tooBigForLowRam(m: { answerTier?: "default" | "compact"; sizeByt
 /** The compact tier, or an untiered model no bigger than it: too small to answer from memory unasked. */
 export function isCompactModel(m: { answerTier?: "default" | "compact"; sizeBytes?: number }): boolean {
   if (m.answerTier) return m.answerTier === "compact";
-  return (m.sizeBytes ?? Number.POSITIVE_INFINITY) <= LOW_RAM_MAX_MODEL_BYTES;
+  return (m.sizeBytes ?? Number.POSITIVE_INFINITY) <= COMPACT_MAX_MODEL_BYTES;
 }
 
 /** Measured median decode speed under which a model is too slow to be the automatic default. */

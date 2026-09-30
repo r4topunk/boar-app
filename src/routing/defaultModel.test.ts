@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickDefaultAnswerModel, rankAnswerModels, tooBigForLowRam } from "./defaultModel";
+import { COMPACT_MAX_MODEL_BYTES, isCompactModel, LOW_RAM_MAX_MODEL_BYTES, pickDefaultAnswerModel, rankAnswerModels, tooBigForLowRam } from "./defaultModel";
 import { contextSizeForRam, estimateMemoryFit, parseGgufShape, toGb } from "../inference/memoryFit";
 
 const GiB = 1024 ** 3;
@@ -151,5 +151,31 @@ describe("CR-1: nothing above the compact model on a low-RAM phone", () => {
     expect(tooBigForLowRam({ sizeBytes: 0.8 * GB }, 3.8 * GiB)).toBe(false);
     expect(tooBigForLowRam({ answerTier: "compact", sizeBytes: 1.1 * GB }, 3.8 * GiB)).toBe(false);
     expect(tooBigForLowRam({ answerTier: "default", sizeBytes: 2.5 * GB }, 7.5 * GiB)).toBe(false);
+  });
+
+  it("never auto-picks a ~1.5 GB untiered model on a 4 GB phone (0.35 tok/s on iPhone 13)", () => {
+    expect(LOW_RAM_MAX_MODEL_BYTES).toBe(1.1e9);
+    // MiniCPM5-2B / LFM2.5-2.6B Q4_0 are ~1.5 GB: blocked on 3.8 GiB, fine on 7.5 GiB.
+    expect(tooBigForLowRam({ sizeBytes: 1.5 * GB }, 3.8 * GiB)).toBe(true);
+    expect(tooBigForLowRam({ sizeBytes: 1.5 * GB }, 7.5 * GiB)).toBe(false);
+    // The compact Qwen2.5-1.5B (0.99 GB) and a 1.2B (0.73 GB) still fit under the cap.
+    expect(tooBigForLowRam({ sizeBytes: 0.99 * GB }, 3.8 * GiB)).toBe(false);
+    expect(tooBigForLowRam({ sizeBytes: 0.73 * GB }, 3.8 * GiB)).toBe(false);
+    const r = rankAnswerModels(
+      [
+        { id: "minicpm5-2b", sizeBytes: 1.5 * GB, tokPerSec: 20, fit: "resident" },
+        { id: "qwen2.5-1.5b", answerTier: "compact", sizeBytes: 0.99 * GB },
+      ],
+      3.8 * GiB
+    );
+    expect(r.pick?.id).toBe("qwen2.5-1.5b");
+  });
+
+  it("lowering the low-RAM cap doesn't change which untiered models count as compact", () => {
+    expect(COMPACT_MAX_MODEL_BYTES).toBe(1.6e9);
+    expect(isCompactModel({ sizeBytes: 1.5 * GB })).toBe(true);
+    expect(isCompactModel({ sizeBytes: 2.4 * GB })).toBe(false);
+    expect(isCompactModel({ answerTier: "compact", sizeBytes: 1.1 * GB })).toBe(true);
+    expect(isCompactModel({ answerTier: "default", sizeBytes: 1.0 * GB })).toBe(false);
   });
 });
