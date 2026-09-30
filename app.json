@@ -2,14 +2,14 @@
   "expo": {
     "name": "BOAR",
     "slug": "boar-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "team.sopa.boar",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "icon": "./assets/icon-ios.png",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "BOAR uses the microphone only while voice input is on, to turn your question into text on this device.",
@@ -27,6 +27,7 @@
     },
     "android": {
       "package": "team.sopa.aoair",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#17110D",
         "foregroundImage": "./assets/android-icon-foreground.png",

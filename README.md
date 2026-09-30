@@ -155,7 +155,7 @@ git clone https://github.com/rferrari/boar-app.git && cd boar-app
 make setup    # or: node scripts/setup.mjs · `make help` lists the single steps
 ```
 
-**iOS:** builds from the same code; see [docs/IOS.md](docs/IOS.md).
+**iOS:** builds from the same code. To put it on your own iPhone with a free Apple ID, see [docs/IOS_FREE_INSTALL.md](docs/IOS_FREE_INSTALL.md); build details in [docs/IOS.md](docs/IOS.md).
 
 ## Docs
 
@@ -164,6 +164,7 @@ make setup    # or: node scripts/setup.mjs · `make help` lists the single steps
 | [docs/demo](docs/demo/README.md) | Videos and screenshots from a phone in airplane mode |
 | [docs/USING.md](docs/USING.md) | Import documents, find more models, recover from a bad model load, reset the app |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Build commands, dev mode, Wi‑Fi troubleshooting |
+| [docs/IOS_FREE_INSTALL.md](docs/IOS_FREE_INSTALL.md) | Install on your own iPhone with a free Apple ID |
 | [docs/IOS.md](docs/IOS.md) | iOS build, native modules, Android/iOS parity |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Design, first-run setup, network permission |
 | [docs/MODELS.md](docs/MODELS.md) | Exact models, datasets and indexes |
