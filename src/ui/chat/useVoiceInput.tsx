@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Sheet, Text, useAnnounce, useToast } from "../components";
-import { getVoiceSupport, startListening, stopListening, type VoiceEvent } from "../../voice/VoiceInput";
+import { cancelListening, getVoiceSupport, startListening, stopListening, type VoiceEvent } from "../../voice/VoiceInput";
 import type { VoiceSupport } from "../../voice/voicePolicy";
 import { VOICE_FINISH_GRACE_MS, voiceCaveatNeeded, voiceErrorKind, type VoicePhase } from "./composerSlots";
 
@@ -131,15 +131,18 @@ export function useVoiceInput({ enabled, onStart, onText, onCancel }: Options): 
     const id = session.current;
     setPhase("finishing");
     stopListening();
-    // Keep what was heard if the final text never comes.
+    // Keep what was heard if the final text never comes; drop the native session so the mic is off.
     grace.current = setTimeout(() => {
-      if (end(id)) announce(t("chat.announce.stoppedListening"));
+      if (!end(id)) return;
+      cancelListening();
+      announce(t("chat.announce.stoppedListening"));
     }, VOICE_FINISH_GRACE_MS);
   }, [announce, end, setPhase, t]);
 
+  // Also while the native start is still pending (permission prompt): VoiceInput stops it once it starts.
   const cancel = useCallback(() => {
     if (!end(session.current)) return;
-    stopListening();
+    cancelListening();
     cb.current.onCancel();
     announce(t("chat.announce.stoppedListening"));
   }, [announce, end, t]);
@@ -150,7 +153,7 @@ export function useVoiceInput({ enabled, onStart, onText, onCancel }: Options): 
       if (grace.current) clearTimeout(grace.current);
       if (phaseRef.current !== "idle") {
         session.current++;
-        stopListening();
+        cancelListening();
       }
     },
     []

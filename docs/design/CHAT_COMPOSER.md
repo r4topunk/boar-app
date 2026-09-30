@@ -54,6 +54,11 @@ to 11 pt, to stay on the last line's centre.
 
 - Mic: starts dictation. What was already typed stays, and the transcript is appended after it.
 - Done ✓: stops the recognizer and keeps the text. Cancel ✕ puts back the text from before listening.
+- An answer starting mid-dictation (Retry): Stop always owns the slot. The dictation then ends as with Done,
+  keeping what was heard, so no mic stays open behind a stream.
+- Sessions (`src/voice/voiceSession.ts`): a session hears events only once its native start has resolved, and
+  only while it is the current session. iOS "request cancelled" errors are ignored. A Done or Cancel pressed
+  during the start (permission prompt) is sent to the native module as soon as the start resolves.
 - iOS ends dictation by itself after 1.8 s of silence (native). Android ends it at the end of speech.
 - Caveat sheet ("audio may go to the provider"): shown only when the recognizer is the system service (Android,
   consent given, reason `system-accepted`). It never shows on iPhone or with Android's on-device recognizer.
