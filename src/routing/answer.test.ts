@@ -1840,10 +1840,10 @@ describe("answer(): multi-pass citations (P1 full cited chunks, P2 attribution)"
       return { answer, subQuestions: ["a", "b"], citations: [CANBERRA_COMPRESSED, HALL], ...(full ? { fullCitations: full } : {}) };
     };
   };
-  const run = async () => {
+  const run = async (reused: RetrievedChunk[] = [HALL]) => {
     const { deepen } = createAnswerer(f.deps);
-    // Reused sources without Canberra: its full text can only come from fullCitations.
-    return deepen("Why was Canberra chosen as the capital of Australia?", [HALL], () => {}, ctx).done;
+    // By default the reused sources leave Canberra out: its full text can only come from fullCitations.
+    return deepen("Why was Canberra chosen as the capital of Australia?", reused, () => {}, ctx).done;
   };
 
   it("P1: CT-1 checks a synthesis [n] against the full retrieved chunk, not the compressed body", async () => {
@@ -1852,6 +1852,17 @@ describe("answer(): multi-pass citations (P1 full cited chunks, P2 attribution)"
     expect(r.text).toContain(`${SELECTED} [1]`);
     expect(r.receipt.reasonCodes.some((c) => c.startsWith("citations:removed"))).toBe(false);
     expect(r.cited).toEqual([1]);
+  });
+
+  it("P1 and P2 hold when the earlier answer's compressed sources are reused (the usual deeper answer)", async () => {
+    multipass(`${SELECTED} [1].`, [CANBERRA, HALL]);
+    const checked = await run([CANBERRA_COMPRESSED, HALL]);
+    expect(checked.receipt.reasonCodes.some((c) => c.startsWith("citations:removed"))).toBe(false);
+    expect(checked.cited).toEqual([1]);
+    multipass(`${SELECTED}. Canberra has the best coffee in the southern hemisphere.`, [CANBERRA, HALL]);
+    const restored = await run([CANBERRA_COMPRESSED, HALL]);
+    expect(restored.receipt.reasonCodes).toContain("citations:added-1");
+    expect(restored.text).toContain(`${SELECTED} [1].`);
   });
 
   it("P1 control: without the full chunks the same [n] is judged against the compressed body and removed", async () => {

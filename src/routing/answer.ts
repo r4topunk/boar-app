@@ -1164,9 +1164,11 @@ export function createAnswerer(deps: AnswerDeps) {
         ctxTokens: timings?.promptTokens,
         cachedTokens: timings?.cachedTokens,
       });
-      // A source in full: the retrieved chunk (single pass), or the orchestrator's (multi-pass), else as shown.
+      // A source in full: the orchestrator's (multi-pass), else the retrieved chunk (single pass), else as shown.
+      // fullCited first: on a deeper answer, raw holds the earlier answer's shown (compressed) sources, which
+      // would shadow the full chunk whenever the synthesis cites the same one again.
       const fullOf = (c: RetrievedChunk) =>
-        raw.find((r) => r.chunkId === c.chunkId) ?? fullCited.find((r) => r.chunkId === c.chunkId) ?? c;
+        fullCited.find((r) => r.chunkId === c.chunkId) ?? raw.find((r) => r.chunkId === c.chunkId) ?? c;
       // CT-1: a [n] stays only where source n supports its sentence.
       let allCitationsRemoved = false;
       if (/\[\d+\]/.test(text)) {
