@@ -12,7 +12,7 @@ import { EVAL_SET } from "./evalSet";
 import { EVAL_RESULTS_DIR, listInstalledEvalModels, runEvaluation, RunEvaluationOptions, EvaluationRun } from "./evalHarness";
 import { evalConfigId } from "./evalHarness.pure";
 import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest } from "./deviceEvalRequest.pure";
-import { runAnswerEvaluation } from "./answerEval";
+import { installForEval, runAnswerEvaluation } from "./answerEval";
 
 export const EVAL_REQUESTS_DIR = `${EVAL_RESULTS_DIR}requests/`;
 const PENDING_PATH = `${EVAL_REQUESTS_DIR}pending.json`;
@@ -149,7 +149,15 @@ async function runAnswerRequest(
   await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels });
   console.log(`[EVAL] device request ${requestId} (answer pipeline): ${configs.join(", ")} x ${resolved.questions.length} questions`);
   try {
+    let install: EvalRequestStatus["install"];
+    if (request.install) {
+      install = await installForEval(request.install, (line) => {
+        console.log(`[EVAL] ${line}`);
+        queueStatus({ requestId, state: "running", configs, total, completed, current: line, installedModels });
+      });
+    }
     const run = await runAnswerEvaluation({
+      answerSettings: request.answerSettings,
       questions: resolved.questions,
       models: resolved.models,
       answerAnyway: request.answerAnyway,
@@ -177,6 +185,7 @@ async function runAnswerRequest(
       resultPath: toRunAsPath(run.savedPath),
       stopped: run.stopped,
       installedModels,
+      install,
     });
     return run;
   } catch (e: any) {

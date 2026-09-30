@@ -16,6 +16,10 @@
 //   --runs-file <path>      also write one row per question (the re-ask wins) in the eval/ judge format;
 //                           with several --models, one file per model (<path minus .jsonl>__<model>.jsonl)
 //   --bundle <id>           app bundle (default team.sopa.aoair)   --udid <id>   device (default: the only iPhone)
+//   --install-places <a,b>  download these cities' places tiles before the run (world gazetteer names)
+//   --install-places-from-questions   ...every city named by a question's grading.city (v2 food items)
+//   --install-assets <ids>  download catalog packs first (e.g. boar-crypto,boar-wikivoyage-en)
+//   --quick-first on|off    answer setting for this run only   --always-complete on|off   (device's restored after)
 //   --no-launch             don't (re)launch the app; it must already be in the foreground
 //   --timeout-min <n>       give up after n minutes (default 180)
 import { execFileSync, spawn } from "node:child_process";
@@ -46,6 +50,14 @@ function parseArgs(argv) {
     else if (a === "--bundle") o.bundle = next();
     else if (a === "--udid") o.udid = next();
     else if (a === "--no-launch") o.launch = false;
+    else if (a === "--install-places") o.installPlaces = next().split(",").map((x) => x.trim()).filter(Boolean);
+    else if (a === "--install-places-from-questions") o.placesFromQuestions = true;
+    else if (a === "--install-assets") o.installAssets = next().split(",").map((x) => x.trim()).filter(Boolean);
+    else if (a === "--quick-first" || a === "--always-complete") {
+      const v = next();
+      if (v !== "on" && v !== "off") throw new Error(`${a} takes on|off`);
+      (o.answerSettings ??= {})[a === "--quick-first" ? "quickFirst" : "alwaysComplete"] = v === "on";
+    }
     else if (a === "--timeout-min") o.timeoutMin = Number(next());
     else if (a === "--help" || a === "-h") o.help = true;
     else throw new Error(`unknown option ${a}`);
@@ -138,14 +150,15 @@ async function main() {
     fail(e.message);
   }
   if (o.help || !o.questions) {
-    console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 22).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+    console.log(readFileSync(new URL(import.meta.url), "utf8").split("
+").slice(1).filter((l, i, a) => a.slice(0, i + 1).every((x) => x.startsWith("//"))).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
     process.exit(o.help ? 0 : 1);
   }
-  let questions = readFileSync(o.questions, "utf8")
+  const rawQuestions = readFileSync(o.questions, "utf8")
     .split("\n")
     .filter((l) => l.trim())
-    .map((l) => JSON.parse(l))
-    .map((q) => ({ id: q.id, query: q.query, category: q.category }));
+    .map((l) => JSON.parse(l));
+  let questions = rawQuestions.map((q) => ({ id: q.id, query: q.query, category: q.category }));
   if (o.only) questions = questions.filter((q) => o.only.includes(q.id) || o.only.includes(q.category));
   if (o.limit) questions = questions.slice(0, o.limit);
   if (!questions.length) fail("no questions left after --only/--limit");
@@ -158,6 +171,8 @@ async function main() {
   const requestId = `req-${stamp.toLowerCase().replace(/[^a-z0-9-]/g, "")}`.slice(0, 64);
   const out = o.out ?? join("eval-results", "iphone", stamp.slice(0, 10), requestId);
   mkdirSync(out, { recursive: true });
+  const places = [...new Set([...(o.installPlaces ?? []), ...(o.placesFromQuestions ? rawQuestions.map((q) => q.grading?.city).filter(Boolean) : [])])];
+  const install = places.length || o.installAssets?.length ? { ...(places.length ? { places } : {}), ...(o.installAssets ? { assets: o.installAssets } : {}) } : null;
   const request = {
     requestId,
     pipeline: "answer",
@@ -165,7 +180,10 @@ async function main() {
     evalSetVersion: `dataset-${dataset}`,
     ...(o.models ? { models: o.models } : {}),
     ...(o.answerAnyway ? { answerAnyway: true } : {}),
+    ...(install ? { install } : {}),
+    ...(o.answerSettings ? { answerSettings: o.answerSettings } : {}),
   };
+  if (install) console.log(`  install first: ${JSON.stringify(install)}`);
   const reqFile = join(out, "request.json");
   writeFileSync(reqFile, JSON.stringify(request));
 
@@ -210,7 +228,11 @@ async function main() {
   if (!copyFrom(o, src, rowsLocal)) fail(`could not copy ${src}`);
   const rows = readFileSync(rowsLocal, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   const { lines, final } = report(rows);
-  const md = [`# iPhone answer-pipeline eval ${requestId}`, "", `${rows.length} rows, ${final.length} questions, dataset ${dataset}${status.stopped ? " (STOPPED)" : ""}.`, "", ...lines, ""].join("\n");
+  const installLine = status.install
+    ? `Install: ${status.install.installed.length} new, ${status.install.already.length} already there, failed: ${status.install.failed.map((f) => `${f.id} (${f.error})`).join("; ") || "none"}.`
+    : "";
+  const settingsLine = rows[0]?.answerSettings ? `Answer settings: ${JSON.stringify(rows[0].answerSettings)}.` : "";
+  const md = [`# iPhone answer-pipeline eval ${requestId}`, "", `${rows.length} rows, ${final.length} answers, dataset ${dataset}${status.stopped ? " (STOPPED)" : ""}.`, installLine, settingsLine, "", ...lines, ""].join("\n");
   writeFileSync(join(out, "report.md"), md);
   if (o.runsFile) {
     // One judge file per config: <runs-file> for a single config, <name>__<model>.jsonl for several.

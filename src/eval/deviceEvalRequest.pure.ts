@@ -28,6 +28,10 @@ export interface EvalRequest {
   answerAnyway?: boolean;
   /** Pipeline "answer" only: dataset label recorded on every row (e.g. "dataset-v2"). */
   evalSetVersion?: string;
+  /** Pipeline "answer" only: packs to download before the first question (city places, catalog ids). */
+  install?: { places?: string[]; assets?: string[] };
+  /** Pipeline "answer" only: answer settings for this run; the device's are restored after. */
+  answerSettings?: { quickFirst?: boolean; alwaysComplete?: boolean };
 }
 
 export type EvalRequestState = "accepted" | "running" | "done" | "failed";
@@ -46,6 +50,8 @@ export interface EvalRequestStatus {
   stopped?: boolean;
   error?: string;
   installedModels?: string[];
+  /** Pipeline "answer" with install: what was downloaded before the run. */
+  install?: { installed: string[]; already: string[]; failed: { id: string; error: string }[] };
 }
 
 const REQUEST_ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -68,13 +74,27 @@ export function parseEvalRequest(json: string): EvalRequest {
   if (raw.pipeline !== undefined && raw.pipeline !== "legacy" && raw.pipeline !== "answer") {
     throw new Error('"pipeline" must be "legacy" or "answer"');
   }
-  const answerOnly = ["questions", "answerAnyway", "evalSetVersion"].filter((k) => raw[k] !== undefined);
+  const answerOnly = ["questions", "answerAnyway", "evalSetVersion", "install", "answerSettings"].filter((k) => raw[k] !== undefined);
   if (raw.pipeline !== "answer" && answerOnly.length) throw new Error(`${answerOnly.join(", ")} need "pipeline": "answer"`);
   if (raw.answerAnyway !== undefined && typeof raw.answerAnyway !== "boolean") throw new Error('"answerAnyway" must be a boolean');
   if (raw.evalSetVersion !== undefined && (typeof raw.evalSetVersion !== "string" || !/^[\w.-]{1,64}$/.test(raw.evalSetVersion))) {
     throw new Error('"evalSetVersion" must be 1-64 letters, digits, dots, dashes or underscores');
   }
+  let install: EvalRequest["install"];
+  if (raw.install !== undefined) {
+    if (typeof raw.install !== "object" || raw.install === null) throw new Error('"install" must be { places?, assets? }');
+    install = { places: stringList(raw.install.places, "install.places"), assets: stringList(raw.install.assets, "install.assets") };
+  }
+  let answerSettings: EvalRequest["answerSettings"];
+  if (raw.answerSettings !== undefined) {
+    const a = raw.answerSettings;
+    const bad = typeof a !== "object" || a === null || Object.entries(a).some(([k, v]) => !["quickFirst", "alwaysComplete"].includes(k) || typeof v !== "boolean");
+    if (bad) throw new Error('"answerSettings" must be { quickFirst?: boolean, alwaysComplete?: boolean }');
+    answerSettings = { quickFirst: a.quickFirst, alwaysComplete: a.alwaysComplete };
+  }
   return {
+    install,
+    answerSettings,
     requestId: raw.requestId,
     models: stringList(raw.models, "models"),
     adaptive: raw.adaptive,

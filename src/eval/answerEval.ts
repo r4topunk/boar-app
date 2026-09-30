@@ -12,7 +12,12 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { answer } from "../routing/answerService";
 import type { AnswerEvent, AnswerResult } from "../routing/events";
-import { DEFAULT_MAX_TOKENS, getActiveModelId, getAnswerSettings, setActiveModelId } from "../models/settings";
+import { DEFAULT_MAX_TOKENS, getActiveModelId, getAnswerSettings, setActiveModelId, setAnswerSettings } from "../models/settings";
+import { findAsset } from "../models/assetRegistry";
+import { ModelManager } from "../models/ModelManager";
+import { resolvePlace, tilesFor } from "../rag/pois";
+import { getDownloadState, startDownload } from "../services/downloadManager";
+import { nameTilesAfter } from "../ui/flows/adapters";
 import { DEFAULT_PERSONALITY_ID, getPersonality } from "../constants/personalities";
 import { EVAL_RESULTS_DIR, EvalProgress } from "./evalHarness";
 import { EvalConfig, evalRowsToJsonl, newEvalRunId } from "./evalHarness.pure";
@@ -23,6 +28,69 @@ export const ANSWER_TIMEOUT_MS = 240_000;
 /** Pause between questions: lets the engine's idle prefix refill run, as between two questions in the chat. */
 const GAP_MS = 1_500;
 
+/** Places areas are downloaded around the city's point, as the chat's "get this city" offer does (CityMapOffer). */
+const CITY_AREA_KM = 15;
+
+export interface EvalInstall {
+  /** City names (resolved with the world gazetteer): their places tiles are downloaded. */
+  places?: string[];
+  /** Catalog ids (e.g. boar-crypto, boar-wikivoyage-en), downloaded if not on the phone. */
+  assets?: string[];
+}
+
+export interface InstallReport {
+  installed: string[];
+  already: string[];
+  failed: { id: string; error: string }[];
+}
+
+/**
+ * Downloads what a run needs before its first question, so a pack A/B needs no UI.
+ * Sequential and awaited; a failure is reported, not thrown, and the run goes on.
+ */
+export async function installForEval(spec: EvalInstall, log: (line: string) => void = () => {}): Promise<InstallReport> {
+  const report: InstallReport = { installed: [], already: [], failed: [] };
+  const manager = new ModelManager();
+  const fetchOne = async (asset: NonNullable<ReturnType<typeof findAsset>>) => {
+    if ((await manager.statusOf(asset)).present || getDownloadState(asset.id)?.phase === "verified") {
+      report.already.push(asset.id);
+      return;
+    }
+    try {
+      log(`installing ${asset.id} (${Math.round(asset.sizeBytes / 1e6)} MB)`);
+      await startDownload(asset);
+      report.installed.push(asset.id);
+    } catch (e: any) {
+      report.failed.push({ id: asset.id, error: e?.message ?? String(e) });
+    }
+  };
+  for (const id of spec.assets ?? []) {
+    const asset = findAsset(id);
+    if (!asset) report.failed.push({ id, error: "not in the catalog" });
+    else await fetchOne(asset);
+  }
+  for (const name of spec.places ?? []) {
+    try {
+      const city = await resolvePlace(name);
+      if (!city) {
+        report.failed.push({ id: `places:${name}`, error: "city not found in the gazetteer" });
+        continue;
+      }
+      const tiles = await tilesFor(city.lat, city.lon, CITY_AREA_KM);
+      if (!tiles.length) {
+        report.failed.push({ id: `places:${name}`, error: "no published tiles for this area" });
+        continue;
+      }
+      await nameTilesAfter(city.name, tiles).catch(() => {});
+      for (const tile of tiles) await fetchOne(tile);
+    } catch (e: any) {
+      report.failed.push({ id: `places:${name}`, error: e?.message ?? String(e) });
+    }
+  }
+  log(`install: ${report.installed.length} new, ${report.already.length} already there, ${report.failed.length} failed`);
+  return report;
+}
+
 export interface RunAnswerEvaluationOptions {
   questions: EvalQuestion[];
   /** Models to answer with; empty = whatever the chat would use now (config "adaptive"). */
@@ -30,6 +98,8 @@ export interface RunAnswerEvaluationOptions {
   /** A declined answer (weak sources) is asked again with answerAnyway, like tapping "Answer anyway". */
   answerAnyway?: boolean;
   evalSetVersion?: string;
+  /** Answer settings for this run only (quick first / always complete); the device's are restored after. */
+  answerSettings?: { quickFirst?: boolean; alwaysComplete?: boolean };
   onProgress?: (p: EvalProgress) => void;
   onRow?: (row: AnswerEvalRow) => void;
   shouldStop?: () => boolean;
@@ -79,6 +149,7 @@ export async function runAnswerEvaluation({
   models = [],
   answerAnyway = false,
   evalSetVersion = "custom",
+  answerSettings: settingsOverride,
   onProgress,
   onRow,
   shouldStop,
@@ -91,6 +162,8 @@ export async function runAnswerEvaluation({
     ? models.map((m) => ({ kind: "model" as const, modelId: m.id, label: m.label }))
     : [{ kind: "adaptive", label: "current model" }];
   const savedModel = await getActiveModelId("llm");
+  const savedSettings = await getAnswerSettings();
+  if (settingsOverride) await setAnswerSettings(settingsOverride);
   const answerSettings = { ...(await getAnswerSettings()) } as Record<string, unknown>;
   let stopped = false;
 
@@ -139,6 +212,9 @@ export async function runAnswerEvaluation({
     }
   } finally {
     if (models.length && savedModel) await setActiveModelId("llm", savedModel).catch(() => {});
+    if (settingsOverride) {
+      await setAnswerSettings({ quickFirst: savedSettings.quickFirst, alwaysComplete: savedSettings.alwaysComplete }).catch(() => {});
+    }
   }
   await FileSystem.writeAsStringAsync(savedPath, evalRowsToJsonl(rows));
   console.log(`[EVAL] answer run ${runId} ${stopped ? "stopped" : "done"} — ${rows.length} rows saved to ${savedPath}`);

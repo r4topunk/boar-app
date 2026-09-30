@@ -105,4 +105,14 @@ describe("answer pipeline requests", () => {
     const bad = resolveAnswerRequest({ ...request, models: ["qwen"] }, installed, []);
     expect(bad.ok).toBe(false);
   });
+
+  it("parses install and answerSettings, and rejects bad ones", () => {
+    const r = parseEvalRequest(
+      JSON.stringify({ requestId: "req-3", pipeline: "answer", install: { places: ["Berlin"], assets: ["boar-crypto"] }, answerSettings: { alwaysComplete: false } })
+    );
+    expect(r.install).toEqual({ places: ["Berlin"], assets: ["boar-crypto"] });
+    expect(r.answerSettings).toEqual({ quickFirst: undefined, alwaysComplete: false });
+    expect(() => parseEvalRequest(JSON.stringify({ requestId: "req-3", install: { places: ["Berlin"] } }))).toThrow(/pipeline/);
+    expect(() => parseEvalRequest(JSON.stringify({ requestId: "req-3", pipeline: "answer", answerSettings: { deep: true } }))).toThrow(/answerSettings/);
+  });
 });
