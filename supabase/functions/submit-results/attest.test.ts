@@ -78,7 +78,7 @@ Deno.test("the signature must cover exactly the challenge and payload", async ()
 
 Deno.test("the payload's platform must be the attested one", () => {
   const payload = JSON.stringify({
-    run: { runId: "r", evalSetVersion: "1", appVersion: "1.0.0", platform: "ios" },
+    run: { runId: "r", evalSetVersion: "1", appVersion: "1.0.0", platform: "ios", cpuFeatures: [] },
     rows: [{ queryId: "factual-1", configId: "m", outcome: "success", tokPerSec: 1e9, ttftMs: -5 }],
   });
   assertEquals(parsePayload(payload, "android"), { error: "run.platform doesn't match the device" });
@@ -86,4 +86,9 @@ Deno.test("the payload's platform must be the attested one", () => {
   assert(!("error" in ok));
   assertEquals(ok.rows[0].tok_per_sec, null); // absurd numbers are dropped, not stored
   assertEquals(ok.rows[0].ttft_ms, null);
+  // No CPU flags (iOS) is unknown, stored as null, so the scores don't claim "no dotprod".
+  assertEquals(ok.run.cpu_features, null);
+  const android = parsePayload(JSON.stringify({ run: { runId: "r", evalSetVersion: "1", appVersion: "1", platform: "android", cpuFeatures: ["asimddp", "BAD FLAG"] }, rows: [{ queryId: "q", configId: "m", outcome: "success" }] }), "android");
+  assert(!("error" in android));
+  assertEquals(android.run.cpu_features, ["asimddp"]);
 });
