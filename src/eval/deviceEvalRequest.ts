@@ -142,11 +142,12 @@ async function runAnswerRequest(
   let completed = 0;
   let current: string | undefined;
   let writes = Promise.resolve();
+  // Every status carries the fields this build understood: the CLI may first read one after "accepted".
   const queueStatus = (status: Omit<EvalRequestStatus, "updatedAt">) => {
-    writes = writes.then(() => writeStatus(status)).catch(() => {});
+    writes = writes.then(() => writeStatus({ ...status, understood: UNDERSTOOD_FIELDS })).catch(() => {});
     return writes;
   };
-  await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels, understood: UNDERSTOOD_FIELDS });
+  await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels });
   console.log(`[EVAL] device request ${requestId} (answer pipeline): ${configs.join(", ")} x ${resolved.questions.length} questions`);
   try {
     let install: EvalRequestStatus["install"];
