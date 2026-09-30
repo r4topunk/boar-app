@@ -84,8 +84,12 @@ function findIphone() {
   devicectl(["list", "devices", "--json-output", tmp]);
   const devices = JSON.parse(readFileSync(tmp, "utf8")).result?.devices ?? [];
   rmSync(tmp, { force: true });
+  // A paired phone whose tunnel is idle (screen off) shows as "available (paired)"; devicectl reconnects on demand.
   const phones = devices.filter(
-    (d) => d.hardwareProperties?.platform === "iOS" && d.hardwareProperties?.reality === "physical" && d.connectionProperties?.tunnelState === "connected"
+    (d) =>
+      d.hardwareProperties?.platform === "iOS" &&
+      d.hardwareProperties?.reality === "physical" &&
+      (d.connectionProperties?.tunnelState === "connected" || (d.connectionProperties?.pairingState === "paired" && d.connectionProperties?.transportType))
   );
   if (phones.length !== 1) throw new Error(`expected exactly one connected physical iPhone, found ${phones.length} (pass --udid)`);
   return phones[0].hardwareProperties.udid;
