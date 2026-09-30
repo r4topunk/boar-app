@@ -208,6 +208,7 @@ async function main() {
   const t0 = Date.now();
   let last = "";
   let status = null;
+  let warned = false;
   while (Date.now() - t0 < o.timeoutMin * 60_000) {
     await sleep(POLL_MS);
     if (!copyFrom(o, `Documents/eval/requests/${requestId}.status.json`, statusLocal)) {
@@ -215,6 +216,12 @@ async function main() {
       continue;
     }
     status = JSON.parse(readFileSync(statusLocal, "utf8"));
+    if (!warned && status.state !== "failed") {
+      warned = true;
+      // A build older than these flags ignores the fields it doesn't know: say so instead of running something else.
+      const missing = Object.keys(request).filter((k) => !(status.understood ?? ["requestId", "models", "adaptive", "queries", "pipeline", "questions", "answerAnyway", "evalSetVersion"]).includes(k));
+      if (missing.length) console.warn(`  ⚠ this build ignores: ${missing.join(", ")} (older than the CLI); results run WITHOUT them`);
+    }
     const line = `${status.state} ${status.completed ?? 0}/${status.total ?? "?"} ${status.current ?? ""}`;
     if (line !== last) console.log(`  [${Math.round((Date.now() - t0) / 1000)}s] ${line}`);
     last = line;

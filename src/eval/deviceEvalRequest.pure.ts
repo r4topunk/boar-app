@@ -50,6 +50,8 @@ export interface EvalRequestStatus {
   stopped?: boolean;
   error?: string;
   installedModels?: string[];
+  /** Request fields this build understood (pipeline "answer"): the CLI warns about any it sent that are missing. */
+  understood?: string[];
   /** Pipeline "answer" with install: what was downloaded before the run. */
   install?: { installed: string[]; already: string[]; failed: { id: string; error: string }[] };
 }
@@ -184,3 +186,6 @@ export function resolveAnswerRequest(request: EvalRequest, installed: CatalogMod
   }
   return { ok: true, models, questions };
 }
+
+/** Every request field this build reads; echoed in the status so a CLI can spot a build older than its flags. */
+export const UNDERSTOOD_FIELDS = ["requestId", "models", "adaptive", "queries", "pipeline", "questions", "answerAnyway", "evalSetVersion", "install", "answerSettings"];

@@ -11,7 +11,7 @@ import { getRoutingPreset } from "../models/settings";
 import { EVAL_SET } from "./evalSet";
 import { EVAL_RESULTS_DIR, listInstalledEvalModels, runEvaluation, RunEvaluationOptions, EvaluationRun } from "./evalHarness";
 import { evalConfigId } from "./evalHarness.pure";
-import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest } from "./deviceEvalRequest.pure";
+import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest, UNDERSTOOD_FIELDS } from "./deviceEvalRequest.pure";
 import { installForEval, runAnswerEvaluation } from "./answerEval";
 
 export const EVAL_REQUESTS_DIR = `${EVAL_RESULTS_DIR}requests/`;
@@ -146,7 +146,7 @@ async function runAnswerRequest(
     writes = writes.then(() => writeStatus(status)).catch(() => {});
     return writes;
   };
-  await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels });
+  await queueStatus({ requestId, state: "accepted", configs, total, completed, installedModels, understood: UNDERSTOOD_FIELDS });
   console.log(`[EVAL] device request ${requestId} (answer pipeline): ${configs.join(", ")} x ${resolved.questions.length} questions`);
   try {
     let install: EvalRequestStatus["install"];
