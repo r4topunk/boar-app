@@ -26,7 +26,14 @@ mkdir -p results && cd results        # everything you send back goes here
   adb shell getprop ro.build.fingerprint; adb shell grep MemTotal /proc/meminfo; } > device.txt
 ```
 
-Start the dev build now. It takes a while the first time, and part A doesn't need it:
+Start the dev build now. It takes a while the first time, and part A doesn't need it.
+
+> **If BOAR from a release is already on the phone, stop here.** The dev build installs as
+> `team.sopa.aoair`, the same app as the release, but signed with the debug key, so Android refuses
+> the install (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` in `build.log`). Don't uninstall to get past it:
+> uninstalling deletes every downloaded model. Use a phone without the release app, or skip parts B
+> and C and do part A only.
+
 
 ```bash
 (cd ../boar-bench && npx expo run:android) > build.log 2>&1 &      # builds and installs "BOAR" (team.sopa.aoair)
@@ -86,12 +93,15 @@ status() { adb exec-out run-as $PKG cat "files/eval/requests/$1.status.json"; ec
 pull() {  # pull <requestId> <name>: status + result rows
   status "$1" > "$2.status.json"
   adb exec-out run-as $PKG cat "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["resultPath"])' "$2.status.json")" > "$2.jsonl"; }
+safe_stop() {  # force-stop BOAR only when no model download is running (a stopped download can't resume)
+  if adb shell dumpsys power | grep -q BOAR:ModelDownload; then echo "a download is running: wait for it, then retry" >&2; return 1; fi
+  adb shell am force-stop $PKG; }
 memwatch() {  # memwatch <file>: app RSS, peak RSS (VmHWM) and the phone's MemAvailable every 2 s
   while sleep 2; do adb shell "run-as $PKG sh -c 'p=\$(pidof $PKG); echo \$(date +%T) \$(grep -E \"^Vm(RSS|HWM)\" /proc/\$p/status) \$(grep MemAvailable /proc/meminfo)'"; done > "$1"; }
 ```
 
 ```bash
-adb shell am force-stop $PKG && adb shell monkey -p $PKG 1 >/dev/null   # fresh process = fresh peak RSS
+safe_stop && adb shell monkey -p $PKG 1 >/dev/null   # fresh process = fresh peak RSS
 memwatch mem-s16.txt & MW=$!
 send ../boar-proof/docs/device-test-pack/request-s16-qwen3-4b.json
 status req-ricardo-s16-qwen3-4b      # repeat until "state": "done" (downloads ~2.9 GB first: 5–15 min, then ~5–10 min)
@@ -106,6 +116,9 @@ once near the end of the run instead.
 
 ## 3. Part C: Maple-Preview 20B-A1B smoke (30 min)
 
+Maple is a 5.5 GiB file. On a phone with 8 GB of RAM or less, Android may close BOAR while it loads
+(`confirmLargeModels` lets it try anyway). That's a result too: send the status file and `mem-maple.txt`.
+
 1. In **BOAR** (Wi-Fi on): Models → **Search** → `maple-preview` → open `deepgrove/maple-preview-GGUF`.
    If the file isn't listed, set **File size** to **Any** (on phones under ~12 GB of RAM the default
    "Fits phone" filter hides it). Download **only** `maple-preview-TQ2_0-head-Q4_K.gguf` (5.50 GiB,
@@ -118,7 +131,7 @@ once near the end of the run instead.
    If the path doesn't exist, `adb shell run-as $PKG ls -la files/models` and send the listing.
 3. Run the 5 questions on Qwen3-4B and Maple (same retrieved context, so the two can be compared):
    ```bash
-   adb shell am force-stop $PKG && adb shell monkey -p $PKG 1 >/dev/null
+   safe_stop && adb shell monkey -p $PKG 1 >/dev/null
    memwatch mem-maple.txt & MW=$!
    send ../boar-proof/docs/device-test-pack/request-maple-smoke.json
    status req-ricardo-maple-smoke       # until "done"; if "failed", the error says why (send it)

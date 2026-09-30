@@ -27,17 +27,20 @@ if [[ "${RELEASE:-0}" == 1 ]]; then
   args+=(--expect-signer "$signer")
 fi
 
+stem=$(basename "$apk" .apk)
+# A report left from an earlier run must never stand in for this one.
+rm -f "$out/$stem.json" "$out/$stem.md"
 status=0
 python3 "$ROOT/scripts/audit-apk.py" "${args[@]}" || status=$?
-stem=$(basename "$apk" .apk)
-verdict=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["verdict"])' "$out/$stem.json")
-echo "report: $out/$stem.md"
 
 case "$status" in
   3) echo "FAIL: $apk is not signed with the release key" >&2; exit 1 ;;
   0|1) ;;
-  *) exit "$status" ;;
+  *) echo "FAIL: the audit of $apk didn't finish (exit $status)" >&2; exit 2 ;;
 esac
+[[ -f "$out/$stem.json" ]] || { echo "FAIL: the audit wrote no report for $apk" >&2; exit 2; }
+verdict=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["verdict"])' "$out/$stem.json")
+echo "report: $out/$stem.md"
 case "$variant" in
   offline)
     [[ "$verdict" == NO-NETWORK-BY-CONSTRUCTION ]] || { echo "FAIL: offline APK is $verdict" >&2; exit 1; } ;;

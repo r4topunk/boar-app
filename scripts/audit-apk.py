@@ -174,7 +174,8 @@ def find_aapt2(explicit: str | None) -> str:
                 if (d / "aapt2").exists():
                     found.append(d / "aapt2")
     if not found:
-        sys.exit("aapt2 not found: install Android build-tools or pass --aapt2 PATH")
+        print("aapt2 not found: install Android build-tools or pass --aapt2 PATH", file=sys.stderr)
+        sys.exit(2)
 
     def ver(p):
         return [int(x) if x.isdigit() else 0 for x in re.split(r"[.-]", p.parent.name)]
@@ -795,4 +796,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Exit codes: 0 all offline, 1 a verdict other than offline, 3 signer, 2 the audit itself failed
+    # (a crash must never read as "1, network-capable" or leave an old report looking current).
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as e:  # noqa: BLE001
+        print(f"audit failed: {type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(2)
