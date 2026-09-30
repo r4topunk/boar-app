@@ -74,7 +74,7 @@ import { Composer } from "./chat/Composer";
 import { modelStatus } from "./chat/composerState";
 import { placesForCopy, sourceName } from "./chat/placesFormat";
 import { locate } from "./chat/locationApi";
-import { promptIdeasFor } from "./chat/suggestions";
+import { suggestionsFor } from "./chat/suggestions";
 import { installedKnowledgeIds } from "./chat/knowledgeApi";
 import { batchAnimatesLayout, flushDelay } from "./chat/streamBatch";
 import { createBottomPin, FOLLOW_SLACK, heightChanged, jumpToLatestShown, keepEndOnResize } from "./chat/listPin";
@@ -816,7 +816,7 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
   const send = useCallback(() => ask(input), [ask, input]);
   // Stable props for the empty state (memo): typing re-renders this screen on every key (audit #7).
   const suggestions = useMemo(
-    () => (showSuggestions ? promptIdeasFor(activeModel?.id, i18n.language, knowledge) : []),
+    () => (showSuggestions ? suggestionsFor(activeModel?.id, i18n.language, knowledge) : []),
     [showSuggestions, activeModel?.id, i18n.language, knowledge]
   );
   const openKnowledge = useCallback(() => navigation.navigate("Knowledge"), [navigation]);
