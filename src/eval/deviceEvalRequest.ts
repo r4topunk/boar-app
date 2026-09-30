@@ -11,7 +11,9 @@ import { getRoutingPreset } from "../models/settings";
 import { EVAL_SET } from "./evalSet";
 import { EVAL_RESULTS_DIR, listInstalledEvalModels, runEvaluation, RunEvaluationOptions, EvaluationRun } from "./evalHarness";
 import { evalConfigId } from "./evalHarness.pure";
-import { EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest, UNDERSTOOD_FIELDS } from "./deviceEvalRequest.pure";
+import { blockedEvalModels, EvalRequest, EvalRequestStatus, parseEvalRequest, resolveAnswerRequest, resolveEvalRequest, UNDERSTOOD_FIELDS } from "./deviceEvalRequest.pure";
+import { getDeviceTotalRamBytes } from "ram-monitor";
+import { confirmLargeModel, getAnswerSettings } from "../models/settings";
 import { installForEval, runAnswerEvaluation } from "./answerEval";
 import { DEVICE_EVAL_ON } from "./deviceEvalGate";
 
@@ -158,6 +160,23 @@ async function runAnswerRequest(
   if (!resolved.ok) {
     await queueStatus({ requestId, state: "failed", error: resolved.error, installedModels, install });
     return null;
+  }
+  // F1: a requested model answer() would replace (low RAM, unconfirmed; or crashed on load) fails the request.
+  const entries = resolved.models.map((m) => installed.find((i) => i.id === m.id)).filter((m): m is (typeof installed)[number] => !!m);
+  let ram = 0;
+  try {
+    ram = getDeviceTotalRamBytes();
+  } catch {}
+  const blocked = blockedEvalModels(entries, ram, await getAnswerSettings(), request.confirmLargeModels === true);
+  if (blocked.length) {
+    const why = blocked
+      .map((b) => (b.reason === "load-crashed" ? `${b.id} crashed the app on its last load` : `${b.id} is too big for this phone's RAM without a confirmation (send "confirmLargeModels": true, or confirm it once in Models)`))
+      .join("; ");
+    await queueStatus({ requestId, state: "failed", error: `requested model would not run: ${why}`, installedModels, install });
+    return null;
+  }
+  if (request.confirmLargeModels) {
+    for (const m of entries) await confirmLargeModel(m.id).catch(() => {});
   }
   const configs = resolved.models.length ? resolved.models.map((m) => `answer:${m.id}`) : ["answer:current"];
   const total = configs.length * resolved.questions.length;

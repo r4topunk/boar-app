@@ -207,17 +207,38 @@ export function parseResultRows(text: string): AnswerEvalRow[] {
 }
 
 /**
- * The (config, question) pairs a previous run of the same request finished: an answer that wasn't
- * declined, or a declined one plus its "Answer anyway" re-ask when the request asks for it.
+ * The (config, question) pairs a previous run of the same request finished: an answer that wasn't declined,
+ * or a declined one plus its "Answer anyway" re-ask when the request asks for it. A row cut off by Stop
+ * (outcome "cancelled") is not finished: that question is asked again.
  */
 export function completedKeys(rows: AnswerEvalRow[], answerAnyway: boolean): Set<string> {
   const byKey = new Map<string, AnswerEvalRow[]>();
   for (const r of rows) byKey.set(resultKey(r.configId, r.queryId), [...(byKey.get(resultKey(r.configId, r.queryId)) ?? []), r]);
   const done = new Set<string>();
+  const whole = (r: AnswerEvalRow) => r.outcome !== "cancelled";
   for (const [key, rs] of byKey) {
     const first = rs.find((r) => !r.answeredAnyway);
-    if (!first) continue;
-    if (!first.declined || !answerAnyway || rs.some((r) => r.answeredAnyway)) done.add(key);
+    if (!first || !whole(first)) continue;
+    if (!first.declined || !answerAnyway || rs.some((r) => r.answeredAnyway && whole(r))) done.add(key);
   }
   return done;
+}
+
+/** Rows of a previous run worth keeping on resume: finished (completedKeys), whole, and still asked for now. */
+export function resumableRows(rows: AnswerEvalRow[], answerAnyway: boolean, current: Set<string>): AnswerEvalRow[] {
+  const done = completedKeys(rows, answerAnyway);
+  return rows.filter((r) => current.has(resultKey(r.configId, r.queryId)) && done.has(resultKey(r.configId, r.queryId)) && r.outcome !== "cancelled");
+}
+
+/** The device's own model and answer settings, kept while a benchmark changes them. */
+export interface RestorePoint {
+  model: string | null;
+  quickFirst: boolean;
+  alwaysComplete: boolean;
+  savedAt?: number;
+}
+
+/** The oldest of several pending restore points: the device's state before the first benchmark that didn't finish. */
+export function oldestRestorePoint(points: RestorePoint[]): RestorePoint | null {
+  return points.length ? [...points].sort((a, b) => (a.savedAt ?? 0) - (b.savedAt ?? 0))[0] : null;
 }

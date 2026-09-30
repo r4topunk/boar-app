@@ -131,7 +131,7 @@ npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyw
   `EXPO_PUBLIC_DEVICE_EVAL=1 scripts/ios-remote-build.sh device`, which forwards the flag.
 - **Transport:** a request file copied into the app container with `devicectl`
   (`Documents/eval/requests/pending.json`). The app picks it up in the
-  foreground and writes `<requestId>.status.json` and `eval/<runId>.answer.jsonl`.
+  foreground and writes `<requestId>.status.json` and `eval/<requestId>.answer.jsonl`.
   No Appium or WDA: keep the phone unlocked (auto-lock off) with BOAR open.
 - **Android:** the same request goes in over `adb shell run-as <pkg>`, which
   needs a debuggable app, so use the development client. For timings like a
@@ -144,7 +144,14 @@ npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyw
   app skips the questions that file already answers, a declined answer
   without its re-ask is redone, and at the end it restores the model and
   answer settings from before the first run (`eval/<requestId>.restore.json`).
-  A new id starts over.
+  A new id starts over. A Stop-cut answer is asked again; rows for questions or
+  models the resent request no longer asks for are dropped. The restore point
+  is always applied at the end, and a leftover one from another killed request
+  wins over a fresh snapshot (it holds the device's real settings).
+- **Low RAM:** a requested model the app would not run (too big for a phone
+  with ≤ 4.5 GB unless confirmed, or one that crashed the app on its last load)
+  fails the request instead of silently answering with another model. Pass
+  `--confirm-large-models` to confirm the RAM case, as the app's "run it anyway" does.
 - One row per answer, in the eval/ judge format, plus: `stages` (every stage
   event with ms since `answer()`), `firstSourcesMs`, `instantMs`, `firstTokenMs`,
   `placesMs`, `places` (count, coverage), `declined`, `answeredAnyway`,

@@ -11,6 +11,7 @@ vi.mock("expo-file-system/legacy", () => ({
   readAsStringAsync: async (p: string) => files.get(p) ?? "",
   writeAsStringAsync: async (p: string, s: string) => void files.set(p, s),
   deleteAsync: async (p: string) => void files.delete(p),
+  readDirectoryAsync: async (dir: string) => [...files.keys()].filter((p) => p.startsWith(dir)).map((p) => p.slice(dir.length)),
 }));
 vi.mock("../routing/answerService", () => ({
   answer: (req: { query: string }, onEvent: (e: any) => void) => {
@@ -45,7 +46,7 @@ const Q = ["q1", "q2", "q3", "q4"].map((id) => ({ id, query: `question ${id}`, c
 const RESULT = "file:///docs/eval/req-1.answer.jsonl";
 const RESTORE = "file:///docs/eval/req-1.restore.json";
 const row = (queryId: string, extra: Record<string, unknown> = {}) =>
-  ({ runId: "eval-first", configId: "answer:qwen", queryId, answer: "x", declined: false, answeredAnyway: false, ...extra }) as any;
+  ({ runId: "eval-first", configId: "answer:qwen", queryId, answer: "x", declined: false, answeredAnyway: false, outcome: "success", ...extra }) as any;
 
 beforeEach(() => {
   files.clear();
@@ -99,5 +100,38 @@ describe("runAnswerEvaluation resume (same request id after the app was killed)"
     expect(run.savedPath).toBe(RESULT);
     expect(settings.alwaysComplete).toBe(true);
     expect(files.has(RESTORE)).toBe(false);
+  }, 20000);
+
+  it("F2: a resend without the killed run's flags still restores the originals", async () => {
+    files.set(RESULT, JSON.stringify(row("q1")));
+    files.set(RESTORE, JSON.stringify({ model: "device-model", quickFirst: true, alwaysComplete: true, savedAt: 1 }));
+    Object.assign(settings, { quickFirst: false, alwaysComplete: false, model: "qwen" });
+    await runAnswerEvaluation({ questions: Q.slice(0, 2), resumeKey: "req-1" });
+    expect(settings).toEqual({ quickFirst: true, alwaysComplete: true, model: "device-model" });
+    expect(files.has(RESTORE)).toBe(false);
+  }, 20000);
+
+  it("F2: a new request after a killed one takes the leftover restore point, not the benchmark's values", async () => {
+    files.set("file:///docs/eval/req-old.restore.json", JSON.stringify({ model: "device-model", quickFirst: true, alwaysComplete: true, savedAt: 1 }));
+    Object.assign(settings, { quickFirst: false, alwaysComplete: false, model: "big-model" });
+    await runAnswerEvaluation({ questions: Q.slice(0, 1), models: [{ id: "qwen", label: "Qwen" }], answerSettings: { alwaysComplete: false }, resumeKey: "req-2" });
+    expect(settings).toEqual({ quickFirst: true, alwaysComplete: true, model: "device-model" });
+    expect([...files.keys()].some((p) => p.endsWith(".restore.json"))).toBe(false);
+  }, 20000);
+
+  it("F3: an answer cut off by Stop is asked again on resume", async () => {
+    files.set(RESULT, [row("q1"), row("q2", { outcome: "cancelled" })].map((r) => JSON.stringify(r)).join("\n"));
+    const run = await runAnswerEvaluation({ questions: Q.slice(0, 2), models: [{ id: "qwen", label: "Qwen" }], resumeKey: "req-1" });
+    expect(asked).toEqual(["question q2"]);
+    expect(run.rows.filter((r) => r.queryId === "q2").map((r) => r.outcome)).toEqual(["success"]);
+  }, 20000);
+
+  it("F4: a resend for fewer questions keeps only the rows it asks for", async () => {
+    files.set(RESULT, [row("q1"), row("q2"), row("q3")].map((r) => JSON.stringify(r)).join("\n"));
+    const seen: string[] = [];
+    const run = await runAnswerEvaluation({ questions: Q.slice(0, 2), models: [{ id: "qwen", label: "Qwen" }], resumeKey: "req-1", onRow: (r) => seen.push(r.queryId) });
+    expect(asked).toEqual([]);
+    expect(run.rows.map((r) => r.queryId)).toEqual(["q1", "q2"]);
+    expect(seen).toEqual(["q1", "q2"]);
   }, 20000);
 });

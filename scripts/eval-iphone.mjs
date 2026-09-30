@@ -25,6 +25,7 @@
 //   --no-launch             don't (re)launch the app; it must already be in the foreground
 //   --timeout-min <n>       give up after n minutes (default 180)
 //   --request-id <id>       reuse a request id: a run the OS killed resumes from its last answered question
+//   --confirm-large-models  on a low-RAM phone, confirm the requested models (the app's "run it anyway") instead of failing
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, openSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -63,6 +64,7 @@ function parseArgs(argv) {
     }
     else if (a === "--timeout-min") o.timeoutMin = Number(next());
     else if (a === "--request-id") o.requestId = next();
+    else if (a === "--confirm-large-models") o.confirmLarge = true;
     else if (a === "--help" || a === "-h") o.help = true;
     else throw new Error(`unknown option ${a}`);
   }
@@ -191,6 +193,7 @@ async function main() {
     ...(o.answerAnyway ? { answerAnyway: true } : {}),
     ...(install ? { install } : {}),
     ...(o.answerSettings ? { answerSettings: o.answerSettings } : {}),
+    ...(o.confirmLarge ? { confirmLargeModels: true } : {}),
   };
   if (install) console.log(`  install first: ${JSON.stringify(install)}`);
   const reqFile = join(out, "request.json");
@@ -210,6 +213,8 @@ async function main() {
     console.log(`✓ launched ${o.bundle} (console → ${log})`);
     await sleep(8000);
   }
+  // A reused request id has an old status file on the device: ignore any status written before this request.
+  const sentAt = Date.now();
   copyTo(o, reqFile, "Documents/eval/requests/pending.json");
   console.log(`✓ request ${requestId} copied; waiting for the app to pick it up (BOAR must stay in the foreground, phone unlocked)`);
 
@@ -225,6 +230,10 @@ async function main() {
       continue;
     }
     status = JSON.parse(readFileSync(statusLocal, "utf8"));
+    if ((status.updatedAt ?? 0) < sentAt - 5000) {
+      status = null;
+      continue;
+    }
     if (!warned && status.state !== "failed") {
       warned = true;
       // A build older than these flags ignores the fields it doesn't know: say so instead of running something else.
@@ -243,6 +252,14 @@ async function main() {
   if (!copyFrom(o, src, rowsLocal)) fail(`could not copy ${src}`);
   const rows = readFileSync(rowsLocal, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   const { lines, final } = report(rows);
+  // A generated answer from another model than its config (the app replaced it: low RAM, a crashed load) would be
+  // scored as the requested one: say so loudly.
+  const mismatched = final.filter((r) => r.configId?.startsWith("answer:") && r.configId !== "answer:current" && (r.tokensGenerated ?? 0) > 0 && r.modelId && r.modelId !== r.configId.slice("answer:".length));
+  if (mismatched.length) {
+    const msg = `⚠ ${mismatched.length} answer(s) came from another model than requested (e.g. ${mismatched[0].queryId}: ${mismatched[0].modelId} for ${mismatched[0].configId}); their scores are not that model's`;
+    console.warn(`  ${msg}`);
+    lines.unshift(msg, "");
+  }
   const installLine = status.install
     ? `Install: ${status.install.installed.length} new, ${status.install.already.length} already there, failed: ${status.install.failed.map((f) => `${f.id} (${f.error})`).join("; ") || "none"}.`
     : "";

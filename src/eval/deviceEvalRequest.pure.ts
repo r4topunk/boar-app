@@ -8,6 +8,7 @@ import type { CatalogModel } from "../models/manifest";
 import type { EvalConfig } from "./evalHarness.pure";
 import type { EvalQuery } from "./evalSet";
 import { EvalQuestion, parseQuestions } from "./answerEval.pure";
+import { tooBigForLowRam } from "../routing/defaultModel";
 
 export interface EvalRequest {
   requestId: string;
@@ -30,6 +31,8 @@ export interface EvalRequest {
   evalSetVersion?: string;
   /** Pipeline "answer" only: packs to download before the first question (city places, catalog ids). */
   install?: { places?: string[]; assets?: string[] };
+  /** Pipeline "answer" only: confirm requested models a low-RAM phone would otherwise refuse (the UI's "run it anyway"). */
+  confirmLargeModels?: boolean;
   /** Pipeline "answer" only: answer settings for this run; the device's are restored after. */
   answerSettings?: { quickFirst?: boolean; alwaysComplete?: boolean };
 }
@@ -76,7 +79,8 @@ export function parseEvalRequest(json: string): EvalRequest {
   if (raw.pipeline !== undefined && raw.pipeline !== "legacy" && raw.pipeline !== "answer") {
     throw new Error('"pipeline" must be "legacy" or "answer"');
   }
-  const answerOnly = ["questions", "answerAnyway", "evalSetVersion", "install", "answerSettings"].filter((k) => raw[k] !== undefined);
+  const answerOnly = ["questions", "answerAnyway", "evalSetVersion", "install", "answerSettings", "confirmLargeModels"].filter((k) => raw[k] !== undefined);
+  if (raw.confirmLargeModels !== undefined && typeof raw.confirmLargeModels !== "boolean") throw new Error('"confirmLargeModels" must be a boolean');
   if (raw.pipeline !== "answer" && answerOnly.length) throw new Error(`${answerOnly.join(", ")} need "pipeline": "answer"`);
   if (raw.answerAnyway !== undefined && typeof raw.answerAnyway !== "boolean") throw new Error('"answerAnyway" must be a boolean');
   if (raw.evalSetVersion !== undefined && (typeof raw.evalSetVersion !== "string" || !/^[\w.-]{1,64}$/.test(raw.evalSetVersion))) {
@@ -97,6 +101,7 @@ export function parseEvalRequest(json: string): EvalRequest {
   return {
     install,
     answerSettings,
+    confirmLargeModels: raw.confirmLargeModels,
     requestId: raw.requestId,
     models: stringList(raw.models, "models"),
     adaptive: raw.adaptive,
@@ -188,4 +193,25 @@ export function resolveAnswerRequest(request: EvalRequest, installed: CatalogMod
 }
 
 /** Every request field this build reads; echoed in the status so a CLI can spot a build older than its flags. */
-export const UNDERSTOOD_FIELDS = ["requestId", "models", "adaptive", "queries", "pipeline", "questions", "answerAnyway", "evalSetVersion", "install", "answerSettings"];
+export const UNDERSTOOD_FIELDS = ["requestId", "models", "adaptive", "queries", "pipeline", "questions", "answerAnyway", "evalSetVersion", "install", "answerSettings", "confirmLargeModels"];
+
+/**
+ * Requested models answer() would silently replace (selectAnswerModel): too big for a low-RAM phone and not
+ * confirmed, or recorded as having crashed the app on load. A run on the fallback would be labeled with the
+ * requested model, so the request fails instead (or confirms first, for the RAM case, with confirmLargeModels).
+ */
+export function blockedEvalModels(
+  models: CatalogModel[],
+  totalRamBytes: number,
+  settings: { largeModelConfirmedIds?: string[]; loadCrashedIds?: string[] },
+  confirmLarge = false
+): { id: string; reason: "low-ram" | "load-crashed" }[] {
+  const confirmed = new Set(settings.largeModelConfirmedIds ?? []);
+  const crashed = new Set(settings.loadCrashedIds ?? []);
+  const out: { id: string; reason: "low-ram" | "load-crashed" }[] = [];
+  for (const m of models) {
+    if (crashed.has(m.id)) out.push({ id: m.id, reason: "load-crashed" });
+    else if (!confirmLarge && !confirmed.has(m.id) && tooBigForLowRam(m as { answerTier?: "default" | "compact"; sizeBytes?: number }, totalRamBytes)) out.push({ id: m.id, reason: "low-ram" });
+  }
+  return out;
+}
