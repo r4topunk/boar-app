@@ -157,9 +157,10 @@ export function RootNavigator({ initialRoute }: { initialRoute: "Main" | "Setup"
       onStateChange={saveNavState}
     >
       <StatusBar style={t.scheme === "dark" ? "light" : "dark"} />
-      {/* Android 3-button navigation: edge-to-edge draws a contrast scrim behind the buttons that follows the
-          system theme (a light bar under the dark app on a light phone). This keeps the scrim and the buttons
-          on the app's own scheme, like the status bar above. No-op on iOS and with gesture navigation. */}
+      {/* Android 3-button navigation: the system's contrast scrim followed the system theme (a light bar under the
+          dark app on a light phone). app.json turns the scrim off (the bar shows the app's background) and starts
+          with light buttons, for the default dark theme; this keeps the buttons on the app's own scheme, like the
+          status bar above. No-op on iOS. */}
       <NavigationBar style={t.scheme === "dark" ? "light" : "dark"} />
       <Stack.Navigator
         initialRouteName={initialRoute}
