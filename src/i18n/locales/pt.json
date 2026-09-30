@@ -64,6 +64,16 @@
     "progress": "Config. {{config}}/{{configs}} · Pergunta {{query}}/{{queries}}",
     "savedTo": "Salvo em {{path}}",
     "stoppedEarly": "Interrompido — resultados parciais salvos.",
+    "unfinished": {
+      "title": "Avaliação não terminada",
+      "saved": "{{done}} de {{total}} respostas foram salvas antes de o app fechar.",
+      "killed": "Ele fechou enquanto {{model}} rodava, provavelmente porque faltou memória no celular. Pule o modelo para contá-lo como falha neste celular, ou tente de novo.",
+      "continue": "Continuar",
+      "continueSkipping": "Pular e continuar",
+      "retry": "Tentar de novo",
+      "keep": "Manter respostas",
+      "discard": "Descartar"
+    },
     "exportJsonl": "Exportar JSONL",
     "exportCsv": "Exportar CSV",
     "exportFailedTitle": "Falha ao exportar",
