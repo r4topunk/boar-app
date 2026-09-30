@@ -1,0 +1,30 @@
+name: Mirror scores to Hugging Face
+
+# Once a day, copy the public (approved) scores to the Hugging Face dataset named by the
+# HF_DATASET variable. Reads with the publishable key only. Needs the HF_TOKEN secret (a
+# fine-grained token with write access to that dataset) and the SUPABASE_URL and
+# SUPABASE_PUBLISHABLE_KEY variables. Does nothing until HF_DATASET is set.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    if: vars.HF_DATASET != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/mirror-scores-hf.mjs
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_DATASET: ${{ vars.HF_DATASET }}
