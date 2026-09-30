@@ -108,7 +108,7 @@ Only the default pair fits: Qwen2.5-1.5B Q4_K_M (0.92 GiB) + bge-small (35 MiB).
 | Goal | Needs |
 |---|---|
 | Simulator build and run | Xcode only, no account |
-| Own iPhone | Free Apple ID signed into Xcode on the build Mac (profile expires every 7 days); step by step in [IOS_FREE_INSTALL.md](IOS_FREE_INSTALL.md). Apple's capability table lists **Extended Virtual Addressing** for free accounts; **Increased Memory Limit** is not in that table, so whether a free team gets it is `UNKNOWN`. If signing fails on it, build with `IOS_STRIP_ENTITLEMENTS=com.apple.developer.kernel.increased-memory-limit` |
+| Own iPhone | Free Apple ID signed into Xcode on the build Mac (profile expires every 7 days); step by step in [IOS_FREE_INSTALL.md](IOS_FREE_INSTALL.md). A personal team was refused both memory entitlements (Increased Memory Limit and Extended Virtual Addressing) on an iPhone 13: build with the three-key `IOS_STRIP_ENTITLEMENTS` list in [IOS_FREE_INSTALL.md](IOS_FREE_INSTALL.md) (both memory keys plus App Attest) |
 | TestFlight / ad hoc / App Store | Apple Developer Program ($99/yr), App ID with "Increased Memory Limit" and "Extended Virtual Addressing" capabilities enabled, then `eas build -p ios --profile preview` or `production` |
 
 `UNKNOWN`: which Apple team (if any) the project owner has. Nothing in this repo is signed for a device yet.

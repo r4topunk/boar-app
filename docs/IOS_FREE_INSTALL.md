@@ -40,7 +40,8 @@ scripts/ios-build-on-host.sh device-run
    - Find its id: `xcrun devicectl list devices`.
 
 5. **Build and install** with the command in the TL;DR. The first run does `npm ci`, `expo prebuild` and `pod install`, and takes several minutes.
-   - `IOS_STRIP_ENTITLEMENTS` drops the capabilities a free team can't have. On an iPhone 13 a personal team refused both memory entitlements. App Attest is also stripped: without it, results you share go to a review queue instead of the public table, and everything else works.
+   - `IOS_STRIP_ENTITLEMENTS` drops the capabilities a free team can't have. On an iPhone 13 a personal team refused both memory entitlements. App Attest is stripped too.
+   - Sharing evaluation results isn't available in this build: a source build has no Supabase keys, and the results server only accepts App Attest keys from BOAR's own App ID, so there's no review queue for it on iOS either. Everything else works.
 
 6. **Trust the developer on the iPhone.** The first launch is blocked. Go to Settings › General › VPN & Device Management, tap your Apple ID and tap Trust. Then open BOAR.
 
@@ -70,6 +71,6 @@ scripts/ios-build-on-host.sh device-run
 ## UNKNOWN
 
 - Whether a free team can get Increased Memory Limit on other iPhones: it was refused on an iPhone 13, and Apple's capability table doesn't list it for free accounts.
-- Whether a free team can use App Attest; it's stripped here to be safe.
+- Whether a free team can use App Attest; it's stripped here, and sharing wouldn't work from a source build anyway.
 - How much free disk the first build needs (not measured).
 - The oldest iOS that works (only iOS 26 was tested).
