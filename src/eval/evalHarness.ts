@@ -259,6 +259,9 @@ export async function discardRun(runId: string): Promise<void> {
  * app is closed during can be continued instead of started over.
  */
 export async function runEvaluation(options: RunEvaluationOptions): Promise<EvaluationRun> {
+  if (options.resume && options.resume.manifest.evalSetVersion !== EVAL_SET_VERSION) {
+    throw new Error(`This run used question set v${options.resume.manifest.evalSetVersion}, and this app has v${EVAL_SET_VERSION}: keep or discard it`);
+  }
   const manifest: EvalRunManifest = options.resume
     ? { ...options.resume.manifest }
     : {

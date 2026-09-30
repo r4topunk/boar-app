@@ -355,6 +355,14 @@ describe("a run the app is closed during", () => {
     expect(run.rows.map((r) => r.outcome)).toEqual(["success", "success", "success", "success"]);
   });
 
+  it("won't continue a run saved with another question set", async () => {
+    const h = await killedDuringPhi();
+    const saved = (await h.loadLatestRun())!;
+    await expect(
+      h.runEvaluation({ configs: [], resume: { manifest: { ...saved.manifest, evalSetVersion: "0" }, rows: saved.rows, skipKilled: true } })
+    ).rejects.toThrow(/question set v0/);
+  });
+
   it("keeps what finished, marks it shared, or discards it", async () => {
     const h = await killedDuringPhi();
     const saved = (await h.loadLatestRun())!;

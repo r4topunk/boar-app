@@ -164,10 +164,14 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
   const handleKeepFinished = async () => {
     if (!unfinished) return;
     impact(ImpactFeedbackStyle.Light);
-    const kept = await keepFinishedRows(unfinished);
-    setUnfinished(null);
-    setRows(kept.rows);
-    setRun(kept);
+    try {
+      const kept = await keepFinishedRows(unfinished);
+      setUnfinished(null);
+      setRows(kept.rows);
+      setRun(kept);
+    } catch (e: any) {
+      toast({ message: `${t("evaluation.exportFailedTitle")}: ${t(userErrorKey(e))}`, tone: "danger" });
+    }
   };
 
   const handleDiscard = async () => {
@@ -265,6 +269,8 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
   const killedLabel = unfinished?.manifest.inFlight
     ? unfinished.manifest.configs.find((c) => evalConfigId(c) === unfinished.manifest.inFlight!.configId)?.label
     : undefined;
+  // A run saved with another question set can't be continued with this one: keep or discard it.
+  const canContinue = unfinished?.manifest.evalSetVersion === EVAL_SET_VERSION;
   const unfinishedTotal = unfinished ? unfinished.manifest.configs.length * unfinished.manifest.queryIds.length : 0;
 
   const autoStarted = useRef(false);
@@ -302,14 +308,16 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
               {killedLabel ? ` ${t("evaluation.unfinished.killed", { model: killedLabel })}` : ""}
             </Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: tokens.space.sm }}>
-              <Button
-                size="sm"
-                icon="play"
-                label={killedLabel ? t("evaluation.unfinished.continueSkipping") : t("evaluation.unfinished.continue")}
-                onPress={() => handleRun({ saved: unfinished, skipKilled: true })}
-                disabled={!!chatBusy || models === null}
-              />
-              {killedLabel && (
+              {canContinue && (
+                <Button
+                  size="sm"
+                  icon="play"
+                  label={killedLabel ? t("evaluation.unfinished.continueSkipping") : t("evaluation.unfinished.continue")}
+                  onPress={() => handleRun({ saved: unfinished, skipKilled: true })}
+                  disabled={!!chatBusy || models === null}
+                />
+              )}
+              {canContinue && killedLabel && (
                 <Button
                   size="sm"
                   variant="secondary"
