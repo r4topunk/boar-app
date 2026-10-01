@@ -191,7 +191,8 @@ export async function setDeepResearchMode(enabled: boolean): Promise<void> {
 
 export async function getThemeId(): Promise<ThemeId> {
   const s = await readSettings();
-  return s.themeId ?? "campfire";
+  // Ocean, Amber and Matrix are no longer offered: a saved one becomes Campfire.
+  return s.themeId === "moonlight" ? "moonlight" : "campfire";
 }
 
 export async function setThemeId(theme: ThemeId): Promise<void> {

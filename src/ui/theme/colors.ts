@@ -425,7 +425,8 @@ export const moonlightTheme = {
   },
 };
 
-export const THEMES = [campfireTheme, moonlightTheme, midnightTheme, amberTheme, frontierTheme] as const;
+// The themes offered in the picker. Ocean, Amber and Matrix stay defined but hidden.
+export const THEMES = [campfireTheme, moonlightTheme] as const;
 
 export function getThemeColors(id: ThemeId = "campfire") {
   switch (id) {
