@@ -15,7 +15,9 @@ export type EvalCategory =
   | "synthesis"
   | "reasoning"
   | "retrieval-grounded"
-  | "no-kb-content";
+  | "no-kb-content"
+  /** VITALIK_SET only: never part of the standard run. */
+  | "vitalik";
 
 export interface EvalQuery {
   id: string;
@@ -153,3 +155,62 @@ export const EVAL_SET: EvalQuery[] = [
     gradingNotes: "Kill/inhibit bacteria (cell wall, protein synthesis); resistance via selection/mutation, overuse. No fabricated citations.",
   },
 ];
+
+/**
+ * Questions on topics Vitalik Buterin, whose post inspired the bounty, writes and talks about
+ * publicly: X (Twitter), zero-knowledge proofs, quadratic funding, far-UVC, Zuzalu, vegan food on
+ * the road. Run on its own (`--queries vitalik`), never as part of the standard set, and versioned
+ * separately so its rows aren't compared with it. Expected titles are the right Wikipedia articles
+ * even when no installed pack has them yet, so the found-article score measures coverage.
+ */
+export const VITALIK_SET_VERSION = "vitalik-1";
+
+export const VITALIK_SET: EvalQuery[] = [
+  {
+    id: "vitalik-about-x",
+    category: "vitalik",
+    query: "Tell me about X.com.",
+    expectedKbTitles: ["X (social network)"],
+    gradingNotes: "The social network formerly Twitter, owned by X Corp. (Elon Musk, 2022). The 1999 X.com bank is acceptable only as history. Must not invent.",
+  },
+  {
+    id: "vitalik-zk-snark",
+    category: "vitalik",
+    query: "How does a zk-SNARK differ from a zk-STARK?",
+    expectedKbTitles: ["Zero-knowledge proof", "Non-interactive zero-knowledge proof"],
+    gradingNotes: "SNARK: succinct, usually trusted setup, pairing-based; STARK: no trusted setup, hash-based, post-quantum, larger proofs.",
+  },
+  {
+    id: "vitalik-quadratic-funding",
+    category: "vitalik",
+    query: "What is quadratic funding and what are its weaknesses?",
+    expectedKbTitles: ["Quadratic funding", "Quadratic voting"],
+    gradingNotes: "Matching funds by the square of the sum of square roots of contributions; weak to collusion and Sybil attacks.",
+  },
+  {
+    id: "vitalik-far-uvc",
+    category: "vitalik",
+    query: "Does far-UVC light at 222 nm harm human skin?",
+    expectedKbTitles: ["Far-UVC", "Ultraviolet germicidal irradiation"],
+    gradingNotes: "Studies so far show little penetration and low harm to skin and eyes at safe doses; inactivates airborne pathogens.",
+  },
+  {
+    id: "vitalik-zuzalu",
+    category: "vitalik",
+    query: "What was Zuzalu?",
+    expectedKbTitles: ["Zuzalu", "Network state"],
+    gradingNotes: "A two-month pop-up city in Montenegro in 2023 (crypto, longevity, public goods), started by Vitalik Buterin.",
+  },
+  {
+    id: "vitalik-vegan-buenos-aires",
+    category: "vitalik",
+    query: "Where can I find vegan food in Buenos Aires?",
+    expectedKbTitles: ["Buenos Aires", "Veganism"],
+    gradingNotes: "Needs a travel source (Wikivoyage Eat section); honest if not covered.",
+  },
+];
+
+/** The version a query's rows are recorded with. */
+export function setVersionOf(q: EvalQuery): string {
+  return q.category === "vitalik" ? VITALIK_SET_VERSION : EVAL_SET_VERSION;
+}
