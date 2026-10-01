@@ -80,19 +80,6 @@ export interface AnswerPlan {
 
 export const FAST_RETRIEVE_K = 6;
 export const FAST_CONTEXT_TOKENS = 1200;
-
-/**
- * The quick answer's budget, by what the question needs. Every context token is prefill before the
- * first word: on the X6 Pro (v1.1.0, Qwen2.5 1.5B) ~1.2k tokens of sources put it at 6-12 s, where
- * v1.0.0 with 1-2 sources was at 1.5-6 s, and in the 2026-09-24 benchmark the expected article
- * was always rank 1 or 2. A lookup needs one article's best sentences; a comparison or an
- * explanation two or three. Deep Research and "Always full answer" keep FAST_RETRIEVE_K and
- * FAST_CONTEXT_TOKENS per pass.
- */
-export function quickBudget(taskType: TaskType): { retrieveK: number; contextTokens: number } {
-  if (taskType === "lookup") return { retrieveK: 3, contextTokens: 450 };
-  return { retrieveK: 4, contextTokens: 700 };
-}
 /**
  * Deep-model budget from the deep-tier contract (docs/adr/0001, measured on
  * Qwen3.6-35B-A3B with expert streaming: prefill 28-41 tok/s on an M4,
@@ -256,7 +243,7 @@ export function planAnswer(i: DepthInput): AnswerPlan {
     };
     reasonCodes.push(`generate:no-deep-model-${generation.mode}-on-${i.fastModel.id}`);
   } else if (i.fastModel) {
-    generation = { tier: "fast", modelId: i.fastModel.id, mode: "single", ...quickBudget(i.taskType), thinking: true };
+    generation = { tier: "fast", modelId: i.fastModel.id, mode: "single", retrieveK: FAST_RETRIEVE_K, contextTokens: FAST_CONTEXT_TOKENS, thinking: true };
     reasonCodes.push(`generate:user-model-${i.fastModel.id}`);
   } else {
     reasonCodes.push("generate:no-model");
