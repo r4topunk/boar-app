@@ -1241,8 +1241,9 @@ export function ChatScreen({
             onDismiss={() => setShowPromptIdeas(false)}
             onUsePrompt={(prompt) => {
               setShowPromptIdeas(false);
-              // Sent straight away; while an answer is still running it waits in the input box instead.
-              if (generating) {
+              // Sent straight away; while the model loads or an answer runs it waits in the input box instead,
+              // as the send button would.
+              if (generating || !ready) {
                 setInput(prompt);
                 requestAnimationFrame(() => inputRef.current?.focus());
               } else {
