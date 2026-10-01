@@ -12,6 +12,7 @@ import {
 import { getDeviceTotalRamBytes, getHardwareInfo } from "ram-monitor";
 import appConfig from "../../app.json";
 import { getShareDeviceId, setShareDeviceId } from "../models/settings";
+import { networkAllowed } from "../config/variant";
 import type { EvalResultRow } from "./evalHarness.pure";
 import {
   buildSubmission,
@@ -36,7 +37,7 @@ const ENDPOINT = submitResultsUrl(SUPABASE_URL, PUBLISHABLE_KEY);
  * False in builds made without the Supabase values in .env, in the offline build (no network
  * permission), and on phones without a hardware key (emulators, simulators): no share button.
  */
-export const resultsSharingAvailable = ENDPOINT !== null && deviceKeySupported();
+export const resultsSharingAvailable = ENDPOINT !== null && networkAllowed() && deviceKeySupported();
 
 /** Everything about this phone that a shared run carries (listed on the preview before sending). */
 export function shareDevice(): ShareDevice {

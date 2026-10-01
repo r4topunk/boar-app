@@ -37,7 +37,9 @@
           "backgroundColor": "#17110D"
         }
       ],
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "./plugins/withIosSceneLifecycle",
+      "./plugins/withIosMetalOff"
     ],
     "extra": {
       "eas": {
