@@ -480,8 +480,9 @@ export function ChatScreen({
     [activeSessionId, refreshSessions, resetToNewChat]
   );
 
-  const send = useCallback(async () => {
-    const query = input.trim();
+  /** `text`: send this instead of the input box (a prompt idea). */
+  const send = useCallback(async (text?: string) => {
+    const query = (text ?? input).trim();
     if (!query || generating) return;
 
     await cancelBackgroundTask();
@@ -822,10 +823,10 @@ export function ChatScreen({
   // stopAndAwaitGeneration needs a handle on the in-flight promise so a
   // session switch can wait for it to actually finish. Only the entry point
   // sets sendTaskRef; send() doesn't need to know about it.
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback((text?: string) => {
     followBottom.current = true;
     scrollToBottom(true);
-    sendTaskRef.current = send().finally(() => {
+    sendTaskRef.current = send(text).finally(() => {
       sendTaskRef.current = null;
     });
   }, [send, scrollToBottom]);
@@ -1203,7 +1204,7 @@ export function ChatScreen({
               placeholder={t("chatScreen.inputPlaceholder")}
               placeholderTextColor={colors.text.dim}
               editable={ready && !generating}
-              onSubmitEditing={handleSend}
+              onSubmitEditing={() => handleSend()}
               returnKeyType="send"
               multiline={false}
             />
@@ -1224,7 +1225,7 @@ export function ChatScreen({
             ) : (
               <Pressable
                 style={[styles.sendBtn, (!ready || !input.trim()) && styles.sendBtnDisabled]}
-                onPress={handleSend}
+                onPress={() => handleSend()}
                 disabled={!ready || !input.trim()}
                 hitSlop={8}
                 accessibilityLabel={t("chatScreen.sendMessage")}
@@ -1239,9 +1240,14 @@ export function ChatScreen({
           <PromptIdeasCarousel
             onDismiss={() => setShowPromptIdeas(false)}
             onUsePrompt={(prompt) => {
-              setInput(prompt);
               setShowPromptIdeas(false);
-              requestAnimationFrame(() => inputRef.current?.focus());
+              // Sent straight away; while an answer is still running it waits in the input box instead.
+              if (generating) {
+                setInput(prompt);
+                requestAnimationFrame(() => inputRef.current?.focus());
+              } else {
+                handleSend(prompt);
+              }
             }}
           />
         )}

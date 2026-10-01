@@ -10,44 +10,37 @@ import { spacing, radii } from "./theme/spacing";
 
 export interface PromptIdea {
   category: string;
-  icon: string;
   prompt: string;
 }
 
 const PROMPT_IDEAS: PromptIdea[] = [
   {
     category: "Expedition & Field Navigation",
-    icon: "⛺",
     prompt:
       "I'm trekking in a high-altitude arid environment. Synthesize methods for off-grid water purification, compare chemical treatment vs. microfiltration, and outline altitude sickness management protocols.",
   },
   {
     category: "Architectural & Historical Research",
-    icon: "🏛️",
     prompt:
       "Compare Moorish design in Southern Spain with Ottoman architecture in the Balkans, detailing specific structural features to observe at historical sites without internet reference.",
   },
   {
     category: "Distributed Systems & Edge Tech",
-    icon: "⚡",
     prompt:
       "Explain the core differences between Paxos and Raft consensus algorithms in distributed systems. Compare leader election mechanisms and network partition handling.",
   },
   {
     category: "Economics & Urban Policy",
-    icon: "📊",
     prompt:
       "Synthesize economic arguments surrounding land value tax vs. traditional property tax on housing supply and urban density.",
   },
   {
     category: "Ecological Restoration",
-    icon: "🌱",
     prompt:
       "Synthesize ecological differences between active reforestation and natural regeneration in degraded tropical soils, detailing soil microbiome impact on seedling survival.",
   },
   {
     category: "Wilderness Emergency Medicine",
-    icon: "🩹",
     prompt:
       "Evaluate first-aid protocols for stabilizing severe closed fractures when medical transport is delayed 24 hours. Compare traction vs. standard rigid splinting.",
   },
@@ -92,7 +85,6 @@ export function PromptIdeasCarousel({ onUsePrompt, onDismiss }: Props) {
       <View style={styles.card}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.headerIcon}>💡</Text>
             <Text style={styles.headerTitle}>{t("promptIdeasCarousel.title")}</Text>
           </View>
           <Pressable onPress={dismiss} hitSlop={8} style={styles.closeBtn}>
@@ -101,7 +93,6 @@ export function PromptIdeasCarousel({ onUsePrompt, onDismiss }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.categoryIcon}>{idea.icon}</Text>
           <View style={styles.categoryPill}>
             <Text style={styles.category}>{idea.category.toUpperCase()}</Text>
           </View>
@@ -194,9 +185,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  headerIcon: {
-    fontSize: 14,
-  },
   headerTitle: {
     ...typography.mono.xs,
     color: colors.text.heading,
@@ -213,9 +201,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.md,
     gap: 8,
-  },
-  categoryIcon: {
-    fontSize: 32,
   },
   categoryPill: {
     backgroundColor: colors.cyan.bgSubtle,
