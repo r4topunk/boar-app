@@ -16,6 +16,7 @@ import { ACTION_INTENT, LAY_SOURCES } from "./wikiPack";
 import { EXPLAIN_INTENT } from "./explain";
 import { identifiersIn, titleHasIdentifier } from "./identifiers";
 import { ptLexicon } from "./ptLexiconAsset";
+import { dedupeArticleCopies } from "./dedupe";
 
 export type { RetrievedChunk } from "./retrieve.types";
 
@@ -149,7 +150,7 @@ export async function retrieve(
   );
   // The page of a standard the question names by number first, from either search.
   const byId = (c: RetrievedChunk) => ids.some((id) => titleHasIdentifier(c.title, id));
-  return [...merged.filter(byId), ...merged.filter((c) => !byId(c))].slice(0, topK);
+  return dedupeArticleCopies([...merged.filter(byId), ...merged.filter((c) => !byId(c))]).slice(0, topK);
 }
 
 /** A "may refer to" list or a "(disambiguation)" page: never a source. */
@@ -205,10 +206,12 @@ async function retrieveOne(
     : [];
   const first = [...named, ...steps];
   const seen = new Set(first.map((c) => c.chunkId));
-  const result = [...first.filter((c, i) => first.findIndex((x) => x.chunkId === c.chunkId) === i), ...fused.filter((c) => !seen.has(c.chunkId))].slice(
-    0,
-    Math.max(topK, named.length)
-  );
+  // One copy per article passage across libraries (src/rag/dedupe.ts), before the cut, so a dropped
+  // copy makes room for the next distinct source.
+  const result = dedupeArticleCopies([
+    ...first.filter((c, i) => first.findIndex((x) => x.chunkId === c.chunkId) === i),
+    ...fused.filter((c) => !seen.has(c.chunkId)),
+  ]).slice(0, Math.max(topK, named.length));
   // A what-to-do question: the lay sources the pack search added past its limit (a first-aid manual next to the
   // clinical article) must reach the answer, not be cut here with the rest of the keyword hits.
   if (action) {
