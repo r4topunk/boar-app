@@ -12,9 +12,15 @@ import { radii } from "./theme/spacing";
 
 const modelManager = new ModelManager();
 
-function formatGB(bytes: number): string {
-  if (bytes <= 0) return "0.0 GB";
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+/** GB with one decimal, a whole number without it ("12", not "12.0"). */
+function gb(bytes: number): string {
+  if (bytes <= 0) return "0";
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1).replace(/\.0$/, "");
+}
+
+/** "1.8/12GB": the unit once, so RAM and disk fit on one line. */
+function formatUsage(used: number, total: number): string {
+  return `${gb(used)}/${gb(total)}GB`;
 }
 
 function MiniBar({
@@ -81,7 +87,7 @@ export function DrawerFooterStats() {
           color={colors.emerald[400]}
         />
         <Text style={styles.value}>
-          {formatGB(rssBytes)}/{formatGB(RAM_BUDGET_BYTES)}
+          {formatUsage(rssBytes, RAM_BUDGET_BYTES)}
         </Text>
       </View>
       <View style={styles.row}>
@@ -92,7 +98,7 @@ export function DrawerFooterStats() {
           color={colors.cyan[400]}
         />
         <Text style={styles.value}>
-          {formatGB(storageBytes)}/{formatGB(STORAGE_BUDGET_BYTES)}
+          {formatUsage(storageBytes, STORAGE_BUDGET_BYTES)}
         </Text>
       </View>
       {tokPerSec != null && (
