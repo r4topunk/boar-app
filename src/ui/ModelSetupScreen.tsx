@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   FlatList,
   Pressable,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
   Switch,
 } from "react-native";
+import { Text } from "./components/AppText";
 import { impact, notification, ImpactFeedbackStyle, NotificationFeedbackType, setHapticsEnabledCache } from "../services/haptics";
 import { useTranslation } from "react-i18next";
 import { MODEL_CATALOG, CatalogModel, AssetKind, CORPUS_CATALOG, REQUIRED_MODELS } from "../models/manifest";

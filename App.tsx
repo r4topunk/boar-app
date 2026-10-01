@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
+import { useFonts } from "expo-font";
 import { StyleSheet, ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import "./src/i18n";
@@ -9,6 +10,7 @@ import { ModelSetupScreen } from "./src/ui/ModelSetupScreen";
 import { ModelManager } from "./src/models/ModelManager";
 import { ThemeProvider, useTheme } from "./src/ui/theme";
 import { initHaptics } from "./src/services/haptics";
+import { FONT_FILES } from "./src/ui/theme/fontFiles";
 
 const modelManager = new ModelManager();
 
@@ -17,6 +19,9 @@ type Screen = "checking" | "required-setup" | "chat";
 function AppContent() {
   const [screen, setScreen] = useState<Screen>("checking");
   const { colors } = useTheme();
+  // Bundled files, so this is quick; on an error the text falls back to the system font.
+  const [fontsLoaded, fontError] = useFonts(FONT_FILES);
+  const fontsReady = fontsLoaded || fontError !== null;
 
   useEffect(() => {
     initHaptics();
@@ -32,15 +37,15 @@ function AppContent() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg.terminal }]} edges={["top", "bottom"]}>
       <StatusBar style="light" />
-      {screen === "checking" && (
+      {(screen === "checking" || !fontsReady) && (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.emerald[400]} size="large" />
         </View>
       )}
-      {screen === "required-setup" && (
+      {fontsReady && screen === "required-setup" && (
         <ModelSetupScreen mode="required" onReady={() => setScreen("chat")} />
       )}
-      {screen === "chat" && (
+      {fontsReady && screen === "chat" && (
         <ChatScreen onRelaunchWizard={() => setScreen("required-setup")} />
       )}
     </SafeAreaView>

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Share } from "react-native";
+import { View, StyleSheet, Pressable, Share } from "react-native";
+import { Text } from "./AppText";
 import { impact, ImpactFeedbackStyle } from "../../services/haptics";
-import { useTheme } from "../theme";
+import { useTheme, fontFamilies } from "../theme";
 import { spacing, radii } from "../theme/spacing";
 
 interface Props {
@@ -135,6 +136,7 @@ function CodeBlockView({
         <Text
           style={[
             typography.mono.sm,
+            { fontFamily: fontFamilies.code },
             { color: colors.text.primary, lineHeight: 19 },
           ]}
           selectable
@@ -160,6 +162,7 @@ export function MarkdownMessage({ content, isStreaming }: Props) {
             key={index}
             style={[
               typography.mono.sm,
+            { fontFamily: fontFamilies.code },
               styles.inlineCode,
               {
                 backgroundColor: "rgba(0, 0, 0, 0.45)",

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { View, StyleSheet, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { searchModels, listGgufFiles, toCatalogModel, HFModelSummary, HFGgufFile } from "../services/modelBrowser";
 import { addDiscoveredModel } from "../models/discoveredModels";

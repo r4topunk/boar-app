@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { ModelManager } from "../models/ModelManager";
 import { RAM_BUDGET_BYTES, STORAGE_BUDGET_BYTES } from "../models/manifest";

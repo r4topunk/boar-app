@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Switch, Pressable, Alert } from "react-native";
+import { View, StyleSheet, Switch, Pressable, Alert } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { getMemorySettings, setMemorySettings, MemorySettings as MemorySettingsType } from "../models/settings";
 import { clearAllHistory } from "../services/chatHistory";

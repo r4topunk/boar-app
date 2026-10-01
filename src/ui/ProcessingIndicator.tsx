@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import { View, StyleSheet, Animated } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { colors } from "./theme/colors";
 import { typography } from "./theme/typography";

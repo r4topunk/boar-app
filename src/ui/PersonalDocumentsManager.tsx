@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, Switch, Alert, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable, Switch, Alert, ActivityIndicator } from "react-native";
+import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import {
   pickDocuments,

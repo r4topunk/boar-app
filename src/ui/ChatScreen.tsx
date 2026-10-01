@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
   Pressable,
   FlatList,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
+import { Text, TextInput } from "./components/AppText";
 import { LinearGradient } from "expo-linear-gradient";
 import { impact, notification, ImpactFeedbackStyle, NotificationFeedbackType } from "../services/haptics";
 import * as Clipboard from "expo-clipboard";

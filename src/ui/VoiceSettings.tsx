@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Switch } from "react-native";
+import { View, StyleSheet, Switch } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { isVoiceInputAvailable } from "../voice/VoiceInput";
 import { getVoiceInputEnabled, setVoiceInputEnabled } from "../models/settings";

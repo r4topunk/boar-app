@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, Pressable, ScrollView } from "react-native";
+import { View, StyleSheet, FlatList, Pressable, ScrollView } from "react-native";
+import { Text } from "./components/AppText";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { useTranslation } from "react-i18next";
 import { MODEL_CATALOG, CatalogModel, AssetKind } from "../models/manifest";

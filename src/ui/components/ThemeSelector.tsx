@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
+import { Text } from "./AppText";
 import { impact, ImpactFeedbackStyle } from "../../services/haptics";
 import { useTheme, THEMES, FONT_SCALES } from "../theme";
 import { ThemeId, FontScale } from "../../models/settings";

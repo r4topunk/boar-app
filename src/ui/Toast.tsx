@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Text, StyleSheet } from "react-native";
+import { Animated, StyleSheet } from "react-native";
+import { Text } from "./components/AppText";
 
 /** Simple auto-dismissing toast. Renders nothing when `message` is null. */
 export function Toast({ message, onHide }: { message: string | null; onHide: () => void }) {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, Switch } from "react-native";
+import { View, StyleSheet, Pressable, Switch } from "react-native";
+import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { PERSONALITIES, PersonalityId, MAX_TOKENS_OPTIONS } from "../constants/personalities";
 import {

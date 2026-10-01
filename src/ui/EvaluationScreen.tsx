@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { llamaEngine } from "../inference/LlamaEngine";

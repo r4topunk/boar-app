@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
+import { Text } from "./AppText";
 import { impact, ImpactFeedbackStyle } from "../../services/haptics";
 import { useTranslation } from "react-i18next";
 import { RetrievedChunk } from "../../rag/retrieve";

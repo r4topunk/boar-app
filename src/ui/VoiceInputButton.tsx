@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, Text, StyleSheet, Animated, Alert, View } from "react-native";
+import { Pressable, StyleSheet, Animated, Alert, View } from "react-native";
+import { Text } from "./components/AppText";
 import { LinearGradient } from "expo-linear-gradient";
 import { isVoiceInputAvailable, startListening, stopListening, VoiceEvent } from "../voice/VoiceInput";
 

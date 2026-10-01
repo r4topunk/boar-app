@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, LayoutAnimation, Platform, UIManager } from "react-native";
+import { View, Pressable, StyleSheet, LayoutAnimation, Platform, UIManager } from "react-native";
+import { Text } from "./components/AppText";
 import { impact } from "../services/haptics";
 import { colors } from "./theme/colors";
 import { typography } from "./theme/typography";

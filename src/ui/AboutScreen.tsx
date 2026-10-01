@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Image } from "react-native";
+import { View, StyleSheet, Pressable, ScrollView, Image } from "react-native";
+import { Text } from "./components/AppText";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { useTranslation } from "react-i18next";
 import { colors } from "./theme/colors";

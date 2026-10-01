@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   Pressable,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   ActivityIndicator,
   AppState,
 } from "react-native";
+import { Text } from "./components/AppText";
 import { LinearGradient } from "expo-linear-gradient";
 import { impact, notification, ImpactFeedbackStyle, NotificationFeedbackType } from "../services/haptics";
 import { useTranslation } from "react-i18next";

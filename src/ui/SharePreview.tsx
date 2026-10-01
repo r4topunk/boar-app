@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Modal, View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { Modal, View, StyleSheet, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import type { EvalResultRow } from "../eval/evalHarness.pure";
 import { describeChipset, describeCores, inferenceFeatures, type ShareDevice } from "../eval/shareResults.pure";

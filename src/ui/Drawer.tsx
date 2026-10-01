@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Pressable, Animated, Dimensions, ScrollView, Image } from "react-native";
+import { View, StyleSheet, Pressable, Animated, Dimensions, ScrollView, Image } from "react-native";
+import { Text } from "./components/AppText";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { useTranslation } from "react-i18next";
 import { ChatSession } from "../services/chatHistory";

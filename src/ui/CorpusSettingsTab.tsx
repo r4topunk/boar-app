@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, StyleSheet, FlatList } from "react-native";
+import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { CatalogModel } from "../models/manifest";
 import { CatalogItemCard, CatalogRowState } from "./CatalogItemCard";

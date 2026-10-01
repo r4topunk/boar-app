@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
+import { Text } from "./AppText";
 import { useTheme } from "../theme";
 import { spacing, radii } from "../theme/spacing";
 import { useLanguage, LANGUAGES } from "../../i18n/LanguageContext";
