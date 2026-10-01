@@ -30,6 +30,9 @@ const opening = new Map<string, Promise<SQLite.SQLiteDatabase | null>>();
 let generation = 0;
 /** Format-2 packs (scripts/build-wiki-pack.mjs), keyed like openPacks. */
 const wikiPacks = new Map<string, WikiPack>();
+// Packs that failed the format check, by id, with the file size they had: not reopened on every
+// search while the same file is there (a new download changes the size, or closePack clears it).
+const rejected = new Map<string, number>();
 
 const CORPUS_DIR = "corpus/";
 
@@ -70,6 +73,7 @@ export async function closePack(id: string): Promise<void> {
   const conn = openPacks.get(id);
   openPacks.delete(id);
   wikiPacks.delete(id);
+  rejected.delete(id);
   conn?.retire();
 }
 
@@ -78,6 +82,7 @@ export async function forgetAllPacks(): Promise<void> {
   generation++;
   await Promise.all([...opening.values()].map((p) => p.catch(() => null)));
   await Promise.all([...openPacks.keys()].map(closePack));
+  rejected.clear();
 }
 
 /** @deprecated The reset forgets packs (forgetAllPacks); kept for callers of the first reset contract. */
@@ -94,17 +99,18 @@ async function openPack(pack: CatalogModel): Promise<SQLite.SQLiteDatabase | nul
     await closePack(pack.id);
     return null;
   }
+  if (rejected.get(pack.id) === info.size) return null;
   const cached = openPacks.get(pack.id);
   if (cached) return cached.db;
   const pending = opening.get(pack.id);
   if (pending) return pending;
   const started = generation;
-  const p = openPackFile(pack, uri, started).finally(() => opening.delete(pack.id));
+  const p = openPackFile(pack, uri, started, info.size).finally(() => opening.delete(pack.id));
   opening.set(pack.id, p);
   return p;
 }
 
-async function openPackFile(pack: CatalogModel, uri: string, started: number): Promise<SQLite.SQLiteDatabase | null> {
+async function openPackFile(pack: CatalogModel, uri: string, started: number, size: number): Promise<SQLite.SQLiteDatabase | null> {
   const path = uri.replace(/^file:\/\//, "");
   const slash = path.lastIndexOf("/");
   const conn = guard(await SQLite.openDatabaseAsync(path.slice(slash + 1), { useNewConnection: true }, path.slice(0, slash)), `pack ${pack.id}`);
@@ -117,6 +123,7 @@ async function openPackFile(pack: CatalogModel, uri: string, started: number): P
   const embeddingsOk = meta.embeddingModelSha256 === EMBEDDING_SHA256 || (meta.formatVersion === "2" && !meta.embeddingModelSha256);
   if (meta.format !== "boar-knowledge-pack" || !embeddingsOk) {
     console.warn(`[packs] ${pack.filename} isn't a knowledge pack for this app's embedding model; skipping it`);
+    rejected.set(pack.id, size);
     conn.retire();
     return null;
   }
@@ -125,6 +132,7 @@ async function openPackFile(pack: CatalogModel, uri: string, started: number): P
       wikiPacks.set(pack.id, await WikiPack.open(db, decompress));
     } catch (e: any) {
       console.warn(`[packs] ${pack.filename} failed to open:`, e?.message ?? e);
+      rejected.set(pack.id, size);
       conn.retire();
       return null;
     }

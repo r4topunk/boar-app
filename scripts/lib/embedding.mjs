@@ -1,7 +1,7 @@
 // The app's embedding model on the computer (bge-small-en-v1.5 through
 // node-llama-cpp), shared by the knowledge-pack builders.
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, statSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, statSync, truncateSync } from "node:fs";
 import { dirname } from "node:path";
 
 export const EMBEDDING_MODEL = {
@@ -53,6 +53,8 @@ export async function embedChunks(chunks, cacheFile, threads) {
   // Cache: raw float32 vectors appended in chunk order.
   const dims = 384;
   const have = existsSync(cacheFile) ? Math.floor(statSync(cacheFile).size / (dims * 4)) : 0;
+  // A run killed mid-write can leave part of a vector at the end: cut it, so appended vectors stay aligned.
+  if (existsSync(cacheFile) && statSync(cacheFile).size !== have * dims * 4) truncateSync(cacheFile, have * dims * 4);
   log(`embeddings: ${have} cached, ${chunks.length - have} to compute`);
   if (have < chunks.length) {
     const { getLlama } = await import("node-llama-cpp");

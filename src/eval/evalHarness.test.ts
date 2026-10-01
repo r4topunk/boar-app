@@ -14,7 +14,11 @@ const generateMock = vi.fn(async (opts: any) => {
 const retrieveMock = vi.fn(async (_query: string) => [] as any[]);
 const presentIds = new Set<string>();
 const recordExecutionMock = vi.fn(async (_r: any) => {});
-const writeMock = vi.fn(async (_path: string, _content: string) => {});
+// The eval/ folder, in memory: what was written survives between runs like the phone's files.
+const files = new Map<string, string>();
+const writeMock = vi.fn(async (path: string, content: string) => {
+  files.set(path, content);
+});
 // Model files whose GGUF ships a chat template (all three curated models do).
 const filesWithTemplate = new Set<string>();
 
@@ -55,6 +59,18 @@ vi.mock("expo-file-system/legacy", () => ({
   cacheDirectory: "file:///cache/",
   makeDirectoryAsync: async () => {},
   writeAsStringAsync: (p: string, c: string) => writeMock(p, c),
+  readAsStringAsync: async (p: string) => {
+    if (!files.has(p)) throw new Error(`no file ${p}`);
+    return files.get(p)!;
+  },
+  readDirectoryAsync: async (dir: string) => [...files.keys()].filter((k) => k.startsWith(dir)).map((k) => k.slice(dir.length)),
+  deleteAsync: async (p: string) => {
+    files.delete(p);
+  },
+  moveAsync: async ({ from, to }: { from: string; to: string }) => {
+    files.set(to, files.get(from)!);
+    files.delete(from);
+  },
 }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: async () => {} }));
 
@@ -69,7 +85,8 @@ import {
   tokensPerSecond,
   EvalResultRow,
 } from "./evalHarness.pure";
-import { runEvaluation } from "./evalHarness";
+import { loadLatestRun, runEvaluation } from "./evalHarness";
+import { KILLED_ERROR, type EvalRunManifest } from "./evalResume.pure";
 import { MODEL_CATALOG } from "../models/manifest";
 
 const PHI = MODEL_CATALOG.find((m) => m.id === "phi-3.5-mini-instruct-q4km")!;
@@ -85,6 +102,7 @@ beforeEach(() => {
   retrieveMock.mockReset().mockResolvedValue([]);
   recordExecutionMock.mockClear();
   writeMock.mockClear();
+  files.clear();
 });
 
 describe("eval set", () => {
@@ -222,12 +240,12 @@ describe("runEvaluation", () => {
     expect(withTemplate.timeoutMs).toBe(plain.timeoutMs);
   });
 
-  it("leaves the adaptive config on live-chat formatting (Phi plain), and records it", async () => {
+  it("uses the model's own chat template in the adaptive config too", async () => {
     presentIds.add(PHI.id).add(QWEN.id);
     const comparison = EVAL_SET.find((q) => q.id === "comparison-1")!;
     const run = await runEvaluation({ configs: [{ kind: "adaptive", label: "Adaptive" }], queries: [comparison] });
     expect(run.rows[0].modelId).toBe(PHI.id);
-    expect(run.rows[0].promptFormat).toBe("plain");
+    expect(run.rows[0].promptFormat).toBe("chat-template");
   });
 
   it("records every query in the persisted execution telemetry", async () => {
@@ -240,7 +258,7 @@ describe("runEvaluation", () => {
   it("adaptive config records the routed model and the preset", async () => {
     presentIds.add(PHI.id).add(QWEN.id);
     const run = await runEvaluation({ configs: [{ kind: "adaptive", label: "Adaptive" }], queries: [queries[0]] });
-    expect(run.rows[0]).toMatchObject({ configId: "adaptive", routingPreset: "balanced", adaptiveRoutingUsed: true, modelId: QWEN.id });
+    expect(run.rows[0]).toMatchObject({ configId: "adaptive", routingPreset: "balanced", adaptiveRoutingUsed: true, modelId: PHI.id });
   });
 
   it("reports a model that isn't installed as a failure row instead of aborting the run", async () => {
@@ -270,7 +288,7 @@ describe("runEvaluation", () => {
     });
     expect(run.stopped).toBe(true);
     expect(run.rows).toHaveLength(1);
-    expect(writeMock).toHaveBeenCalledWith(run.savedPath, evalRowsToJsonl(run.rows));
+    expect(files.get(run.savedPath)).toBe(evalRowsToJsonl(run.rows));
     expect(run.savedPath).toMatch(/^file:\/\/\/docs\/eval\/eval-.*\.jsonl$/);
   });
 
@@ -279,5 +297,113 @@ describe("runEvaluation", () => {
     resident = PHI.filename;
     await runEvaluation({ configs: [{ kind: "model", modelId: QWEN.id, label: "Qwen" }], queries: [queries[0]] });
     expect(resident).toBe(PHI.filename);
+  });
+});
+
+describe("a run the app is closed during", () => {
+  const queries = [EVAL_SET.find((q) => q.id === "greeting-1")!, EVAL_SET.find((q) => q.id === "grounded-2")!];
+  const configs = [
+    { kind: "model" as const, modelId: QWEN.id, label: "Qwen" },
+    { kind: "model" as const, modelId: PHI.id, label: "Phi" },
+  ];
+
+  /** Runs Qwen's two answers, then "dies" as Phi's first answer starts (the run never returns). */
+  async function killedDuringPhi() {
+    presentIds.add(PHI.id).add(QWEN.id);
+    generateMock.mockImplementation(async (opts: any) => {
+      if (resident === PHI.filename) return new Promise<string>(() => {});
+      for (const piece of ["Mock", " answer", "."]) opts.onToken?.(piece);
+      return "Mock answer.";
+    });
+    void runEvaluation({ configs, queries });
+    await vi.waitFor(() => expect(resident).toBe(PHI.filename));
+    // A new app session: nothing from the dead one is running.
+    vi.resetModules();
+    const fresh = await import("./evalHarness");
+    generateMock.mockImplementation(async (opts: any) => {
+      for (const piece of ["Mock", " answer", "."]) opts.onToken?.(piece);
+      return "Mock answer.";
+    });
+    return fresh;
+  }
+
+  it("saves each answer as it finishes, and names the answer in progress", async () => {
+    const h = await killedDuringPhi();
+    const saved = (await h.loadLatestRun())!;
+    expect(saved.rows.map((r) => `${r.configId}/${r.queryId}`)).toEqual([`model:${QWEN.id}/greeting-1`, `model:${QWEN.id}/grounded-2`]);
+    expect(saved.manifest.inFlight).toEqual({ configId: `model:${PHI.id}`, queryId: "greeting-1" });
+    expect(saved.manifest.endedAt).toBeUndefined();
+  });
+
+  it("continues without loading the model it died on, recording that model as failed", async () => {
+    const h = await killedDuringPhi();
+    const saved = (await h.loadLatestRun())!;
+    loadMock.mockClear();
+    const run = await h.runEvaluation({ configs: [], resume: { ...saved, skipKilled: true } });
+    expect(run.runId).toBe(saved.manifest.runId);
+    expect(loadMock.mock.calls.map((c) => c[0])).not.toContain(PHI.filename);
+    expect(run.rows).toHaveLength(4);
+    expect(run.rows.slice(2).map((r) => [r.queryId, r.outcome, r.errorMessage])).toEqual([
+      ["greeting-1", "failure", KILLED_ERROR],
+      ["grounded-2", "failure", KILLED_ERROR],
+    ]);
+    expect((await h.loadLatestRun())!.manifest.endedAt).toBeGreaterThan(0);
+  });
+
+  it("can try the model again from the answer it stopped at", async () => {
+    const h = await killedDuringPhi();
+    const saved = (await h.loadLatestRun())!;
+    generateMock.mockClear();
+    const run = await h.runEvaluation({ configs: [], resume: { ...saved, skipKilled: false } });
+    expect(generateMock).toHaveBeenCalledTimes(2);
+    expect(run.rows.map((r) => r.outcome)).toEqual(["success", "success", "success", "success"]);
+  });
+
+  it("won't continue a run saved with another question set", async () => {
+    const h = await killedDuringPhi();
+    const saved = (await h.loadLatestRun())!;
+    await expect(
+      h.runEvaluation({ configs: [], resume: { manifest: { ...saved.manifest, evalSetVersion: "0" }, rows: saved.rows, skipKilled: true } })
+    ).rejects.toThrow(/question set v0/);
+  });
+
+  it("keeps what finished, marks it shared, or discards it", async () => {
+    const h = await killedDuringPhi();
+    const saved = (await h.loadLatestRun())!;
+    const kept = await h.keepFinishedRows(saved);
+    expect(kept.stopped).toBe(true);
+    expect(kept.rows.filter((r) => r.errorMessage === KILLED_ERROR)).toHaveLength(2);
+    await h.markRunShared(kept.runId);
+    expect((await h.loadLatestRun())!.manifest).toMatchObject({ stopped: true, sharedAt: expect.any(Number) });
+    await h.discardRun(kept.runId);
+    expect(await h.loadLatestRun()).toBeNull();
+  });
+
+  it("doesn't offer to continue the run that is going on now", async () => {
+    presentIds.add(PHI.id);
+    let seen: unknown = "unset";
+    generateMock.mockImplementationOnce(async () => {
+      seen = await loadLatestRun();
+      return "Mock answer.";
+    });
+    await runEvaluation({ configs: [{ kind: "model", modelId: PHI.id, label: "Phi" }], queries: [queries[0]] });
+    expect(seen).toBeNull();
+    expect((await loadLatestRun())!.manifest.endedAt).toBeGreaterThan(0);
+  });
+
+  it("falls back to the complete .tmp a kill between write and move leaves, and skips a torn manifest", async () => {
+    const m: EvalRunManifest = { runId: "eval-b", evalSetVersion: "1", configs: [], queryIds: ["greeting-1"], startedAt: 1 };
+    files.set("file:///docs/eval/eval-b.run.json.tmp", JSON.stringify(m));
+    files.set("file:///docs/eval/eval-c.run.json", "{torn");
+    expect((await loadLatestRun())!.manifest.runId).toBe("eval-b");
+  });
+
+  it("ignores a manifest that isn't a run", async () => {
+    files.set("file:///docs/eval/zzz.run.json", "{not json");
+    expect(await loadLatestRun()).toBeNull();
+    const m: EvalRunManifest = { runId: "eval-x", evalSetVersion: "1", configs: [], queryIds: [], startedAt: 1 };
+    files.set("file:///docs/eval/eval-x.run.json", JSON.stringify(m));
+    files.delete("file:///docs/eval/zzz.run.json");
+    expect((await loadLatestRun())!.rows).toEqual([]);
   });
 });
