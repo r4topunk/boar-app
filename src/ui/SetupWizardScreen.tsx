@@ -570,7 +570,7 @@ export function SetupWizardScreen({ onReady, onSkip }: Props) {
             <Text style={styles.customizeWhileWaitingText}>
               {t("setupWizard.step3.customizeWhileWaiting")}
             </Text>
-            <AccordionSection icon="🎨" title={t("setupWizard.step3.interfaceCustomization")}>
+            <AccordionSection title={t("setupWizard.step3.interfaceCustomization")}>
               <ThemeSelector />
             </AccordionSection>
           </View>

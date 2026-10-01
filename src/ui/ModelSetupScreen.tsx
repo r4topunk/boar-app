@@ -220,7 +220,6 @@ export function ModelSetupScreen(props: Props) {
       {/* Settings Top Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.mascotIcon}>🐗</Text>
           <View>
             <Text style={styles.title}>{t("modelSetupScreen.header.title")}</Text>
             <Text style={styles.subtitle}>{t("modelSetupScreen.header.subtitle")}</Text>
@@ -237,11 +236,11 @@ export function ModelSetupScreen(props: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.accordionScroll}>
-        <AccordionSection icon="🎭" title={t("modelSetupScreen.sections.tone")}>
+        <AccordionSection title={t("modelSetupScreen.sections.tone")}>
           <PersonalitySettings />
         </AccordionSection>
 
-        <AccordionSection icon="🤖" title={t("modelSetupScreen.sections.models")}>
+        <AccordionSection title={t("modelSetupScreen.sections.models")}>
           <Text style={styles.sectionHeading}>{t("modelSetupScreen.installedModels")}</Text>
           <FlatList
             data={[
@@ -272,7 +271,7 @@ export function ModelSetupScreen(props: Props) {
           </View>
         </AccordionSection>
 
-        <AccordionSection icon="📦" title={t("modelSetupScreen.sections.knowledgeBase")}>
+        <AccordionSection title={t("modelSetupScreen.sections.knowledgeBase")}>
           <CorpusSettingsTab
             corpusItems={CORPUS_CATALOG}
             getRow={getRow}
@@ -281,15 +280,15 @@ export function ModelSetupScreen(props: Props) {
           />
         </AccordionSection>
 
-        <AccordionSection icon="💾" title={t("modelSetupScreen.sections.memory")}>
+        <AccordionSection title={t("modelSetupScreen.sections.memory")}>
           <MemorySettings />
         </AccordionSection>
 
-        <AccordionSection icon="⚡" title={t("modelSetupScreen.sections.telemetry")}>
+        <AccordionSection title={t("modelSetupScreen.sections.telemetry")}>
           <UsageStatsContent />
         </AccordionSection>
 
-        <AccordionSection icon="🎨" title={t("modelSetupScreen.sections.displayTheme")}>
+        <AccordionSection title={t("modelSetupScreen.sections.displayTheme")}>
           <View style={styles.themeSectionWrapper}>
             <ThemeSelector />
           </View>
@@ -306,18 +305,18 @@ export function ModelSetupScreen(props: Props) {
           </View>
         </AccordionSection>
 
-        <AccordionSection icon="🌐" title={t("modelSetupScreen.sections.language")}>
+        <AccordionSection title={t("modelSetupScreen.sections.language")}>
           <View style={styles.themeSectionWrapper}>
             <LanguageSelector />
           </View>
         </AccordionSection>
 
-        <AccordionSection icon="🎙️" title={t("modelSetupScreen.sections.voice")}>
+        <AccordionSection title={t("modelSetupScreen.sections.voice")}>
           <VoiceSettings />
         </AccordionSection>
 
         {/* RECOVERY & DANGER ZONE SECTION */}
-        <AccordionSection icon="⚠️" title={t("modelSetupScreen.sections.recovery")}>
+        <AccordionSection title={t("modelSetupScreen.sections.recovery")}>
           <View style={styles.recoveryContainer}>
             {/* Setup Wizard Shortcut */}
             <View style={styles.recoveryCard}>
@@ -437,9 +436,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  mascotIcon: {
-    fontSize: 22,
   },
   title: {
     ...typography.ui.titleSm,

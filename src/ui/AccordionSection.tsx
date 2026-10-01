@@ -11,14 +11,13 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 interface Props {
-  icon: string;
   title: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }
 
 /** Collapsible section for the Settings screen — styled with field terminal elevation */
-export function AccordionSection({ icon, title, defaultOpen = false, children }: Props) {
+export function AccordionSection({ title, defaultOpen = false, children }: Props) {
   const [open, setOpen] = useState(defaultOpen);
 
   const toggle = () => {
@@ -30,7 +29,6 @@ export function AccordionSection({ icon, title, defaultOpen = false, children }:
   return (
     <View style={styles.container}>
       <Pressable style={styles.header} onPress={toggle}>
-        <Text style={styles.headerIcon}>{icon}</Text>
         <Text style={styles.headerTitle}>{title.toUpperCase()}</Text>
         <Text style={styles.chevron}>{open ? "▲" : "▼"}</Text>
       </Pressable>
@@ -59,7 +57,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
-  headerIcon: { fontSize: 16 },
   headerTitle: {
     ...typography.mono.xs,
     fontSize: 11,
