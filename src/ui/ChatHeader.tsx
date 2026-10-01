@@ -4,6 +4,7 @@ import { Text } from "./components/AppText";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { useTranslation } from "react-i18next";
 import { colors } from "./theme/colors";
+import { shortModelLabel } from "../models/modelLabel";
 import { typography } from "./theme/typography";
 import { spacing, radii } from "./theme/spacing";
 
@@ -74,7 +75,7 @@ export function ChatHeader({
               </View>
             </View>
             <Text style={styles.modelPillText} numberOfLines={1}>
-              {activeModelLabel ? activeModelLabel.toUpperCase() : t("chatHeader.localLlmCore")}
+              {activeModelLabel ? shortModelLabel(activeModelLabel).toUpperCase() : t("chatHeader.localLlmCore")}
             </Text>
           </View>
         </View>
@@ -159,9 +160,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border.default,
     paddingHorizontal: spacing.md,
-    paddingTop: 8,
-    paddingBottom: 8,
-    gap: 6,
+    paddingTop: 10,
+    paddingBottom: 10,
+    gap: 8,
   },
   headerContainerDeepResearch: {
     backgroundColor: "#111028",
@@ -172,9 +173,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  // Round 42px controls and mascot, as in the new UI's header.
   iconBtn: {
-    padding: 6,
-    borderRadius: radii.sm,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
   hamburgerIcon: {
@@ -190,9 +195,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   mascotImg: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   titleColumn: {
     flex: 1,
@@ -203,7 +208,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   titleText: {
-    ...typography.ui.title,
+    ...typography.ui.titleLg,
     color: colors.text.heading,
     letterSpacing: 0.5,
   },
@@ -244,9 +249,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.07)",
     borderColor: colors.border.subtle,
     borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -254,9 +259,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   newChatBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.md,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: colors.emerald.bgSubtle,
     borderColor: colors.emerald.border,
     borderWidth: 1,
