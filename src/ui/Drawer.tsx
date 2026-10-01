@@ -14,7 +14,6 @@ const DRAWER_WIDTH = Math.min(310, SCREEN_WIDTH * 0.82);
 
 export interface DrawerItem {
   key: string;
-  icon: string;
   label: string;
   onPress: () => void;
 }
@@ -160,7 +159,6 @@ export function Drawer({
                   });
                 }}
               >
-                <Text style={styles.itemIcon}>{item.icon}</Text>
                 <Text style={styles.itemLabel}>{item.label}</Text>
               </Pressable>
             ))}
@@ -268,7 +266,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: radii.md,
   },
-  itemIcon: { fontSize: 18 },
   itemLabel: {
     ...typography.ui.titleSm,
     color: colors.text.heading,
