@@ -78,7 +78,7 @@ export function SystemDetailsScreen() {
         />
         <ListRow title="i8mm" value={yesNo(features?.i8mm)} />
         <ListRow title="dotprod" value={yesNo(features?.dotprod)} />
-        <ListRow title={t("evaluation.preview.os")} value={device.osVersion ? `Android ${device.osVersion}${device.apiLevel ? ` (API ${device.apiLevel})` : ""}` : "—"} />
+        <ListRow title={t("evaluation.preview.os")} value={device.osVersion ? `${device.platform === "ios" ? "iOS" : "Android"} ${device.osVersion}${device.apiLevel ? ` (API ${device.apiLevel})` : ""}` : "—"} />
       </Section>
 
       <Section title={t("flows.system.memory")} footer={t("flows.system.memoryFooter")}>
