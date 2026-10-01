@@ -332,7 +332,7 @@
       "telemetry": "Telemetria de Execução",
       "about": "Sobre & Informações"
     },
-    "inputPlaceholder": "Faça uma pergunta de pesquisa offline…",
+    "inputPlaceholder": "Pergunta de pesquisa…",
     "stopGeneration": "Parar geração",
     "sendMessage": "Enviar mensagem",
     "research": {

@@ -332,7 +332,7 @@
       "telemetry": "Execution Telemetry",
       "about": "About & Info"
     },
-    "inputPlaceholder": "Ask an offline research question…",
+    "inputPlaceholder": "Research question…",
     "stopGeneration": "Stop generation",
     "sendMessage": "Send message",
     "research": {
