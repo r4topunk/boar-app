@@ -1,7 +1,12 @@
 import { Platform, TextStyle } from "react-native";
 import { FontScale } from "../../models/settings";
+import { CODE, DISPLAY } from "./fonts";
 
+// The app's Text (components/AppText.tsx) turns these into the bundled Baloo 2 and Lexend files by
+// weight; mono reads as Lexend with fixed-width digits, code stays monospace.
 export const fontFamilies = {
+  display: DISPLAY,
+  code: CODE,
   mono: Platform.select({
     ios: "Menlo",
     android: "monospace",
@@ -102,25 +107,25 @@ export function getTypography(scale: FontScale = "standard"): Typography {
         lineHeight: 22 + lineDelta,
       },
       titleSm: {
-        fontFamily: fontFamilies.sans,
+        fontFamily: fontFamilies.display,
         fontSize: Math.max(12, 14 + delta),
         lineHeight: 18 + lineDelta,
         fontWeight: "700",
       },
       title: {
-        fontFamily: fontFamilies.sans,
+        fontFamily: fontFamilies.display,
         fontSize: Math.max(14, 16 + delta),
         lineHeight: 22 + lineDelta,
         fontWeight: "700",
       },
       titleLg: {
-        fontFamily: fontFamilies.sans,
+        fontFamily: fontFamilies.display,
         fontSize: Math.max(17, 20 + delta),
         lineHeight: 26 + lineDelta,
         fontWeight: "800",
       },
       headline: {
-        fontFamily: fontFamilies.sans,
+        fontFamily: fontFamilies.display,
         fontSize: Math.max(20, 24 + delta),
         lineHeight: 30 + lineDelta,
         fontWeight: "900",

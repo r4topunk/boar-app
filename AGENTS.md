@@ -64,9 +64,6 @@ can be scripted if needed (e.g. `printf '2\n1\n' | node scripts/setup.mjs`).
 
 ## Release APK (no Metro needed)
 
-Published releases are built by GitHub Actions with the release key (`release-apk.yml`,
-see [docs/RELEASING.md](docs/RELEASING.md)). To build one locally:
-
 ```bash
 npx expo prebuild -p android --clean
 cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
@@ -217,12 +214,6 @@ npm run pack:push -- build/knowledge-pack/<id>.sqlite  # copy onto a USB-connect
   problem. Don't spend time chasing it.
 - **A stale `android/` directory causing weird build errors after editing
   `app.json`**: see the `--clean` note above.
-- **"Share results" is refused from a development build**: on purpose. The server
-  only accepts runs signed by a hardware key of a release build signed with BOAR's
-  release key (`make apk-downloader`). It has the dev build's application id but
-  not its signing key, so installing it means uninstalling the dev build first,
-  which deletes its models: ask the phone's owner. See `docs/RESULTS_SCORE.md`
-  ("Which builds can share").
 - **Don't run destructive git/native-reset commands to "fix" a build
   problem** (`rm -rf android`, force-pushes, etc.) without checking
   `git status` first and understanding why the build actually failed —

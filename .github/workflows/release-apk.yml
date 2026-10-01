@@ -1,9 +1,8 @@
 name: Release APK
 
-# Builds both Android variants signed with BOAR's release key, checks each one
+# Builds the Android APK signed with BOAR's release key, checks it
 # (scripts/check-release-apk.sh: package, versionCode, signer) and, when a tag is
-# given, creates a draft GitHub Release with the downloader APK as its first asset
-# (make setup installs the first .apk it finds). Nobody's laptop needs the key.
+# given, creates a draft GitHub Release with it. Nobody's laptop needs the key.
 #
 # The key lives only in the "release" environment's secrets (docs/RELEASING.md),
 # which can only be used from main, so a branch with an edited workflow can't
@@ -25,16 +24,10 @@ concurrency:
 
 jobs:
   build:
-    name: Build ${{ matrix.variant }}
+    name: Build APK
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 150
-    strategy:
-      fail-fast: true
-      matrix:
-        variant: [downloader, offline]
-    env:
-      VARIANT: ${{ matrix.variant }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,24 +62,24 @@ jobs:
             echo "BOAR_UPLOAD_KEY_PASSWORD=$KEY_PASSWORD"
           } >> ~/.gradle/gradle.properties
 
-      - name: Build and audit
+      - name: Build
         env:
           # Public by design (the publishable key); empty means no "Share results" button.
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
-        run: scripts/build-variant.sh "$VARIANT"
+        run: |
+          npx expo prebuild -p android --clean --no-install
+          (cd android && ./gradlew --no-daemon :app:assembleRelease -PreactNativeArchitectures=arm64-v8a)
 
       - name: Check package, versionCode and signer
-        run: |
-          version=$(node -p "require('./app.json').expo.version")
-          RELEASE_VARIANT="$VARIANT" scripts/check-release-apk.sh "dist/boar-${VARIANT}-${version}-arm64.apk"
+        run: scripts/check-release-apk.sh android/app/build/outputs/apk/release/app-release.apk
 
       - name: Name it as the release does
         run: |
           version=$(node -p "require('./app.json').expo.version")
-          if [ "$VARIANT" = downloader ]; then name="boar-v${version}-arm64.apk"; else name="boar-offline-v${version}-arm64.apk"; fi
+          name="boar-v${version}-arm64.apk"
           mkdir -p out
-          mv "dist/boar-${VARIANT}-${version}-arm64.apk" "out/$name"
+          mv android/app/build/outputs/apk/release/app-release.apk "out/$name"
           (cd out && sha256sum "$name" > "$name.sha256" && cat "$name.sha256")
 
       - name: Remove the key
@@ -95,7 +88,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ matrix.variant }}
+          name: apk
           path: out/
           if-no-files-found: error
 
@@ -114,7 +107,7 @@ jobs:
         with:
           path: out
           merge-multiple: true
-      - name: Create the draft, downloader APK first
+      - name: Create the draft
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
@@ -123,13 +116,16 @@ jobs:
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3"; exit 1; }
           [ "$TAG" = "v$version" ] || { echo "tag $TAG doesn't match app.json's version $version"; exit 1; }
           # An existing tag must be this commit: --target is ignored for a tag that's already there.
-          existing=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null || true)
+          # (git ls-remote prints nothing for a missing tag; gh api printed its error JSON instead.)
+          refs=$(git ls-remote --tags "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          # An annotated tag lists its tag object and, as ^{}, the commit it points to.
+          existing=$(awk '$2 ~ /\^\{\}$/ { print $1 }' <<<"$refs")
+          [ -n "$existing" ] || existing=$(awk 'NR == 1 { print $1 }' <<<"$refs")
           if [ -n "$existing" ] && [ "$existing" != "$GITHUB_SHA" ]; then
             echo "tag $TAG already points to $existing, not this build ($GITHUB_SHA)"; exit 1
           fi
           gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "BOAR $TAG" --notes "Draft: write the notes before publishing."
-          # One at a time, in this order: make setup installs the first .apk.
-          for f in "boar-$TAG-arm64.apk" "boar-$TAG-arm64.apk.sha256" "boar-offline-$TAG-arm64.apk" "boar-offline-$TAG-arm64.apk.sha256"; do
+          for f in "boar-$TAG-arm64.apk" "boar-$TAG-arm64.apk.sha256"; do
             gh release upload "$TAG" "out/$f"
           done
           gh release view "$TAG" --json assets --jq '.assets[].name'

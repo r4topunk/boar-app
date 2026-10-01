@@ -1,6 +1,6 @@
 import type { BundledFamily } from "./fonts";
 
-/** Font files for `useFonts` (App.tsx). Bundled assets: loading never touches the network. */
+/** Font files for useFonts (App.tsx). Bundled assets: loading never touches the network. */
 export const FONT_FILES: Record<BundledFamily, number> = {
   Baloo2_700Bold: require("@expo-google-fonts/baloo-2/700Bold/Baloo2_700Bold.ttf"),
   Baloo2_800ExtraBold: require("@expo-google-fonts/baloo-2/800ExtraBold/Baloo2_800ExtraBold.ttf"),

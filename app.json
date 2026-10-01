@@ -2,34 +2,18 @@
   "expo": {
     "name": "BOAR",
     "slug": "boar-app",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "team.sopa.boar",
-      "buildNumber": "2",
-      "icon": "./assets/icon-ios.png",
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "BOAR uses the microphone only while voice input is on, to turn your question into text on this device.",
-        "NSSpeechRecognitionUsageDescription": "BOAR transcribes your voice question on this device. Audio is never sent to a server.",
-        "UIFileSharingEnabled": true,
-        "LSSupportsOpeningDocumentsInPlace": true,
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "BOAR uses your location, read on this device, to answer questions about places near you, such as restaurants in the city you are in. It is never sent anywhere."
-      },
-      "entitlements": {
-        "com.apple.developer.kernel.increased-memory-limit": true,
-        "com.apple.developer.kernel.extended-virtual-addressing": true,
-        "com.apple.developer.devicecheck.appattest-environment": "production"
-      }
+      "supportsTablet": true
     },
     "android": {
       "package": "team.sopa.aoair",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
-        "backgroundColor": "#17110D",
+        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -41,50 +25,25 @@
     },
     "plugins": [
       "expo-sqlite",
-      [
-        "expo-navigation-bar",
-        {
-          "enforceContrast": false,
-          "style": "light"
-        }
-      ],
       "expo-dev-client",
       "expo-sharing",
-      [
-        "llama.rn",
-        {
-          "enableEntitlements": false,
-          "enableOpenCLAndHexagon": false
-        }
-      ],
+      "expo-font",
       [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 360,
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#17110D",
-          "android": {
-            "image": "./assets/splash-icon-android.png",
-            "imageWidth": 240,
-            "backgroundColor": "#17110D"
-          }
+          "backgroundColor": "#17110D"
         }
       ],
-      "./plugins/withReleaseSigning",
-      "./plugins/withIosSceneLifecycle",
-      "./plugins/withIosMetalOff",
-      "expo-font"
+      "./plugins/withReleaseSigning"
     ],
     "extra": {
       "eas": {
         "projectId": "cba72560-8333-4fca-af84-f42d1c25abe3"
       }
     },
-    "owner": "vaipraonde",
-    "locales": {
-      "en": "./locales/en.json",
-      "pt": "./locales/pt.json"
-    }
+    "owner": "vaipraonde"
   }
 }
