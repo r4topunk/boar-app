@@ -167,7 +167,6 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerIcon}>🧪</Text>
           <View>
             <Text style={styles.headerTitle}>{t("evaluation.title")}</Text>
             <Text style={styles.headerSubtitle}>
@@ -326,7 +325,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.cardElevated,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  headerIcon: { fontSize: 20 },
   headerTitle: { ...typography.ui.titleSm, color: colors.text.heading, letterSpacing: 0.5 },
   headerSubtitle: { ...typography.mono.xs, fontSize: 9, color: colors.text.dim },
   closeBtn: {
