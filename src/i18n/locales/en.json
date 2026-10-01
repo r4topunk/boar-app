@@ -66,10 +66,10 @@
       "yellow": "High RAM / 12GB Required",
       "red": "Incompatible (Exceeds Device RAM)"
     },
-    "downloadingAsset": "Downloading asset",
+    "downloadingAsset": "Downloading",
     "eta": "ETA: {{eta}}",
     "retryDownload": "🔄 Retry Download",
-    "downloadAsset": "📥 Download Asset",
+    "downloadAsset": "Download",
     "loadingModel": "Loading model…",
     "selectUse": "🔘 Select & Use",
     "indexedNote": "Indexed in offline knowledge base",
