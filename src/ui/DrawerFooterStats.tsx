@@ -80,24 +80,24 @@ export function DrawerFooterStats() {
   return (
     <View style={styles.container}>
       <View style={styles.row}>
-        <Text style={styles.label}>{t("drawerFooterStats.ram")}</Text>
+        <Text style={styles.label} numberOfLines={1}>{t("drawerFooterStats.ram")}</Text>
         <MiniBar
           fraction={ramFraction}
           over={ramFraction > 1}
           color={colors.emerald[400]}
         />
-        <Text style={styles.value}>
+        <Text style={styles.value} numberOfLines={1}>
           {formatUsage(rssBytes, RAM_BUDGET_BYTES)}
         </Text>
       </View>
       <View style={styles.row}>
-        <Text style={styles.label}>{t("drawerFooterStats.disk")}</Text>
+        <Text style={styles.label} numberOfLines={1}>{t("drawerFooterStats.disk")}</Text>
         <MiniBar
           fraction={storageFraction}
           over={storageFraction > 1}
           color={colors.cyan[400]}
         />
-        <Text style={styles.value}>
+        <Text style={styles.value} numberOfLines={1}>
           {formatUsage(storageBytes, STORAGE_BUDGET_BYTES)}
         </Text>
       </View>
@@ -126,7 +126,8 @@ const styles = StyleSheet.create({
     ...typography.mono.xs,
     fontSize: 9,
     color: colors.text.dim,
-    width: 28,
+    // Wide enough for "DISK" at the new 12px size; a fixed 28 wrapped it.
+    minWidth: 40,
     fontWeight: "700",
   },
   track: {
@@ -145,6 +146,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: colors.text.muted,
     fontVariant: ["tabular-nums"],
+    flexShrink: 0,
   },
   tokRow: {
     flexDirection: "row",
