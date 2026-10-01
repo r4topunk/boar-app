@@ -321,7 +321,6 @@ export function ModelSetupScreen(props: Props) {
             {/* Setup Wizard Shortcut */}
             <View style={styles.recoveryCard}>
               <View style={styles.recoveryHeader}>
-                <Text style={styles.recoveryIcon}>🪄</Text>
                 <Text style={styles.recoveryTitle}>{t("modelSetupScreen.recovery.wizardTitle")}</Text>
               </View>
               <Text style={styles.recoveryDesc}>{t("modelSetupScreen.recovery.wizardDesc")}</Text>
@@ -518,9 +517,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  recoveryIcon: {
-    fontSize: 14,
   },
   recoveryTitle: {
     ...typography.mono.xs,

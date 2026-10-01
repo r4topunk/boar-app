@@ -26,7 +26,7 @@ export function VoiceSettings() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>🎙️ {t("voiceSettings.title")}</Text>
+      <Text style={styles.title}>{t("voiceSettings.title")}</Text>
 
       <View style={styles.row}>
         <View style={{ flex: 1 }}>

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, Image } from "react-native";
 import { Text } from "./AppText";
 import { impact, ImpactFeedbackStyle } from "../../services/haptics";
 import { useTheme, THEMES, FONT_SCALES } from "../theme";
@@ -158,9 +158,10 @@ export function ThemeSelector({ compact = false }: Props) {
               },
             ]}
           >
-            <Text style={[typography.ui.caption, { color: colors.text.accentEmerald }]}>
-              🐗 BOAR
-            </Text>
+            <View style={styles.previewRole}>
+              <Image source={require("../../../assets/boar.png")} style={styles.previewAvatar} resizeMode="contain" />
+              <Text style={[typography.ui.caption, { color: colors.text.accentEmerald }]}>BOAR</Text>
+            </View>
             <Text style={[typography.ui.body, { color: colors.text.primary, marginTop: 4 }]}>
               Local inference operational. Process RSS remains strictly under 12GB limit.
             </Text>
@@ -177,6 +178,9 @@ export function ThemeSelector({ compact = false }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // The same mascot as on chat replies.
+  previewRole: { flexDirection: "row", alignItems: "center", gap: 6 },
+  previewAvatar: { width: 20, height: 20, borderRadius: 4 },
   container: {
     gap: spacing.sm,
   },
