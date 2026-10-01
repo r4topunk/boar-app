@@ -44,7 +44,8 @@
     "noChecksum": "no checksum available",
     "adding": "Adding…",
     "addButton": "➕ Add",
-    "noGgufFiles": "No .gguf files found in this repo."
+    "noGgufFiles": "No .gguf files found in this repo.",
+    "offlineNote": "You're offline. Connect to the internet to search Hugging Face for more models; everything else works offline."
   },
   "catalogItemCard": {
     "calculating": "Calculating…",
@@ -311,7 +312,12 @@
     "cycleTone": "Cycle Assistant Tone",
     "newChatSession": "New Chat Session",
     "deepResearch": "Deep Research",
-    "deepResearchActive": "Deep Research Active"
+    "deepResearchActive": "Deep Research Active",
+    "online": "ONLINE",
+    "onlineTitle": "You're online",
+    "onlineBody": "Your phone is connected to the internet. BOAR doesn't need it: answers, search and your library all work on this phone. Only downloading models or packs and searching Hugging Face for models use the connection. Turn on airplane mode to see it work fully offline.",
+    "offlineTitle": "You're offline",
+    "offlineBody": "No internet connection. Everything works: answers, search and your library are all on this phone."
   },
   "chatScreen": {
     "initializingCore": "Initializing local offline core…",

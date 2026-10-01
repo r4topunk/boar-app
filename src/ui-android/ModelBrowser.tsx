@@ -5,6 +5,8 @@ import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { searchModels, listGgufFiles, toCatalogModel, HFModelSummary, HFGgufFile } from "../services/modelBrowser";
 import { addDiscoveredModel } from "../models/discoveredModels";
+import { useNetworkState } from "expo-network";
+import { isOnline } from "../services/connectivity.pure";
 
 function formatBytes(bytes: number): string {
   return bytes >= 1024 * 1024 * 1024
@@ -25,6 +27,7 @@ interface Props {
  * verification, and duplicate-download guard as every other model.
  */
 export function ModelBrowser({ onAdded }: Props) {
+  const online = isOnline(useNetworkState());
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -93,8 +96,11 @@ export function ModelBrowser({ onAdded }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.hint}>{t("modelBrowser.hint")}</Text>
-      <View style={styles.searchRow}>
+      {/* The phone's own network state (no request): searching needs the internet, nothing else does. */}
+      {!online && <Text style={styles.offlineNote}>{t("modelBrowser.offlineNote")}</Text>}
+      <View style={[styles.searchRow, !online && styles.disabled]}>
         <TextInput
+          editable={online}
           style={styles.input}
           placeholder={t("modelBrowser.searchPlaceholder")}
           placeholderTextColor={colors.text.dim}
@@ -103,7 +109,7 @@ export function ModelBrowser({ onAdded }: Props) {
           onSubmitEditing={runSearch}
           returnKeyType="search"
         />
-        <Pressable style={styles.searchBtn} onPress={runSearch} disabled={searching}>
+        <Pressable style={styles.searchBtn} onPress={runSearch} disabled={searching || !online}>
           {searching ? <ActivityIndicator color={colors.text.heading} /> : <Text style={styles.searchBtnText}>🔎</Text>}
         </Pressable>
       </View>
@@ -178,6 +184,8 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontSize: 13,
   },
+  offlineNote: { color: colors.text.accentAmber, fontSize: 12, lineHeight: 17 },
+  disabled: { opacity: 0.4 },
   searchBtn: {
     backgroundColor: colors.emerald[600],
     borderRadius: 6,

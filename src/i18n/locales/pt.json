@@ -44,7 +44,8 @@
     "noChecksum": "checksum não disponível",
     "adding": "Adicionando…",
     "addButton": "➕ Adicionar",
-    "noGgufFiles": "Nenhum arquivo .gguf encontrado neste repositório."
+    "noGgufFiles": "Nenhum arquivo .gguf encontrado neste repositório.",
+    "offlineNote": "Você está offline. Conecte-se à internet para buscar mais modelos no Hugging Face; todo o resto funciona offline."
   },
   "catalogItemCard": {
     "calculating": "Calculando…",
@@ -311,7 +312,12 @@
     "cycleTone": "Alternar tom do assistente",
     "newChatSession": "Nova sessão de chat",
     "deepResearch": "Pesquisa Aprofundada",
-    "deepResearchActive": "Pesquisa Aprofundada Ativa"
+    "deepResearchActive": "Pesquisa Aprofundada Ativa",
+    "online": "ONLINE",
+    "onlineTitle": "Você está online",
+    "onlineBody": "Seu celular está conectado à internet. O BOAR não precisa dela: respostas, busca e sua biblioteca funcionam neste celular. Só baixar modelos ou pacotes e buscar modelos no Hugging Face usam a conexão. Ative o modo avião para vê-lo funcionar totalmente offline.",
+    "offlineTitle": "Você está offline",
+    "offlineBody": "Sem conexão com a internet. Tudo funciona: respostas, busca e sua biblioteca estão neste celular."
   },
   "chatScreen": {
     "initializingCore": "Inicializando núcleo offline local…",

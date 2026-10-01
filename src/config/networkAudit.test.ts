@@ -25,7 +25,10 @@ const FORBIDDEN_DEPENDENCIES = [
   "firebase",
   "@sentry/react-native",
   "axios",
-  "expo-network",
+  // expo-network is allowed: it only reads the phone's own state (Android ConnectivityManager, iOS
+  // NWPathMonitor) for the header's ONLINE/OFFLINE pill, and opens no connection of its own
+  // (checked in its Kotlin and Swift sources, 57.0.x). netinfo stays out: its reachability check
+  // requests a URL.
   "@react-native-community/netinfo",
   // Location through Google Play Services (FusedLocationProviderClient): breaks
   // on GrapheneOS. Use modules/offline-location (plain LocationManager) instead.
