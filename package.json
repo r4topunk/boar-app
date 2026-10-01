@@ -43,6 +43,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "scores:mirror": "node scripts/mirror-scores-hf.mjs",
     "eval:device": "node scripts/eval-device.mjs",
     "eval:summary": "node scripts/eval-summary.mjs",
     "pack:build": "node scripts/build-knowledge-pack.mjs",
