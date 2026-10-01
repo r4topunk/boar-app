@@ -123,7 +123,10 @@ jobs:
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3"; exit 1; }
           [ "$TAG" = "v$version" ] || { echo "tag $TAG doesn't match app.json's version $version"; exit 1; }
           # An existing tag must be this commit: --target is ignored for a tag that's already there.
-          existing=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null || true)
+          # ls-remote prints nothing for a missing tag and fails on a real error (gh api printed its
+          # 404 JSON on stdout, which read as an existing tag). ^{} is the commit of an annotated tag.
+          refs=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}") || { echo "could not list the remote tags"; exit 1; }
+          existing=$(awk -v t="refs/tags/$TAG" '$2 == t "^{}" { c = $1 } $2 == t { l = $1 } END { print (c != "") ? c : l }' <<<"$refs")
           if [ -n "$existing" ] && [ "$existing" != "$GITHUB_SHA" ]; then
             echo "tag $TAG already points to $existing, not this build ($GITHUB_SHA)"; exit 1
           fi
