@@ -62,7 +62,7 @@ export function ChatHeader({
         {/* Brand & Mascot */}
         <View style={styles.brandContainer}>
           <Image
-            source={require("../../assets/boar.png")}
+            source={require("../../assets/mascot.png")}
             style={styles.mascotImg}
             resizeMode="contain"
           />

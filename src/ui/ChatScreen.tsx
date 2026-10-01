@@ -1017,7 +1017,7 @@ export function ChatScreen({
                 <View style={styles.bubbleHeader}>
                   <View style={styles.bubbleRole}>
                     {item.role !== "user" && (
-                      <Image source={require("../../assets/boar.png")} style={styles.bubbleAvatar} resizeMode="contain" />
+                      <Image source={require("../../assets/mascot.png")} style={styles.bubbleAvatar} resizeMode="contain" />
                     )}
                     <Text
                       style={[

@@ -23,7 +23,7 @@ export function ChatEmptyState({ suggestions, onAsk, onFill }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.hero}>
-        <Image source={require("../../../assets/boar.png")} style={styles.mascot} resizeMode="contain" />
+        <Image source={require("../../../assets/mascot.png")} style={styles.mascot} resizeMode="contain" />
         <Text style={styles.wordmark}>BOAR</Text>
         <Text style={styles.tagline}>{t("chat.empty.tagline")}</Text>
       </View>
