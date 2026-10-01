@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Modal, View, StyleSheet, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import type { EvalResultRow } from "../eval/evalHarness.pure";
@@ -48,7 +49,8 @@ export function SharePreview({ visible, rows, device, appVersion, sending, onCan
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <View style={styles.container}>
+      {/* A Modal is a new window: it doesn't inherit the app's safe area, so it sets its own. */}
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <View style={styles.header}>
           <Text style={styles.title}>{t("evaluation.preview.title")}</Text>
           <Text style={styles.subtitle}>{t("evaluation.preview.subtitle")}</Text>
@@ -120,7 +122,7 @@ export function SharePreview({ visible, rows, device, appVersion, sending, onCan
             {sending ? <ActivityIndicator color={colors.text.heading} /> : <Text style={[styles.btnText, styles.primaryText]}>{t("evaluation.shareConfirm")}</Text>}
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
