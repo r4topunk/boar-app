@@ -219,7 +219,8 @@ async function retrieveOne(
     const lay = wiki
       .flatMap((w) => w.hits.filter((h) => LAY_SOURCES.has(h.source)).map((h) => packHitToChunk(w.packId, h)))
       .filter((c) => !inResult.has(c.chunkId));
-    result.push(...lay.slice(0, 2));
+    // Through the same copy check as the rest (result is already one copy per passage, so it all stays).
+    result.push(...dedupeArticleCopies([...result, ...lay]).slice(result.length, result.length + 2));
   }
   return result;
 }
