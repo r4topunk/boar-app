@@ -1,6 +1,7 @@
 import ExpoModulesCore
 import Darwin
 import os
+import UIKit
 
 /**
  * iOS counterpart of RamMonitorModule.kt. Same JS contract, iOS-native
@@ -61,6 +62,29 @@ public class RamMonitorModule: Module {
         "coreMaxFreqKHz": [Int](repeating: 0, count: ProcessInfo.processInfo.processorCount),
       ]
     }
+
+    // For the on-device benchmark (src/bench): a hot phone throttles the CPU, so every run records the
+    // thermal state and waits for "nominal" first. ProcessInfo is thread-safe; UIDevice is read on main.
+    Function("getThermalState") { () -> String in
+      switch ProcessInfo.processInfo.thermalState {
+      case .nominal: return "nominal"
+      case .fair: return "fair"
+      case .serious: return "serious"
+      case .critical: return "critical"
+      @unknown default: return "unknown"
+      }
+    }
+
+    AsyncFunction("getPowerInfo") { () -> [String: Any] in
+      let device = UIDevice.current
+      device.isBatteryMonitoringEnabled = true
+      let state = device.batteryState
+      return [
+        "batteryLevel": Double(device.batteryLevel),
+        "charging": state == .unknown ? NSNull() : (state == .charging || state == .full) as Any,
+        "lowPowerMode": ProcessInfo.processInfo.isLowPowerModeEnabled,
+      ]
+    }.runOnQueue(.main)
   }
 
   private static func cpuFeatures() -> String {

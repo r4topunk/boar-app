@@ -20,11 +20,21 @@ export interface HardwareInfo {
   coreMaxFreqKHz: number[];
 }
 
+export interface PowerInfo {
+  /** 0..1, -1 when unknown. */
+  batteryLevel: number;
+  /** null when the OS doesn't know (e.g. the simulator). Full on the charger counts as charging. */
+  charging: boolean | null;
+  lowPowerMode: boolean | null;
+}
+
 interface RamMonitorNativeModule {
   getMemoryInfo(): MemoryInfo;
   getDeviceTotalRamBytes(): number;
   getHardwareInfo?(): HardwareInfo;
   getAvailableRamBytes?(): number;
+  getThermalState?(): string;
+  getPowerInfo?(): Promise<PowerInfo>;
 }
 
 const RamMonitor = requireNativeModule<RamMonitorNativeModule>("RamMonitor");
@@ -61,5 +71,23 @@ export function getAvailableRamBytes(): number {
     return RamMonitor.getAvailableRamBytes?.() ?? 0;
   } catch {
     return 0;
+  }
+}
+
+/** iOS's ProcessInfo.thermalState ("nominal" | "fair" | "serious" | "critical"), or "unknown" (Android, older native builds). */
+export function getThermalState(): string {
+  try {
+    return RamMonitor.getThermalState?.() ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/** Battery level, charging and Low Power Mode (iOS), or null where the native build lacks it. */
+export async function getPowerInfo(): Promise<PowerInfo | null> {
+  try {
+    return (await RamMonitor.getPowerInfo?.()) ?? null;
+  } catch {
+    return null;
   }
 }

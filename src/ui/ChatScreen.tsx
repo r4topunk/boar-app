@@ -53,6 +53,9 @@ import { EvaluationScreen } from "./EvaluationScreen";
 import { takePendingEvalRequest } from "../eval/deviceEvalRequest";
 import { DEVICE_EVAL_ON } from "../eval/deviceEvalGate";
 import type { EvalRequest } from "../eval/deviceEvalRequest.pure";
+import { takePendingBenchRequest } from "../bench/modelBench";
+import type { BenchRequest } from "../bench/modelBench.pure";
+import { BenchScreen } from "./BenchScreen";
 import { ChatHeader } from "./ChatHeader";
 import { Banner, Button, IconButton, Progress, Screen, Sheet, Text, useAnnounce, useToast } from "./components";
 import { footerBottom } from "./components/Screen";
@@ -173,6 +176,7 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [deviceEvalRequest, setDeviceEvalRequest] = useState<EvalRequest | null>(null);
+  const [benchRequest, setBenchRequest] = useState<BenchRequest | null>(null);
   const [openSource, setOpenSource] = useState<{ messageId: string; index: number } | null>(null);
 
   // The running answer. `generating` mirrors it for rendering; the ref is the
@@ -458,6 +462,27 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
       clearInterval(id);
     };
   }, [ready, deviceEvalRequest]);
+
+  // A model benchmark request (scripts/bench-iphone.mjs, src/bench/modelBench.ts), behind the same gate.
+  useEffect(() => {
+    if (!DEVICE_EVAL_ON || !ready || benchRequest || deviceEvalRequest) return;
+    let cancelled = false;
+    const check = async () => {
+      if (cancelled || activeRef.current) return;
+      try {
+        const request = await takePendingBenchRequest();
+        if (request && !cancelled) setBenchRequest(request);
+      } catch (e: any) {
+        console.warn("[BENCH] could not read device request:", e?.message ?? e);
+      }
+    };
+    check();
+    const id = setInterval(check, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [ready, benchRequest, deviceEvalRequest]);
 
   // ---- running answers ----
   const cancelBackgroundTask = useCallback(async () => {
@@ -1027,6 +1052,9 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
     [effective, t]
   );
 
+  if (benchRequest) {
+    return <BenchScreen request={benchRequest} onClose={() => setBenchRequest(null)} />;
+  }
   if (deviceEvalRequest) {
     return <EvaluationScreen deviceRequest={deviceEvalRequest} onClose={() => setDeviceEvalRequest(null)} />;
   }
