@@ -113,6 +113,7 @@ import type { MemoryFit } from "../inference/memoryFit";
 import type { AnswerSettings } from "../models/settings";
 import type { ResearchOptions, ResearchProgress, ResearchResult } from "../services/orchestrator";
 import type { ExecutionOutcome, ExecutionTelemetryRecord, ModelResidency } from "../services/executionTelemetry.pure";
+import { smallTalkReply } from "./smallTalk";
 
 export interface InstalledLlm {
   id: string;
@@ -590,6 +591,15 @@ export function createAnswerer(deps: AnswerDeps) {
           emit({ type: "token", answerId, tier: "instant", text: numbers });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
           return { answerId, tier: "instant", outcome: "success", text: numbers, sources: [], receipt: r, cited: [] };
+        }
+        // Small talk ("hi", "valeu", "who are you", "what time is it"): a fixed reply, no model load, no search.
+        const chat = smallTalkReply(req.query, isPortugueseQuestion(req.query), new Date());
+        if (chat) {
+          markVisible();
+          const r: AnswerReceipt = { modelId: "small-talk", modelLabel: "BOAR", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: [`answer:small-talk-${chat.kind}`] };
+          emit({ type: "token", answerId, tier: "instant", text: chat.text });
+          emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
+          return { answerId, tier: "instant", outcome: "success", text: chat.text, sources: [], receipt: r, cited: [] };
         }
         const calc = calculate(req.query, isPortugueseQuestion(req.query));
         if (calc) {

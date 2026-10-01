@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DepthInput, DepthModel, deepAutoEligible, deepAutoIneligibility, measuredSpeeds, modelSpeedStats, planAnswer, resolveDeepModel } from "./depth";
+import { DepthInput, DepthModel, deepAutoEligible, deepAutoIneligibility, measuredSpeeds, modelSpeedStats, planAnswer, resolveDeepModel, FAST_RETRIEVE_K, FAST_CONTEXT_TOKENS } from "./depth";
 
 const GB = 1024 ** 3;
 const qwen15: DepthModel = { id: "qwen1.5", label: "Qwen 1.5B", sizeBytes: 1 * GB, roles: ["fast"] };
@@ -185,5 +185,18 @@ describe("deepAutoEligible on a low-RAM phone (CR-1)", () => {
     expect(deepAutoEligible(fast)).toBe(true);
     expect(deepAutoEligible(fast, { model: { sizeBytes: 11e9 }, totalRamBytes: 3.8 * 1024 ** 3 })).toBe(false);
     expect(deepAutoEligible(fast, { model: { sizeBytes: 11e9 }, totalRamBytes: 12 * 1024 ** 3 })).toBe(true);
+  });
+});
+
+describe("quick answers read only what the question needs", () => {
+  it("a lookup gets 3 sources and 450 tokens, other questions 4 and 700", () => {
+    expect(planAnswer(base({ taskType: "lookup" })).generation).toMatchObject({ tier: "fast", retrieveK: 3, contextTokens: 450 });
+    expect(planAnswer(base({ taskType: "compare" })).generation).toMatchObject({ tier: "fast", retrieveK: 4, contextTokens: 700 });
+    expect(planAnswer(base({ taskType: "research" })).generation).toMatchObject({ tier: "fast", retrieveK: 4, contextTokens: 700 });
+  });
+
+  it("Deep Research and 'Always full answer' keep the full budget per pass", () => {
+    expect(planAnswer(base({ taskType: "lookup", requestedTier: "deep" })).generation).toMatchObject({ retrieveK: FAST_RETRIEVE_K, contextTokens: FAST_CONTEXT_TOKENS });
+    expect(planAnswer(base({ taskType: "research", alwaysComplete: true })).generation).toMatchObject({ retrieveK: FAST_RETRIEVE_K, contextTokens: FAST_CONTEXT_TOKENS });
   });
 });
