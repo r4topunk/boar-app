@@ -153,27 +153,6 @@ export function UsageStatsContent() {
           <View style={styles.cardTitleRow}>
             <Text style={styles.cardTitle}>RAM & PROCESS MEMORY</Text>
           </View>
-          <View
-            style={[
-              styles.statusPill,
-              withinRamLimit ? styles.statusPillEmerald : styles.statusPillCrimson,
-            ]}
-          >
-            <View
-              style={[
-                styles.statusDot,
-                withinRamLimit ? styles.statusDotEmerald : styles.statusDotCrimson,
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusPillText,
-                withinRamLimit ? styles.statusTextEmerald : styles.statusTextCrimson,
-              ]}
-            >
-              {withinRamLimit ? "12GB BOUNTY COMPLIANT" : "OVER 12GB LIMIT"}
-            </Text>
-          </View>
         </View>
 
         {/* Visual Memory Gauge against 12GB limit */}
