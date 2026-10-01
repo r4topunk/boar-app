@@ -28,6 +28,8 @@ interface Settings {
   adaptiveRoutingEnabled?: boolean;
   /** Random id created the first time this install shares results (src/eval/shareResults.ts). */
   installId?: string;
+  /** The server's id for this phone's sharing key, once it has accepted the key (src/eval/shareResults.ts). */
+  shareDeviceId?: string;
 }
 
 export interface MemorySettings {
@@ -287,5 +289,16 @@ export async function getAdaptiveRoutingEnabled(): Promise<boolean> {
 export async function setAdaptiveRoutingEnabled(enabled: boolean): Promise<void> {
   const s = await readSettings();
   s.adaptiveRoutingEnabled = enabled;
+  await writeSettings(s);
+}
+
+/** The server's id for this phone's hardware sharing key; undefined until a share registers it. */
+export async function getShareDeviceId(): Promise<string | undefined> {
+  return (await readSettings()).shareDeviceId;
+}
+
+export async function setShareDeviceId(id: string | undefined): Promise<void> {
+  const s = await readSettings();
+  s.shareDeviceId = id;
   await writeSettings(s);
 }
