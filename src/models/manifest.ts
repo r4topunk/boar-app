@@ -204,6 +204,49 @@ export const MODEL_CATALOG: CatalogModel[] = [
     description: "Introductions of Wikipedia's ~50,000 Vital Articles (level 5), searchable offline. ~164MB.",
     required: false,
   },
+  // Format-2 packs (scripts/build-wiki-pack.mjs, docs/KNOWLEDGE_PACKS.md): full articles in
+  // compressed blocks with their own keyword index, searched by src/rag/wikiPack.ts. Built by the
+  // new UI's engine work; the files are pinned to their upload commit on the Hugging Face dataset
+  // r4topunk/boar-packs. Measured builds of 2026-09-26/27.
+  {
+    id: "boar-wikivoyage-en",
+    kind: "corpus",
+    format: "sqlite-pack",
+    label: "English Wikivoyage (34,002 travel guides)",
+    filename: "corpus/boar-wikivoyage-en.sqlite",
+    sizeBytes: 351092736,
+    sha256: "ff8595e32f56b8b84e20464afd8bf88532d47d2d82d799e3df8489440004b66e",
+    sourceUrl: "https://huggingface.co/datasets/r4topunk/boar-packs/resolve/9557c7b2a50a1c37fdf36d41db4cd0fdc8c33c0b/wiki/en/boar-wikivoyage-en.sqlite",
+    license: "CC BY-SA 4.0 (Wikivoyage)",
+    description: "Travel guides: see, do, eat, drink, stay safe. ~351MB.",
+    required: false,
+  },
+  {
+    id: "boar-preparedness",
+    kind: "corpus",
+    format: "sqlite-pack",
+    label: "Emergency and preparedness (1,754 articles)",
+    filename: "corpus/boar-preparedness.sqlite",
+    sizeBytes: 16490496,
+    sha256: "53d8bcefd8ac65648eb959da2f0761cfb9efcb668822c4030f188312b764865e",
+    sourceUrl: "https://huggingface.co/datasets/r4topunk/boar-packs/resolve/6e336fe8b7d77af4af081b70b6de15f47647ed36/topics/boar-preparedness.sqlite",
+    license: "CC BY-SA 4.0 (Wikipedia, Appropedia, Wikibooks, Wikivoyage) and public domain (US government)",
+    description: "First aid, survival, disasters, water, food preservation and self-sufficiency. ~16MB.",
+    required: false,
+  },
+  {
+    id: "boar-crypto",
+    kind: "corpus",
+    format: "sqlite-pack",
+    label: "Ethereum and crypto (3,141 documents)",
+    filename: "corpus/boar-crypto.sqlite",
+    sizeBytes: 36093952,
+    sha256: "ae9fbd2c7a46a46a815d46d0283e7b192adb4c342b38a2adc4881e8f9d8831fb",
+    sourceUrl: "https://huggingface.co/datasets/r4topunk/boar-packs/resolve/a55c1ec8a5fe8bbda99c4197c33474637bef1958/topics/boar-crypto.sqlite",
+    license: "CC0 1.0 (EIPs, ERCs, specs), MIT (ethereum.org), CC BY-SA 4.0 (Wikipedia) and others",
+    description: "EIPs and ERCs, Ethereum specs, the Yellow Paper, ethereum.org, BIPs and related Wikipedia. ~36MB.",
+    required: false,
+  },
   // Add more tested candidates / corpus packs here later (each needs a
   // unique `id` and `filename`). They ship with `required: false` and
   // appear in the Settings screen as optional downloads.
