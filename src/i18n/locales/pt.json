@@ -443,7 +443,7 @@
     "runFailedTitle": "Falha na avaliação",
     "deviceRequest": "Iniciado por um computador conectado (pedido {{id}}).",
     "noRetrieval": "sem recuperação",
-    "share": "⇪ Compartilhar resultados",
+    "share": "Compartilhar",
     "sharing": "Compartilhando…",
     "shared": "✓ Compartilhado",
     "shareTitle": "Compartilhar resultados",
@@ -480,6 +480,63 @@
       "answers": "{{count}} perguntas e respostas (toque para ler)",
       "notSentSection": "Não é enviado",
       "notSent": "Suas conversas, seus documentos, seu nome, sua localização, seus contatos. Este celular é identificado só por um número aleatório criado no app."
+    },
+    "shareProgress": {
+      "sendingTitle": "Enviando seus resultados",
+      "step": {
+        "prepare": "Empacotando as respostas",
+        "challenge": "Pedindo um código de uso único ao servidor",
+        "key": "Obtendo a chave de segurança deste celular",
+        "sign": "Assinando os resultados",
+        "send": "Enviando e conferindo"
+      },
+      "title": {
+        "shared": "Compartilhado",
+        "shared-pending": "Enviado para revisão",
+        "already-shared": "Já compartilhado",
+        "rate-limited": "Limite diário atingido",
+        "cooldown": "Cedo demais",
+        "network-limited": "Limite da rede atingido",
+        "rejected": "Não aceito",
+        "offline": "Não foi possível falar com o servidor",
+        "busy": "O servidor está ocupado",
+        "server-error": "O servidor teve um problema",
+        "key-failed": "Não foi possível assinar os resultados",
+        "failed": "Não foi possível compartilhar"
+      },
+      "why": {
+        "shared": "Sua avaliação está no ranking. Obrigado!",
+        "shared-pending": "O hardware seguro deste celular não conseguiu provar que os resultados vêm de um celular de verdade, o que acontece em alguns celulares genuínos. A avaliação foi salva e a equipe do BOAR vai revisá-la antes de aparecer no site.",
+        "already-shared": "Esta avaliação já estava no servidor; nada novo foi enviado.",
+        "rate-limited": "Cada celular pode compartilhar 3 avaliações em 24 horas. Tente mais tarde.",
+        "rate-limitedAt": "Cada celular pode compartilhar 3 avaliações em 24 horas. Você pode compartilhar de novo às {{time}}.",
+        "cooldown": "É preciso esperar uma hora entre compartilhamentos do mesmo celular. Tente mais tarde.",
+        "cooldownAt": "É preciso esperar uma hora entre compartilhamentos do mesmo celular. Você pode compartilhar de novo às {{time}}.",
+        "network-limited": "Muitas avaliações foram compartilhadas desta rede hoje, talvez de outros celulares no mesmo Wi-Fi. Tente mais tarde ou por outra conexão.",
+        "rejected": "O servidor recusou esta avaliação. Só o app oficial do BOAR, atualizado, em um celular de verdade pode compartilhar. Os detalhes abaixo dizem o porquê.",
+        "offline": "O servidor não respondeu. Verifique a internet e tente de novo. Seus resultados continuam no celular.",
+        "busy": "Muitos compartilhamentos agora. Tente de novo em alguns minutos.",
+        "server-error": "Algo deu errado no servidor. Tente de novo em alguns minutos; se continuar, exporte os resultados e envie para a equipe.",
+        "key-failed": "Este celular não conseguiu criar ou usar uma chave de segurança para assinar os resultados, então eles não podem ser compartilhados. Exporte e envie o arquivo para a equipe.",
+        "failed": "Algo inesperado deu errado. Tente de novo, ou exporte os resultados."
+      },
+      "logTitle": "O que aconteceu",
+      "log": {
+        "prepare": "Empacotando {{count}} respostas",
+        "challenge": "Pedindo ao servidor um código de uso único…",
+        "challengeGot": "Código de uso único {{code}}…",
+        "key": "Criando uma chave no hardware seguro do celular…",
+        "key-existing": "Usando a chave deste celular",
+        "key-new-attested": "Chave nova, certificada pelo hardware seguro do celular",
+        "key-new-unattested": "O hardware seguro não certifica chaves: usando uma chave simples, para revisão",
+        "sign": "Assinando os resultados",
+        "send": "Enviando {{size}} ({{count}} respostas)",
+        "status": "O servidor respondeu {{status}}"
+      },
+      "detail": "Detalhes: {{detail}}",
+      "retry": "Tentar de novo",
+      "exportTitle": "Guardar uma cópia",
+      "exportFooter": "Salve a avaliação inteira em um arquivo, aconteça o que acontecer: JSONL para ferramentas, CSV para planilhas."
     }
   },
   "chat": {

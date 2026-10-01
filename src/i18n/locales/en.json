@@ -443,7 +443,7 @@
     "runFailedTitle": "Evaluation failed",
     "deviceRequest": "Started from a connected computer (request {{id}}).",
     "noRetrieval": "no retrieval",
-    "share": "⇪ Share results",
+    "share": "Share",
     "sharing": "Sharing…",
     "shared": "✓ Shared",
     "shareTitle": "Share results",
@@ -480,6 +480,63 @@
       "answers": "{{count}} questions and answers (tap to read)",
       "notSentSection": "Not sent",
       "notSent": "Your chats, your documents, your name, your location, your contacts. This phone is identified only by a random number created in the app."
+    },
+    "shareProgress": {
+      "sendingTitle": "Sending your results",
+      "step": {
+        "prepare": "Packing the answers",
+        "challenge": "Getting a one-time code from the server",
+        "key": "Getting this phone's security key",
+        "sign": "Signing the results",
+        "send": "Sending and checking"
+      },
+      "title": {
+        "shared": "Shared",
+        "shared-pending": "Sent for review",
+        "already-shared": "Already shared",
+        "rate-limited": "Daily limit reached",
+        "cooldown": "Too soon",
+        "network-limited": "Network limit reached",
+        "rejected": "Not accepted",
+        "offline": "Couldn't reach the server",
+        "busy": "The server is busy",
+        "server-error": "The server had a problem",
+        "key-failed": "Couldn't sign the results",
+        "failed": "Couldn't share"
+      },
+      "why": {
+        "shared": "Your run is on the leaderboard. Thank you!",
+        "shared-pending": "This phone's secure hardware couldn't prove the results come from a real phone, which happens on some genuine phones. The run is saved and the BOAR team will review it before it appears on the website.",
+        "already-shared": "This run was already on the server; nothing new was sent.",
+        "rate-limited": "Each phone can share 3 runs in 24 hours. Try again later.",
+        "rate-limitedAt": "Each phone can share 3 runs in 24 hours. You can share again at {{time}}.",
+        "cooldown": "Shares from one phone need an hour between them. Try again later.",
+        "cooldownAt": "Shares from one phone need an hour between them. You can share again at {{time}}.",
+        "network-limited": "Many runs were shared from this network today, maybe other phones on the same Wi-Fi. Try again later, or from another connection.",
+        "rejected": "The server refused this run. Only the official BOAR app, up to date, on a real phone can share. The details below say why.",
+        "offline": "No answer from the server. Check the internet connection and try again. Your results are still on the phone.",
+        "busy": "Too many shares right now. Try again in a few minutes.",
+        "server-error": "Something went wrong on the server. Try again in a few minutes; if it keeps happening, export the results and send them to the team.",
+        "key-failed": "This phone couldn't create or use a security key to sign the results, so they can't be shared. Export them instead and send the file to the team.",
+        "failed": "Something unexpected went wrong. Try again, or export the results."
+      },
+      "logTitle": "What happened",
+      "log": {
+        "prepare": "Packing {{count}} answers",
+        "challenge": "Asking the server for a one-time code…",
+        "challengeGot": "One-time code {{code}}…",
+        "key": "Creating a key in the phone's secure hardware…",
+        "key-existing": "Using this phone's key",
+        "key-new-attested": "New key, certified by the phone's secure hardware",
+        "key-new-unattested": "The secure hardware can't certify keys: using a plain key, for review",
+        "sign": "Signing the results",
+        "send": "Sending {{size}} ({{count}} answers)",
+        "status": "Server answered {{status}}"
+      },
+      "detail": "Details: {{detail}}",
+      "retry": "Try again",
+      "exportTitle": "Keep a copy",
+      "exportFooter": "Save the whole run as a file, whatever happened: JSONL for tools, CSV for spreadsheets."
     }
   },
   "chat": {
