@@ -26,7 +26,6 @@ export function KnowledgeBaseScreen({ onClose }: { onClose: () => void }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerIcon}>📚</Text>
           <Text style={styles.title}>{t("knowledgeBaseScreen.title")}</Text>
         </View>
         <Pressable onPress={handleClose} hitSlop={8} style={styles.closeBtn}>
@@ -56,9 +55,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  headerIcon: {
-    fontSize: 18,
   },
   title: {
     ...typography.ui.titleSm,
