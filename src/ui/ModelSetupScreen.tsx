@@ -300,7 +300,7 @@ export function ModelSetupScreen(props: Props) {
             <Switch
               value={hapticsEnabled}
               onValueChange={toggleHaptics}
-              trackColor={{ false: "#333", true: "#3a7a4a" }}
+              trackColor={{ false: colors.border.default, true: colors.emerald[500] }}
             />
           </View>
         </AccordionSection>

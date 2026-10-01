@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Switch, Pressable, Alert } from "react-native";
+import { colors } from "./theme/colors";
 import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { getMemorySettings, setMemorySettings, MemorySettings as MemorySettingsType } from "../models/settings";
@@ -58,7 +59,7 @@ export function MemorySettings({ onCleared }: { onCleared?: () => void }) {
         <Switch
           value={settings.autoSummarize}
           onValueChange={(v) => update({ autoSummarize: v })}
-          trackColor={{ false: "#333", true: "#3a7a4a" }}
+          trackColor={{ false: colors.border.default, true: colors.emerald[500] }}
         />
       </View>
 
@@ -102,7 +103,7 @@ export function MemorySettings({ onCleared }: { onCleared?: () => void }) {
         <Switch
           value={settings.autoGenerateTitles}
           onValueChange={(v) => update({ autoGenerateTitles: v })}
-          trackColor={{ false: "#333", true: "#3a7a4a" }}
+          trackColor={{ false: colors.border.default, true: colors.emerald[500] }}
         />
       </View>
 
@@ -114,24 +115,24 @@ export function MemorySettings({ onCleared }: { onCleared?: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: "#111", borderRadius: 10, padding: 14, margin: 12, gap: 12 },
-  title: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  card: { backgroundColor: colors.bg.card, borderRadius: 10, padding: 14, margin: 12, gap: 12 },
+  title: { color: colors.text.heading, fontSize: 14, fontWeight: "600" },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
-  rowLabel: { color: "#eee", fontSize: 13, fontWeight: "600" },
-  rowValue: { color: "#999", fontSize: 11, marginTop: 2 },
-  subheading: { color: "#ccc", fontSize: 12, fontWeight: "600" },
+  rowLabel: { color: colors.text.primary, fontSize: 13, fontWeight: "600" },
+  rowValue: { color: colors.text.muted, fontSize: 11, marginTop: 2 },
+  subheading: { color: colors.text.secondary, fontSize: 12, fontWeight: "600" },
   pillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  pill: { backgroundColor: "#1a1a1a", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
-  pillSelected: { backgroundColor: "#2a5f3a" },
-  pillText: { color: "#999", fontSize: 12 },
-  pillTextSelected: { color: "#fff", fontWeight: "600" },
+  pill: { backgroundColor: colors.bg.cardHover, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
+  pillSelected: { backgroundColor: colors.emerald[600] },
+  pillText: { color: colors.text.muted, fontSize: 12 },
+  pillTextSelected: { color: colors.text.heading, fontWeight: "600" },
   clearBtn: {
-    backgroundColor: "rgba(122,42,42,0.3)",
+    backgroundColor: colors.crimson.bgSubtle,
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(122,42,42,0.5)",
+    borderColor: colors.crimson.border,
   },
-  clearBtnText: { color: "#f88", fontSize: 13, fontWeight: "700" },
+  clearBtnText: { color: colors.crimson[400], fontSize: 13, fontWeight: "700" },
 });

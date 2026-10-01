@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, Pressable, Switch, Alert, ActivityIndicator } from "react-native";
+import { colors } from "./theme/colors";
 import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import {
@@ -108,7 +109,7 @@ export function PersonalDocumentsManager() {
         <TextInput
           style={styles.nameInput}
           placeholder={t("personalDocumentsManager.namePlaceholder")}
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.text.dim}
           value={newName}
           onChangeText={setNewName}
           editable={!importProgress}
@@ -119,7 +120,7 @@ export function PersonalDocumentsManager() {
           disabled={!!importProgress}
         >
           {importProgress ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.text.heading} />
           ) : (
             <Text style={styles.importBtnText}>📄 {t("personalDocumentsManager.pickButton")}</Text>
           )}
@@ -172,12 +173,12 @@ export function PersonalDocumentsManager() {
 }
 
 const styles = StyleSheet.create({
-  hint: { color: "#888", fontSize: 11, marginHorizontal: 12, marginTop: 4, lineHeight: 16 },
+  hint: { color: colors.text.muted, fontSize: 11, marginHorizontal: 12, marginTop: 4, lineHeight: 16 },
   list: { padding: 12, gap: 10 },
   importCard: {
     marginHorizontal: 12,
     marginTop: 10,
-    backgroundColor: "#111",
+    backgroundColor: colors.bg.card,
     borderRadius: 10,
     padding: 12,
     gap: 8,
@@ -185,25 +186,25 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.06)",
   },
   nameInput: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.bg.cardHover,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    color: "#eee",
+    color: colors.text.primary,
     fontSize: 13,
   },
   importBtn: {
-    backgroundColor: "#2a5f3a",
+    backgroundColor: colors.emerald[600],
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: "center",
   },
-  importBtnDisabled: { backgroundColor: "#333" },
-  importBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  progressText: { color: "#8f8", fontSize: 11, textAlign: "center" },
-  empty: { color: "#666", fontSize: 12, marginHorizontal: 12, marginTop: 8 },
+  importBtnDisabled: { backgroundColor: colors.border.default },
+  importBtnText: { color: colors.text.heading, fontWeight: "700", fontSize: 13 },
+  progressText: { color: colors.text.accentEmerald, fontSize: 11, textAlign: "center" },
+  empty: { color: colors.text.dim, fontSize: 12, marginHorizontal: 12, marginTop: 8 },
   collectionCard: {
-    backgroundColor: "#111",
+    backgroundColor: colors.bg.card,
     borderRadius: 10,
     padding: 12,
     gap: 6,
@@ -212,11 +213,11 @@ const styles = StyleSheet.create({
   },
   collectionCardInactive: { opacity: 0.55 },
   collectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  collectionName: { color: "#eee", fontSize: 14, fontWeight: "600", flex: 1 },
-  collectionMeta: { color: "#8f8", fontSize: 11 },
+  collectionName: { color: colors.text.primary, fontSize: 14, fontWeight: "600", flex: 1 },
+  collectionMeta: { color: colors.text.accentEmerald, fontSize: 11 },
   collectionActions: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4 },
-  exportBtn: { backgroundColor: "rgba(59,130,246,0.2)", borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
-  exportBtnText: { color: "#9cc4ff", fontSize: 12, fontWeight: "600" },
+  exportBtn: { backgroundColor: colors.cyan.bgSubtle, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 6 },
+  exportBtnText: { color: colors.text.accentCyan, fontSize: 12, fontWeight: "600" },
   trashBtn: { marginLeft: "auto", padding: 4 },
   trashIcon: { fontSize: 15 },
 });

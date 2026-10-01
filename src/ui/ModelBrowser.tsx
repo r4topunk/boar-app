@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { View, StyleSheet, Pressable, FlatList, ActivityIndicator, Alert } from "react-native";
+import { colors } from "./theme/colors";
 import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { searchModels, listGgufFiles, toCatalogModel, HFModelSummary, HFGgufFile } from "../services/modelBrowser";
@@ -96,14 +97,14 @@ export function ModelBrowser({ onAdded }: Props) {
         <TextInput
           style={styles.input}
           placeholder={t("modelBrowser.searchPlaceholder")}
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.text.dim}
           value={query}
           onChangeText={setQuery}
           onSubmitEditing={runSearch}
           returnKeyType="search"
         />
         <Pressable style={styles.searchBtn} onPress={runSearch} disabled={searching}>
-          {searching ? <ActivityIndicator color="#fff" /> : <Text style={styles.searchBtnText}>🔎</Text>}
+          {searching ? <ActivityIndicator color={colors.text.heading} /> : <Text style={styles.searchBtnText}>🔎</Text>}
         </Pressable>
       </View>
 
@@ -125,7 +126,7 @@ export function ModelBrowser({ onAdded }: Props) {
             </Pressable>
 
             {expandedRepo === item.id && filesLoading === item.id && (
-              <ActivityIndicator color="#8f8" style={{ marginTop: 8 }} />
+              <ActivityIndicator color={colors.text.accentEmerald} style={{ marginTop: 8 }} />
             )}
 
             {expandedRepo === item.id &&
@@ -166,33 +167,33 @@ export function ModelBrowser({ onAdded }: Props) {
 
 const styles = StyleSheet.create({
   container: { marginTop: 4 },
-  hint: { color: "#888", fontSize: 11, marginBottom: 8, lineHeight: 16 },
+  hint: { color: colors.text.muted, fontSize: 11, marginBottom: 8, lineHeight: 16 },
   searchRow: { flexDirection: "row", gap: 8 },
   input: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.bg.cardHover,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    color: "#eee",
+    color: colors.text.primary,
     fontSize: 13,
   },
   searchBtn: {
-    backgroundColor: "#2a5f3a",
+    backgroundColor: colors.emerald[600],
     borderRadius: 6,
     paddingHorizontal: 14,
     justifyContent: "center",
   },
   searchBtnText: { fontSize: 15 },
   repoCard: {
-    backgroundColor: "#111",
+    backgroundColor: colors.bg.card,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
-  repoId: { color: "#eee", fontSize: 13, fontWeight: "600" },
-  repoMeta: { color: "#8f8", fontSize: 11, marginTop: 2 },
+  repoId: { color: colors.text.primary, fontSize: 13, fontWeight: "600" },
+  repoMeta: { color: colors.text.accentEmerald, fontSize: 11, marginTop: 2 },
   fileRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -202,8 +203,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.06)",
   },
-  fileName: { color: "#ddd", fontSize: 12 },
-  fileMeta: { color: "#888", fontSize: 10, marginTop: 2 },
-  addBtn: { backgroundColor: "rgba(59,130,246,0.2)", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
-  addBtnText: { color: "#9cc4ff", fontSize: 11, fontWeight: "600" },
+  fileName: { color: colors.text.primary, fontSize: 12 },
+  fileMeta: { color: colors.text.muted, fontSize: 10, marginTop: 2 },
+  addBtn: { backgroundColor: colors.cyan.bgSubtle, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  addBtnText: { color: colors.text.accentCyan, fontSize: 11, fontWeight: "600" },
 });

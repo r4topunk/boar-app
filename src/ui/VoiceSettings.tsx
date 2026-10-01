@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Switch } from "react-native";
+import { colors } from "./theme/colors";
 import { Text } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { isVoiceInputAvailable } from "../voice/VoiceInput";
@@ -33,7 +34,7 @@ export function VoiceSettings() {
           <Text style={styles.rowLabel}>{t("voiceSettings.enabledLabel")}</Text>
           <Text style={styles.rowValue}>{t("voiceSettings.enabledValue")}</Text>
         </View>
-        <Switch value={enabled} onValueChange={toggle} trackColor={{ false: "#333", true: "#3a7a4a" }} />
+        <Switch value={enabled} onValueChange={toggle} trackColor={{ false: colors.border.default, true: colors.emerald[500] }} />
       </View>
 
       <View style={styles.row}>
@@ -56,10 +57,10 @@ export function VoiceSettings() {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: "#111", borderRadius: 10, padding: 14, margin: 12, gap: 12 },
-  title: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  card: { backgroundColor: colors.bg.card, borderRadius: 10, padding: 14, margin: 12, gap: 12 },
+  title: { color: colors.text.heading, fontSize: 14, fontWeight: "600" },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
-  rowLabel: { color: "#eee", fontSize: 13, fontWeight: "600" },
-  rowValue: { color: "#999", fontSize: 12, marginTop: 2 },
-  note: { color: "#666", fontSize: 11, lineHeight: 16 },
+  rowLabel: { color: colors.text.primary, fontSize: 13, fontWeight: "600" },
+  rowValue: { color: colors.text.muted, fontSize: 12, marginTop: 2 },
+  note: { color: colors.text.dim, fontSize: 11, lineHeight: 16 },
 });

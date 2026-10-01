@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Pressable, Switch } from "react-native";
+import { colors } from "./theme/colors";
 import { Text, TextInput } from "./components/AppText";
 import { useTranslation } from "react-i18next";
 import { PERSONALITIES, PersonalityId, MAX_TOKENS_OPTIONS } from "../constants/personalities";
@@ -94,7 +95,7 @@ export function PersonalitySettings() {
           value={customPrompt}
           onChangeText={updateCustomPrompt}
           placeholder={t("personalitySettings.customPromptPlaceholder")}
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.text.dim}
           multiline
         />
       )}
@@ -125,7 +126,7 @@ export function PersonalitySettings() {
           <Switch
             value={deepResearch}
             onValueChange={toggleDeepResearch}
-            trackColor={{ false: "#333", true: "#3a7a4a" }}
+            trackColor={{ false: colors.border.default, true: colors.emerald[500] }}
           />
         </View>
       </View>
@@ -139,7 +140,7 @@ export function PersonalitySettings() {
           <Switch
             value={adaptiveRouting}
             onValueChange={toggleAdaptiveRouting}
-            trackColor={{ false: "#333", true: "#3a7a4a" }}
+            trackColor={{ false: colors.border.default, true: colors.emerald[500] }}
           />
         </View>
     </View>
@@ -148,9 +149,9 @@ export function PersonalitySettings() {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: "#111", borderRadius: 10, padding: 14, margin: 12, gap: 10 },
+  card: { backgroundColor: colors.bg.card, borderRadius: 10, padding: 14, margin: 12, gap: 10 },
   deepResearchRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  title: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  title: { color: colors.text.heading, fontSize: 14, fontWeight: "600" },
   option: {
     flexDirection: "row",
     alignItems: "center",
@@ -158,38 +159,38 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
   },
-  optionSelected: { backgroundColor: "#0e1a12" },
+  optionSelected: { backgroundColor: colors.emerald.bgSubtle },
   radio: {
     width: 16,
     height: 16,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: "#555",
+    borderColor: colors.border.elevated,
     alignItems: "center",
     justifyContent: "center",
   },
-  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#3a7a4a" },
-  optionLabel: { color: "#eee", fontSize: 13, fontWeight: "600" },
-  optionDescription: { color: "#999", fontSize: 11, marginTop: 2 },
+  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.emerald[500] },
+  optionLabel: { color: colors.text.primary, fontSize: 13, fontWeight: "600" },
+  optionDescription: { color: colors.text.muted, fontSize: 11, marginTop: 2 },
   customInput: {
-    backgroundColor: "#1a1a1a",
-    color: "#fff",
+    backgroundColor: colors.bg.cardHover,
+    color: colors.text.heading,
     borderRadius: 8,
     padding: 10,
     fontSize: 13,
     minHeight: 70,
     textAlignVertical: "top",
   },
-  subheading: { color: "#ccc", fontSize: 12, fontWeight: "600", marginTop: 4 },
+  subheading: { color: colors.text.secondary, fontSize: 12, fontWeight: "600", marginTop: 4 },
   tokenRow: { flexDirection: "row", gap: 8 },
   tokenPill: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.bg.cardHover,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  tokenPillSelected: { backgroundColor: "#2a5f3a" },
-  tokenPillText: { color: "#999", fontSize: 12 },
-  tokenPillTextSelected: { color: "#fff", fontWeight: "600" },
-  note: { color: "#666", fontSize: 11 },
+  tokenPillSelected: { backgroundColor: colors.emerald[600] },
+  tokenPillText: { color: colors.text.muted, fontSize: 12 },
+  tokenPillTextSelected: { color: colors.text.heading, fontWeight: "600" },
+  note: { color: colors.text.dim, fontSize: 11 },
 });
