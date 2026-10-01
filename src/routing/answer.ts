@@ -115,6 +115,9 @@ import type { ResearchOptions, ResearchProgress, ResearchResult } from "../servi
 import type { ExecutionOutcome, ExecutionTelemetryRecord, ModelResidency } from "../services/executionTelemetry.pure";
 import { smallTalkReply } from "./smallTalk";
 
+/** Development builds log each answer's checks to Metro ([ANSWER] lines); never in a release build or a test. */
+const DEV_LOG = typeof __DEV__ !== "undefined" && __DEV__ && process.env.NODE_ENV !== "test";
+
 export interface InstalledLlm {
   id: string;
   label: string;
@@ -743,6 +746,7 @@ export function createAnswerer(deps: AnswerDeps) {
           emit({ type: "warning", answerId, code: "weak_sources", message: "No offline source backs this answer." });
         }
         emit({ type: "done", answerId, tier, outcome, receipt: r, error, cited, ...(finalText !== undefined ? { finalText } : {}) });
+        if (DEV_LOG) console.log(`[ANSWER] done ${JSON.stringify({ q: req.query.slice(0, 80), tier, outcome, codes: reasonCodes, text: text.slice(0, 200) })}`);
         record(outcome, r, error);
         return { answerId, tier, outcome, text, sources, receipt: r, cited };
       };
@@ -1174,6 +1178,8 @@ export function createAnswerer(deps: AnswerDeps) {
         ctxTokens: timings?.promptTokens,
         cachedTokens: timings?.cachedTokens,
       });
+      // Development builds only: what the model wrote, before the checks below can change or hold it back.
+      if (DEV_LOG) console.log(`[ANSWER] model wrote ${JSON.stringify(text.slice(0, 600))} from ${JSON.stringify(sources.map((c) => c.title))}`);
       // A source in full: the orchestrator's (multi-pass), else the retrieved chunk (single pass), else as shown.
       // fullCited first: on a deeper answer, raw holds the earlier answer's shown (compressed) sources, which
       // would shadow the full chunk whenever the synthesis cites the same one again.

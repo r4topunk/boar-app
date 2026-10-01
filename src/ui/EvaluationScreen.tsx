@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { BackHandler, Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { llamaEngine } from "../inference/LlamaEngine";
@@ -273,6 +273,17 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
   const canContinue = unfinished?.manifest.evalSetVersion === EVAL_SET_VERSION;
   const unfinishedTotal = unfinished ? unfinished.manifest.configs.length * unfinished.manifest.queryIds.length : 0;
 
+  // Opened standalone (a device request): Android back is the Done button, and does nothing during a
+  // run, so a stray press can't close the app in the middle of a benchmark.
+  useEffect(() => {
+    if (!onClose) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (!running) onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onClose, running]);
+
   const autoStarted = useRef(false);
   useEffect(() => {
     if (deviceRequest && models !== null && !autoStarted.current) {
@@ -284,7 +295,9 @@ export function EvaluationScreen({ onClose, chatBusy, deviceRequest }: Props) {
 
   return (
     // The flow screens' 14 pt rhythm, like its siblings (Prism FL-29).
-    <Screen contentStyle={screenRhythm(tokens)}>
+    // Opened outside the navigator (a device request), no header sits above it: it owns the top inset
+    // too. Screen adds it by hand on Android only; iOS's automatic inset already covers it.
+    <Screen edges={onClose ? ["top", "bottom", "left", "right"] : undefined} contentStyle={screenRhythm(tokens)}>
       {!onClose && <ScreenTitle>{t("flows.performance.evaluationTitle")}</ScreenTitle>}
       <View style={{ gap: tokens.space.xs }}>
         {onClose && !running && (

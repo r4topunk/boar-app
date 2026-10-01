@@ -495,11 +495,20 @@ export function ChatScreen({ onRelaunchWizard }: { onRelaunchWizard?: () => void
       };
       // A local copy of the state, so what gets persisted doesn't depend on render timing.
       let local = (itemsRef.current.find((m) => m.id === messageId) as Extract<ChatItem, { kind: "assistant" }>).answer;
+      let attached = false;
       const handle = start((event) => {
+        // An instant answer (calculator, small talk, emergency numbers, first-aid card) sends its text and
+        // its done during start(), before handle.answerId is attached below: the reducer drops events of an
+        // unknown answer, so the saved copy came out empty and replaced the text that had flashed on screen.
+        // This run's first event carries its id (a Deepen's message already holds the earlier answer's).
+        if (!attached) {
+          attached = true;
+          local = attachAnswer(local, event.answerId);
+        }
         local = answerReducer(local, event);
         queueEvent(messageId, event);
       }, ctx);
-      local = attachAnswer(local, handle.answerId);
+      if (!local.answerIds.includes(handle.answerId)) local = attachAnswer(local, handle.answerId);
       setItems((prev) => updateAnswer(prev, messageId, (a) => attachAnswer(a, handle.answerId)));
       activeRef.current = { messageId, handle };
       setActive(activeRef.current);
