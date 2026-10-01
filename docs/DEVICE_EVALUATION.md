@@ -55,10 +55,7 @@ shape and comparable.
 3. **A development build of BOAR** installed (`npx expo run:android`, or
    `npm run eval:device -- --install` builds and installs one). Release builds
    can't be driven this way on purpose: request pickup only exists in
-   development builds, and reading results needs a debuggable app. The other
-   way round, a development build can't share its runs (Evaluation › Share
-   results): the server accepts only release builds, see
-   [RESULTS_SCORE.md](RESULTS_SCORE.md#which-builds-can-share).
+   development builds, and reading results needs a debuggable app.
 4. **Metro running** in another terminal: `make start` (or
    `npx expo start --localhost`).
 5. **Models downloaded** in the app (Settings → Models). The tool never
@@ -110,55 +107,6 @@ poll …/<requestId>.status.json ◀─────────── writes pro
 pull files/eval/<runId>.jsonl ◀──────────── saves the results
 print the report
 ```
-
-## iPhone: the live answer pipeline
-
-`npm run eval:iphone` runs any question file through the same `answer()` the chat
-calls (`src/eval/answerEval.ts`): routing, places, instant snippets, the
-multi-part research answer and the device's answer settings. The Android CLI
-and the Evaluation screen still replay the older `executor.ts` path over the
-17-question set, so their times are not the chat's.
-
-```bash
-npm run eval:iphone -- --questions eval/dataset/questions.v2.jsonl --answer-anyway \
-  --runs-file eval/results/runs/v2/qwen2.5-1.5b-instruct-q4km__iphone-<sha>.jsonl
-```
-
-- **Benchmark build:** request pickup is on only in development builds and in
-  builds made with `EXPO_PUBLIC_DEVICE_EVAL=1` (`src/eval/deviceEvalGate.ts`, read
-  once at load). A shipped build never polls for requests or creates
-  `eval/requests`. For a Release iPhone build:
-  `EXPO_PUBLIC_DEVICE_EVAL=1 scripts/ios-remote-build.sh device`, which forwards the flag.
-- **Transport:** a request file copied into the app container with `devicectl`
-  (`Documents/eval/requests/pending.json`). The app picks it up in the
-  foreground and writes `<requestId>.status.json` and `eval/<requestId>.answer.jsonl`.
-  No Appium or WDA: keep the phone unlocked (auto-lock off) with BOAR open.
-- **Android:** the same request goes in over `adb shell run-as <pkg>`, which
-  needs a debuggable app, so use the development client. For timings like a
-  release build, serve production-mode JS with the flag:
-  `EXPO_PUBLIC_DEVICE_EVAL=1 npx expo start --localhost --no-dev --minify`.
-  `__DEV__` is then off and the flag keeps pickup on.
-- **Resume:** results go to `eval/<requestId>.answer.jsonl` and are rewritten
-  after every question. If the OS kills the app mid-run, send the **same
-  request (same `requestId`)** again (`eval-iphone.mjs --request-id <id>`). The
-  app skips the questions that file already answers, a declined answer
-  without its re-ask is redone, and at the end it restores the model and
-  answer settings from before the first run (`eval/<requestId>.restore.json`).
-  A new id starts over. A Stop-cut answer is asked again; rows for questions or
-  models the resent request no longer asks for are dropped. The restore point
-  is always applied at the end, and a leftover one from another killed request
-  wins over a fresh snapshot (it holds the device's real settings).
-- **Low RAM:** a requested model the app would not run (too big for a phone
-  with ≤ 4.5 GB unless confirmed, or one that crashed the app on its last load)
-  fails the request instead of silently answering with another model. Pass
-  `--confirm-large-models` to confirm the RAM case, as the app's "run it anyway" does.
-- One row per answer, in the eval/ judge format, plus: `stages` (every stage
-  event with ms since `answer()`), `firstSourcesMs`, `instantMs`, `firstTokenMs`,
-  `placesMs`, `places` (count, coverage), `declined`, `answeredAnyway`,
-  `citedTitles` and the receipt. With `--answer-anyway` a declined answer is
-  asked again, as if "Answer anyway" was tapped; `--runs-file` keeps the re-ask.
-- The prompt is fixed (default personality, no history, 512 tokens); the answer
-  settings in effect are recorded on every row.
 
 ## Tips
 

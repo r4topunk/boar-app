@@ -1,7 +1,5 @@
-import { Platform } from "react-native";
-import { LlamaContext, getBackendDevicesInfo, initLlama } from "llama.rn";
+import { LlamaContext, initLlama } from "llama.rn";
 import * as FileSystem from "expo-file-system/legacy";
-import { cpuDeviceNames, initWithCpuFallback } from "../inference/initFallback";
 
 /**
  * Wraps a small local embedding model (GGUF, <300MB) via llama.rn's
@@ -41,13 +39,12 @@ export class EmbeddingEngine {
       throw new Error(`Embedding model not found at ${modelPath}`);
     }
     await this.unloadNow();
-    // iPhone 13: llama.rn's Metal backend can fail to start; the embedder then runs on CPU (see initFallback).
-    const loaded = await initWithCpuFallback(
-      initLlama,
-      { model: modelPath, embedding: true, n_ctx: 512, n_threads: 2 },
-      { platform: Platform.OS, cpuDevices: () => cpuDeviceNames(getBackendDevicesInfo), log: (m) => console.warn(m) }
-    );
-    this.context = loaded.context;
+    this.context = await initLlama({
+      model: modelPath,
+      embedding: true,
+      n_ctx: 512,
+      n_threads: 2,
+    });
     this.modelFilename = modelFilename;
   }
 

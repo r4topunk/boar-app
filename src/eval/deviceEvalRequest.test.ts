@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { blockedEvalModels, matchModels, parseEvalRequest, resolveEvalRequest } from "./deviceEvalRequest.pure";
+import { matchModels, parseEvalRequest, resolveEvalRequest } from "./deviceEvalRequest.pure";
 import { EVAL_SET } from "./evalSet";
 import { MODEL_CATALOG, CatalogModel } from "../models/manifest";
 
@@ -72,23 +72,5 @@ describe("resolveEvalRequest", () => {
   it("still runs adaptive when no model is installed, matching the Evaluation screen", () => {
     const r = resolveEvalRequest({ requestId: "r" }, [], EVAL_SET, "A");
     expect(r.ok && r.configs.map((c) => c.kind)).toEqual(["adaptive"]);
-  });
-});
-
-describe("blockedEvalModels (F1: a requested model answer() would replace)", () => {
-  const GiB = 1024 ** 3;
-  const FOUR_B = { ...QWEN, id: "qwen3-4b", answerTier: "default" as const, sizeBytes: 2.5e9 };
-  it("flags an unconfirmed big model on a low-RAM phone, and a model that crashed on load", () => {
-    expect(blockedEvalModels([FOUR_B, QWEN], 3.8 * GiB, {})).toEqual([{ id: "qwen3-4b", reason: "low-ram" }]);
-    expect(blockedEvalModels([QWEN], 3.8 * GiB, { loadCrashedIds: [QWEN.id] })).toEqual([{ id: QWEN.id, reason: "load-crashed" }]);
-  });
-  it("lets it run when confirmed (in the app or by the request), or on a phone with enough RAM", () => {
-    expect(blockedEvalModels([FOUR_B], 3.8 * GiB, { largeModelConfirmedIds: ["qwen3-4b"] })).toEqual([]);
-    expect(blockedEvalModels([FOUR_B], 3.8 * GiB, {}, true)).toEqual([]);
-    expect(blockedEvalModels([FOUR_B], 7.5 * GiB, {})).toEqual([]);
-  });
-  it("parses confirmLargeModels only on the answer pipeline", () => {
-    expect(parseEvalRequest(JSON.stringify({ requestId: "r1", pipeline: "answer", confirmLargeModels: true })).confirmLargeModels).toBe(true);
-    expect(() => parseEvalRequest(JSON.stringify({ requestId: "r1", confirmLargeModels: true }))).toThrow(/pipeline/);
   });
 });

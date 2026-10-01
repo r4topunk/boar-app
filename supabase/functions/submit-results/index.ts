@@ -1,51 +1,25 @@
-// Receives one evaluation run from the app and stores it, only from a real phone running BOAR.
+// Receives one evaluation run from the app and stores it in eval_runs / eval_rows.
 //
 // POST /functions/v1/submit-results, header `apikey: <publishable key>`, JSON body:
+//   { installId, run: { runId, evalSetVersion, appVersion, platform, osVersion?, deviceBrand?,
+//     deviceModel?, soc?, socManufacturer?, hardware?, apiLevel?, ramBytes?, cpuCores?,
+//     cpuFeatures?: string[], coreMaxFreqKHz?: number[] }, rows: [<eval JSONL row>, ...] }
 //
-// 1. { "step": "challenge" } -> 200 { challenge }: a one-time nonce, valid for 5 minutes.
-// 2. { "step": "submit", challenge, payload, signature, device } -> 201 { id, rows, hidden, scores }
-//    - payload: a JSON string { run: {...}, rows: [<eval JSONL row>, ...] } (see payload.ts).
-//    - signature: over the UTF-8 of `${challenge}.${payload}` with the phone's hardware key.
-//      Android: DER ECDSA from the Keystore key. iOS: an App Attest assertion.
-//    - device: { platform: "android", attestation: [cert, ...] } or
-//      { platform: "ios", keyId, attestation: [attestationObject] } the first time (the key's
-//      attestation must carry this same challenge); afterwards { platform, id }.
-//      An Android phone whose secure hardware can't attest sends { platform: "android",
-//      attestation: [], publicKey, attestationError? }: its runs are stored for review, hidden.
+// After saving the rows it computes each model's score (compute_eval_scores, score v1) into the
+// public eval_scores table; the score is never taken from the app.
 //
-// Once the key is checked, every answer also carries `device`, the id the app sends from then on.
-// Errors: 400 bad request · 401 bad key, signature or challenge · 403 banned · 409 already
-// shared · 412 unknown device (make a new key) · 429 { error, retryAt? }: rate_limited or cooldown
-// (this device), network_limited (this network) · 503 busy or review_queue_full.
-// A 201 carries pendingReview: true for an unattested phone. The limits and the storing happen in
-// submit_eval_run() in one transaction; see
-// supabase/migrations/20260929200000_secure_sharing.sql.
-//
-// The publishable key is public (it ships in the APK), so it only keeps out random callers; the
-// hardware key is what makes curl useless. verify_jwt is off (supabase/config.toml) because the
-// new API keys aren't JWTs.
+// The publishable key is public (it ships in the APK), so it only keeps out random callers;
+// the limits below are what protect the tables. verify_jwt is off (supabase/config.toml)
+// because the new API keys aren't JWTs.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import {
-  AttestError,
-  b64decode,
-  b64encode,
-  deviceIdFromSpki,
-  verifyAndroid,
-  verifyAndroidSignature,
-  verifyIos,
-  verifyIosAssertion,
-} from "./attest.ts";
-import { parsePayload } from "./payload.ts";
 
-// The largest run payload.ts accepts (204 rows) is about 1 MB once signed and escaped.
-const MAX_BODY_BYTES = 1.5 * 1024 * 1024;
-const PACKAGE_NAME = "team.sopa.aoair";
-/** SHA-256 of BOAR's release signing certificate. Debug builds share Expo's public debug key, so
- * they can't share runs. More (comma-separated) in ANDROID_CERT_DIGESTS, e.g. after a key change. */
-const RELEASE_CERT = "7cf514f9ab8253cbd78eb7d112d66fd05c2ad27e6fc987bf8f3276a7eedf1f01";
-/** "<Team ID>.team.sopa.aoair"; iOS sharing is refused until it is set. */
-const APPLE_APP_ID = Deno.env.get("APPLE_APP_ID") ?? "";
-const MAX_CHALLENGES_PER_10_MIN = 3000;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_ROWS = 1000;
+const MAX_RUNS_PER_DAY = 20;
+// The install id is chosen by the caller, so the per-install limit alone can be dodged by
+// sending a new id each time. This cap on all submissions doesn't depend on the caller.
+const MAX_RUNS_PER_HOUR_ALL = 300;
+const MAX_ANSWER_CHARS = 8000;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -58,22 +32,36 @@ function keys(name: string): string[] {
   }
 }
 
-const hex = (b: ArrayBuffer) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, "0")).join("");
-const sha256hex = async (text: string) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
-const b64url = (b: Uint8Array) => b64encode(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const str = (v: unknown, max: number): string | null =>
+  typeof v === "string" && v.length > 0 && v.length <= max ? v : null;
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const posInt = (v: unknown): number | null => {
+  const n = num(v);
+  return n !== null && Number.isInteger(n) && n > 0 ? n : null;
+};
+/** Short lowercase CPU flags like "i8mm" or "asimddp", at most 100 of them. */
+const cpuFlags = (v: unknown): string[] | null =>
+  Array.isArray(v) ? v.filter((f) => typeof f === "string" && /^[a-z0-9_]{1,32}$/.test(f)).slice(0, 100) : null;
+const int = (v: unknown): number | null => {
+  const n = num(v);
+  return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
+};
+const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+/** Core frequencies in kHz (0 = unknown), at most 64 cores. */
+const freqs = (v: unknown): number[] | null =>
+  Array.isArray(v) && v.length <= 64 && v.every((f) => Number.isInteger(f) && f >= 0 && f < 10_000_000) ? v : null;
 
-const secret = keys("SUPABASE_SECRET_KEYS")[0] ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const db = createClient(Deno.env.get("SUPABASE_URL")!, secret, { auth: { persistSession: false } });
-const certDigests = [
-  RELEASE_CERT,
-  ...(Deno.env.get("ANDROID_CERT_DIGESTS") ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
-];
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
   if (!keys("SUPABASE_PUBLISHABLE_KEYS").includes(req.headers.get("apikey") ?? "")) {
     return json(401, { error: "invalid apikey" });
   }
+
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) return json(413, { error: "body too large" });
   let body: any;
@@ -83,142 +71,105 @@ Deno.serve(async (req) => {
     return json(400, { error: "invalid JSON" });
   }
 
-  // Supabase's gateway replaces x-forwarded-for with the caller's address: checked on 2026-09-30
-  // by sending forged values (one address, a list, two headers), which all hashed the same as none.
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
-  const ipHash = ip ? await sha256hex(`${secret}:${ip}`) : null;
-
-  if (body?.step === "challenge") {
-    const { count, error: countError } = await db
-      .from("eval_challenges")
-      .select("challenge", { count: "exact", head: true })
-      .gte("created_at", new Date(Date.now() - 600_000).toISOString());
-    if (countError) return json(500, { error: "could not issue a challenge" });
-    if ((count ?? 0) >= MAX_CHALLENGES_PER_10_MIN) return json(503, { error: "busy" });
-    const challenge = b64url(crypto.getRandomValues(new Uint8Array(32)));
-    const { data: issued, error } = await db.rpc("new_eval_challenge", { p_challenge: challenge, p_ip_hash: ipHash });
-    if (error) return json(500, { error: "could not issue a challenge" });
-    if (!issued) return json(429, { error: "network_limited" });
-    return json(200, { challenge });
+  const installId = str(body?.installId, 100);
+  const run = body?.run ?? {};
+  const rows: unknown[] = Array.isArray(body?.rows) ? body.rows : [];
+  const runId = str(run.runId, 100);
+  const evalSetVersion = str(run.evalSetVersion, 20);
+  const appVersion = str(run.appVersion, 40);
+  const platform = run.platform === "android" || run.platform === "ios" ? run.platform : null;
+  if (!installId || !runId || !evalSetVersion || !appVersion || !platform) {
+    return json(400, { error: "installId, run.runId, run.evalSetVersion, run.appVersion and run.platform are required" });
   }
-  if (body?.step !== "submit") return json(400, { error: "step must be challenge or submit" });
+  if (rows.length === 0 || rows.length > MAX_ROWS) return json(400, { error: `rows must hold 1 to ${MAX_ROWS} items` });
 
-  const { challenge, payload, signature, device } = body;
-  if (typeof challenge !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) return json(400, { error: "bad challenge" });
-  if (typeof payload !== "string" || typeof signature !== "string" || signature.length > 8192) {
-    return json(400, { error: "payload and signature are required" });
-  }
-  const platform = device?.platform;
-  if (platform !== "android" && platform !== "ios") return json(400, { error: "device.platform must be android or ios" });
-  if (platform === "ios" && !APPLE_APP_ID) return json(403, { error: "sharing from iOS isn't open yet" });
-
-  const parsed = parsePayload(payload, platform);
-  if ("error" in parsed) return json(400, { error: parsed.error });
-
-  // Used up now, whatever happens next: a request can't be replayed.
-  const { data: fresh, error: challengeError } = await db.rpc("take_eval_challenge", { p_challenge: challenge });
-  if (challengeError) return json(500, { error: "could not check the challenge" });
-  if (!fresh) return json(401, { error: "challenge expired or already used" });
-
-  const message = `${challenge}.${payload}`;
-  let deviceId: string;
-  let spki: Uint8Array;
-  let signCount = 0;
-  try {
-    if (Array.isArray(device.attestation) && device.attestation.length === 0) {
-      // No attestation (some genuine phones can't): register the bare key, runs wait for review.
-      if (platform !== "android" || typeof device.publicKey !== "string" || device.publicKey.length > 400) {
-        return json(400, { error: "an unattested key needs platform android and its publicKey" });
-      }
-      const bare = b64decode(device.publicKey);
-      try {
-        await crypto.subtle.importKey("spki", bare as BufferSource, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
-      } catch {
-        return json(400, { error: "publicKey must be a P-256 SubjectPublicKeyInfo" });
-      }
-      deviceId = await deviceIdFromSpki(bare);
-      const reason = typeof device.attestationError === "string" ? device.attestationError.slice(0, 200) : null;
-      const { error } = await db.from("eval_devices").upsert(
-        { id: deviceId, platform, public_key: b64encode(bare), attested: false, attestation: { attested: false, reason } },
-        { onConflict: "id", ignoreDuplicates: true },
-      );
-      if (error) return json(500, { error: "could not save the device" });
-    } else if (Array.isArray(device.attestation)) {
-      // First share from this key: check what the hardware says about it, then remember it.
-      const attested = platform === "android"
-        ? await verifyAndroid(device.attestation, challenge, { packageName: PACKAGE_NAME, certDigests })
-        : await verifyIos(String(device.attestation[0] ?? ""), String(device.keyId ?? ""), challenge, APPLE_APP_ID);
-      deviceId = "id" in attested ? String(attested.id) : await deviceIdFromSpki(attested.spki);
-      const { error } = await db.from("eval_devices").upsert(
-        { id: deviceId, platform, public_key: b64encode(attested.spki), attestation: attested.info },
-        { onConflict: "id", ignoreDuplicates: true },
-      );
-      if (error) return json(500, { error: "could not save the device" });
-    } else {
-      deviceId = String(device.id ?? "");
-      if (!/^[0-9a-f]{64}$/.test(deviceId)) return json(400, { error: "device.id or device.attestation is required" });
-    }
-  } catch (e) {
-    if (e instanceof AttestError) return json(401, { error: `attestation refused: ${e.message}` });
-    console.error("attestation check failed", e);
-    return json(503, { error: "could not check the attestation" });
+  const records = [];
+  for (const r of rows as any[]) {
+    const queryId = str(r?.queryId, 100);
+    const configId = str(r?.configId, 200);
+    const outcome = str(r?.outcome, 40);
+    if (!queryId || !configId || !outcome) return json(400, { error: "each row needs queryId, configId and outcome" });
+    const data = { ...r };
+    if (typeof data.answer === "string") data.answer = data.answer.slice(0, MAX_ANSWER_CHARS);
+    // The fields compute_eval_scores casts: anything malformed becomes null instead of failing the run.
+    data.tokensGenerated = int(r.tokensGenerated);
+    data.peakRssBytes = int(r.peakRssBytes);
+    data.timedOut = bool(r.timedOut);
+    data.expectedKbHit = bool(r.expectedKbHit);
+    data.configLabel = str(r.configLabel, 200);
+    records.push({
+      query_id: queryId,
+      config_id: configId,
+      model_id: str(r.modelId, 200),
+      outcome,
+      ttft_ms: num(r.ttftMs),
+      tok_per_sec: num(r.tokPerSec),
+      total_latency_ms: num(r.totalLatencyMs),
+      data,
+    });
   }
 
-  const { data: known, error: deviceError } = await db.from("eval_devices")
-    .select("platform, public_key, sign_count, banned").eq("id", deviceId).maybeSingle();
-  if (deviceError) return json(500, { error: "could not read the device" });
-  if (!known || known.platform !== platform) return json(412, { error: "unknown device" });
-  if (known.banned) return json(403, { error: "banned" });
-  spki = b64decode(known.public_key);
-  signCount = Number(known.sign_count);
+  const secret = keys("SUPABASE_SECRET_KEYS")[0] ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const db = createClient(Deno.env.get("SUPABASE_URL")!, secret!, { auth: { persistSession: false } });
+  const submitterHash = await sha256(installId);
 
-  if (platform === "android") {
-    if (!(await verifyAndroidSignature(spki, signature, message))) return json(401, { error: "bad signature" });
-  } else {
-    const counter = await verifyIosAssertion(spki, signature, message, APPLE_APP_ID, signCount);
-    if (counter === null) return json(401, { error: "bad signature" });
-    const { data: bumped, error } = await db.from("eval_devices").update({ sign_count: counter })
-      .eq("id", deviceId).lt("sign_count", counter).select("id");
-    if (error) return json(500, { error: "could not save the device" });
-    if (!bumped?.length) return json(401, { error: "bad signature" }); // a parallel request used this counter
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { count, error: countError } = await db
+    .from("eval_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("submitter_hash", submitterHash)
+    .gte("received_at", since);
+  if (countError) return json(500, { error: "could not check the rate limit" });
+  if ((count ?? 0) >= MAX_RUNS_PER_DAY) return json(429, { error: "too many runs today" });
+  const { count: hourCount, error: hourError } = await db
+    .from("eval_runs")
+    .select("id", { count: "exact", head: true })
+    .gte("received_at", new Date(Date.now() - 3600 * 1000).toISOString());
+  if (hourError) return json(500, { error: "could not check the rate limit" });
+  if ((hourCount ?? 0) >= MAX_RUNS_PER_HOUR_ALL) return json(429, { error: "too many runs right now" });
+
+  const { data: inserted, error: runError } = await db
+    .from("eval_runs")
+    .insert({
+      submitter_hash: submitterHash,
+      run_id: runId,
+      eval_set_version: evalSetVersion,
+      app_version: appVersion,
+      platform,
+      os_version: str(run.osVersion, 40),
+      device_brand: str(run.deviceBrand, 80),
+      device_model: str(run.deviceModel, 80),
+      soc: str(run.soc, 80),
+      soc_manufacturer: str(run.socManufacturer, 80),
+      hardware: str(run.hardware, 80),
+      api_level: posInt(run.apiLevel),
+      ram_bytes: posInt(run.ramBytes),
+      cpu_cores: posInt(run.cpuCores),
+      cpu_features: cpuFlags(run.cpuFeatures),
+      core_max_khz: freqs(run.coreMaxFreqKHz),
+      row_count: records.length,
+    })
+    .select("id")
+    .single();
+  if (runError) {
+    // 23505: this install already sent this run.
+    if (runError.code === "23505") return json(409, { error: "run already submitted" });
+    return json(500, { error: "could not save the run" });
   }
 
-  // From here the request is proven to come from this device: tell the app its id.
-  const reply = (status: number, body: Record<string, unknown>) => json(status, { ...body, device: deviceId });
-  const { data: result, error: submitError } = await db.rpc("submit_eval_run", {
-    p_device: deviceId,
-    p_ip_hash: ipHash,
-    p_run: parsed.run,
-    p_rows: parsed.rows,
-  });
-  if (submitError || !result) {
-    console.error("submit_eval_run failed", submitError);
-    return reply(500, { error: "could not save the run" });
+  const { error: rowsError } = await db.from("eval_rows").insert(records.map((r) => ({ ...r, run: inserted.id })));
+  if (rowsError) {
+    await db.from("eval_runs").delete().eq("id", inserted.id);
+    return json(500, { error: "could not save the rows" });
   }
-  switch (result.error) {
-    case undefined:
-      return reply(201, {
-        id: result.id,
-        rows: parsed.rows.length,
-        hidden: result.hidden,
-        pendingReview: result.pending_review === true,
-        scores: result.scores,
-      });
-    case "rate_limited":
-    case "cooldown":
-      return reply(429, { error: result.error, retryAt: result.retry_at ?? null });
-    case "network_limited":
-      return reply(429, { error: result.error });
-    case "duplicate":
-      return reply(409, { error: "run already submitted" });
-    case "unknown_device":
-      return reply(412, { error: "unknown device" });
-    case "banned":
-      return reply(403, { error: "banned" });
-    case "busy":
-    case "review_queue_full":
-      return reply(503, { error: result.error });
-    default:
-      return reply(400, { error: result.error });
+  const { error: scoreError } = await db.rpc("compute_eval_scores", { p_run: inserted.id });
+  if (scoreError) {
+    await db.from("eval_runs").delete().eq("id", inserted.id);
+    return json(500, { error: "could not score the run" });
   }
+  const { data: scores } = await db
+    .from("eval_scores")
+    .select("config_id, score, median_tok_per_sec, median_ttft_ms, peak_rss_bytes")
+    .eq("run", inserted.id);
+  return json(201, { id: inserted.id, rows: records.length, scores: scores ?? [] });
 });

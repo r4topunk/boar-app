@@ -41,8 +41,3 @@ export function impact(style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedba
 export function notification(type: Haptics.NotificationFeedbackType): void {
   if (enabled) Haptics.notificationAsync(type).catch(() => {});
 }
-
-/** Light tick for discrete value changes (switch, segmented control, chip toggle). */
-export function selection(): void {
-  if (enabled) Haptics.selectionAsync().catch(() => {});
-}
