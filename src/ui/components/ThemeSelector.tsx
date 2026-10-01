@@ -57,7 +57,6 @@ export function ThemeSelector({ compact = false }: Props) {
                 <View style={[styles.swatchDot, { backgroundColor: t.text.primary }]} />
               </View>
               <View style={styles.themeInfo}>
-                <Text style={styles.themeIcon}>{t.icon}</Text>
                 <Text
                   style={[
                     styles.themeName,
@@ -223,9 +222,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-  },
-  themeIcon: {
-    fontSize: 12,
   },
   themeName: {
     fontSize: 11,

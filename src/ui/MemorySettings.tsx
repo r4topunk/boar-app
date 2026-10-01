@@ -48,7 +48,7 @@ export function MemorySettings({ onCleared }: { onCleared?: () => void }) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>💾 {t("memorySettings.title")}</Text>
+      <Text style={styles.title}>{t("memorySettings.title")}</Text>
 
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
@@ -107,7 +107,7 @@ export function MemorySettings({ onCleared }: { onCleared?: () => void }) {
       </View>
 
       <Pressable style={styles.clearBtn} onPress={confirmClearAll}>
-        <Text style={styles.clearBtnText}>🗑️ {t("memorySettings.clearAllChatHistory")}</Text>
+        <Text style={styles.clearBtnText}>{t("memorySettings.clearAllChatHistory")}</Text>
       </Pressable>
     </View>
   );

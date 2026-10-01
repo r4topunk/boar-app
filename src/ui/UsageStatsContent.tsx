@@ -151,7 +151,6 @@ export function UsageStatsContent() {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <Text style={styles.cardIcon}>🧠</Text>
             <Text style={styles.cardTitle}>RAM & PROCESS MEMORY</Text>
           </View>
           <View
@@ -235,7 +234,6 @@ export function UsageStatsContent() {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <Text style={styles.cardIcon}>💾</Text>
             <Text style={styles.cardTitle}>APP STORAGE BREAKDOWN</Text>
           </View>
           <View
@@ -302,7 +300,6 @@ export function UsageStatsContent() {
       {/* SECTION 3: INFERENCE TELEMETRY */}
       <View style={styles.card}>
         <View style={styles.cardTitleRow}>
-          <Text style={styles.cardIcon}>⚡</Text>
           <Text style={styles.cardTitle}>LAST INFERENCE BENCHMARK</Text>
         </View>
 
@@ -343,7 +340,6 @@ export function UsageStatsContent() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <Text style={styles.cardIcon}>🧭</Text>
               <Text style={styles.cardTitle}>LAST ADAPTIVE ROUTING DECISION</Text>
             </View>
             <View
@@ -406,7 +402,6 @@ export function UsageStatsContent() {
       {/* SECTION 4: ACTIVE MODEL ARCHITECTURE */}
       <View style={styles.card}>
         <View style={styles.cardTitleRow}>
-          <Text style={styles.cardIcon}>⚙️</Text>
           <Text style={styles.cardTitle}>ACTIVE ENGINE CONFIGURATION</Text>
         </View>
 
@@ -471,9 +466,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  cardIcon: {
-    fontSize: 14,
   },
   cardTitle: {
     ...typography.mono.xs,
