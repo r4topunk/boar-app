@@ -253,10 +253,186 @@ export const frontierTheme = {
   },
 };
 
-export const THEMES = [midnightTheme, amberTheme, frontierTheme] as const;
 
-export function getThemeColors(id: ThemeId = "midnight") {
+/**
+ * Campfire and Moonlight: the look of the marketing and social posts (the "Fogueira & Luar"
+ * palettes, dark). Same shape as the themes above, so every screen takes them without edits:
+ * emerald is the action color (primary buttons), cyan the "verified" gold (sources, seals), amber
+ * the warning and crimson the error. Values from the designer's palette; status colors are the
+ * AA-adjusted ones.
+ */
+export const campfireTheme = {
+  id: "campfire" as ThemeId,
+  name: "Campfire",
+  icon: "🔥",
+  description: "Ember on warm charcoal",
+  bg: {
+    black: "#120D0A",
+    terminal: "#17110D",
+    surface: "#1C1510",
+    card: "#221913",
+    cardElevated: "#2A1F17",
+    cardHover: "#33271E",
+    input: "#1A130F",
+    subtle: "rgba(245, 233, 220, 0.03)",
+    overlay: "rgba(23, 17, 13, 0.78)",
+    modalOverlay: "rgba(10, 7, 5, 0.85)",
+  },
+  border: {
+    subtle: "rgba(245, 233, 220, 0.07)",
+    default: "#4A3526",
+    elevated: "#5C4432",
+    focus: "#FF7A3D",
+    emerald: "rgba(255, 122, 61, 0.35)",
+    cyan: "rgba(255, 193, 94, 0.35)",
+    amber: "rgba(242, 193, 78, 0.4)",
+    danger: "rgba(242, 105, 81, 0.4)",
+    frontier: "rgba(255, 193, 94, 0.45)",
+  },
+  text: {
+    primary: "#F5E9DC",
+    heading: "#FFF4E8",
+    secondary: "#D8CABA",
+    muted: "#B3A596",
+    dim: "#8A7B6C",
+    inverse: "#17110D",
+    accentEmerald: "#FF7A3D",
+    accentCyan: "#FFC15E",
+    accentAmber: "#F2C14E",
+    accentViolet: "#FFC15E",
+  },
+  emerald: {
+    50: "#FFF1E8",
+    400: "#FF915C",
+    500: "#FF7A3D",
+    600: "#E5652B",
+    900: "#4A2414",
+    bgSubtle: "rgba(255, 122, 61, 0.12)",
+    border: "rgba(255, 122, 61, 0.28)",
+  },
+  cyan: {
+    400: "#FFCF80",
+    500: "#FFC15E",
+    600: "#E0A23F",
+    bgSubtle: "rgba(255, 193, 94, 0.12)",
+    border: "rgba(255, 193, 94, 0.3)",
+  },
+  frontier: {
+    glow: "#FF7A3D",
+    glowCyan: "#FFC15E",
+    badgeBg: "rgba(255, 193, 94, 0.18)",
+    badgeBorder: "rgba(255, 193, 94, 0.45)",
+    text: "#FFC15E",
+    gradientStart: "#2A1A10",
+    gradientEnd: "#17110D",
+  },
+  amber: {
+    400: "#F2C14E",
+    500: "#E0AE3A",
+    600: "#C79524",
+    bgSubtle: "rgba(242, 193, 78, 0.12)",
+    border: "rgba(242, 193, 78, 0.35)",
+  },
+  crimson: {
+    400: "#F26951",
+    500: "#F0674F",
+    600: "#D2513B",
+    900: "#4D1C14",
+    bgSubtle: "rgba(242, 105, 81, 0.12)",
+    border: "rgba(242, 105, 81, 0.35)",
+  },
+};
+
+export const moonlightTheme = {
+  id: "moonlight" as ThemeId,
+  name: "Moonlight",
+  icon: "🌙",
+  description: "Amber on night blue",
+  bg: {
+    black: "#0A0E24",
+    terminal: "#0E1330",
+    surface: "#131938",
+    card: "#171D42",
+    cardElevated: "#1E254E",
+    cardHover: "#262E5C",
+    input: "#121836",
+    subtle: "rgba(255, 248, 230, 0.03)",
+    overlay: "rgba(14, 19, 48, 0.78)",
+    modalOverlay: "rgba(6, 9, 24, 0.85)",
+  },
+  border: {
+    subtle: "rgba(255, 248, 230, 0.07)",
+    default: "#323B6E",
+    elevated: "#424C86",
+    focus: "#FFB547",
+    emerald: "rgba(255, 181, 71, 0.35)",
+    cyan: "rgba(244, 231, 181, 0.35)",
+    amber: "rgba(242, 193, 78, 0.4)",
+    danger: "rgba(249, 111, 87, 0.4)",
+    frontier: "rgba(244, 231, 181, 0.45)",
+  },
+  text: {
+    primary: "#FFF8E6",
+    heading: "#FFFCF2",
+    secondary: "#D2D6EA",
+    muted: "#A9B0D0",
+    dim: "#7C84A8",
+    inverse: "#0E1330",
+    accentEmerald: "#FFB547",
+    accentCyan: "#F4E7B5",
+    accentAmber: "#F2C14E",
+    accentViolet: "#F4E7B5",
+  },
+  emerald: {
+    50: "#FFF6E6",
+    400: "#FFC266",
+    500: "#FFB547",
+    600: "#E59C2E",
+    900: "#4A3210",
+    bgSubtle: "rgba(255, 181, 71, 0.12)",
+    border: "rgba(255, 181, 71, 0.28)",
+  },
+  cyan: {
+    400: "#F8EEC8",
+    500: "#F4E7B5",
+    600: "#D9CA92",
+    bgSubtle: "rgba(244, 231, 181, 0.12)",
+    border: "rgba(244, 231, 181, 0.3)",
+  },
+  frontier: {
+    glow: "#FFB547",
+    glowCyan: "#F4E7B5",
+    badgeBg: "rgba(244, 231, 181, 0.18)",
+    badgeBorder: "rgba(244, 231, 181, 0.45)",
+    text: "#F4E7B5",
+    gradientStart: "#171D42",
+    gradientEnd: "#0E1330",
+  },
+  amber: {
+    400: "#F2C14E",
+    500: "#E0AE3A",
+    600: "#C79524",
+    bgSubtle: "rgba(242, 193, 78, 0.12)",
+    border: "rgba(242, 193, 78, 0.35)",
+  },
+  crimson: {
+    400: "#F96F57",
+    500: "#F0674F",
+    600: "#D2513B",
+    900: "#4D1C14",
+    bgSubtle: "rgba(249, 111, 87, 0.12)",
+    border: "rgba(249, 111, 87, 0.35)",
+  },
+};
+
+export const THEMES = [campfireTheme, moonlightTheme, midnightTheme, amberTheme, frontierTheme] as const;
+
+export function getThemeColors(id: ThemeId = "campfire") {
   switch (id) {
+    case "campfire":
+      return campfireTheme;
+    case "moonlight":
+      return moonlightTheme;
     case "amber":
       return amberTheme;
     case "frontier":
@@ -267,6 +443,6 @@ export function getThemeColors(id: ThemeId = "midnight") {
   }
 }
 
-// Default export matching standard tokens
-export const colors = midnightTheme;
+// The colors most screens read once, at start (StyleSheet.create): Campfire, the app's look.
+export const colors = campfireTheme;
 export type Colors = typeof midnightTheme;

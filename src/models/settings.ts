@@ -3,7 +3,7 @@ import { AssetKind } from "./manifest";
 import { PersonalityId, DEFAULT_PERSONALITY_ID } from "../constants/personalities";
 import { ModelRole, RoutingPreset } from "../routing/types";
 
-export type ThemeId = "midnight" | "amber" | "frontier";
+export type ThemeId = "campfire" | "moonlight" | "midnight" | "amber" | "frontier";
 export type FontScale = "compact" | "standard" | "large";
 export type LanguageId = "en" | "pt";
 
@@ -191,7 +191,7 @@ export async function setDeepResearchMode(enabled: boolean): Promise<void> {
 
 export async function getThemeId(): Promise<ThemeId> {
   const s = await readSettings();
-  return s.themeId ?? "midnight";
+  return s.themeId ?? "campfire";
 }
 
 export async function setThemeId(theme: ThemeId): Promise<void> {

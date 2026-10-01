@@ -8,7 +8,7 @@ import {
   getFontScale,
   setFontScale as persistFontScale,
 } from "../../models/settings";
-import { getThemeColors, midnightTheme, Colors } from "./colors";
+import { getThemeColors, campfireTheme, Colors } from "./colors";
 import { getTypography, Typography } from "./typography";
 
 interface ThemeContextType {
@@ -21,16 +21,16 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  themeId: "midnight",
+  themeId: "campfire",
   fontScale: "standard",
-  colors: midnightTheme,
+  colors: campfireTheme,
   typography: getTypography("standard"),
   setTheme: async () => {},
   setFontScale: async () => {},
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeIdState] = useState<ThemeId>("midnight");
+  const [themeId, setThemeIdState] = useState<ThemeId>("campfire");
   const [fontScale, setFontScaleState] = useState<FontScale>("standard");
 
   useEffect(() => {

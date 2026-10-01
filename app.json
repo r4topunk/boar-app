@@ -33,7 +33,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#080C14"
+          "backgroundColor": "#17110D"
         }
       ],
       "./plugins/withReleaseSigning"
