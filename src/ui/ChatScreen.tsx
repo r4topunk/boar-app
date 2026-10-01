@@ -13,6 +13,7 @@ import {
   Image,
 } from "react-native";
 import { Text, TextInput } from "./components/AppText";
+import { Ambient } from "./components/Ambient";
 import { LinearGradient } from "expo-linear-gradient";
 import { impact, notification, ImpactFeedbackStyle, NotificationFeedbackType } from "../services/haptics";
 import * as Clipboard from "expo-clipboard";
@@ -885,15 +886,8 @@ export function ChatScreen({
       colors={isDeepActive ? [colors.frontier.gradientStart, colors.bg.terminal] : [colors.bg.terminal, colors.bg.surface]}
       style={styles.container}
     >
-      {/* Ambient background glows */}
-      <View
-        style={[styles.ambientGlowTop, isDeepActive && styles.ambientGlowTopDeep]}
-        pointerEvents="none"
-      />
-      <View
-        style={[styles.ambientGlowBottom, isDeepActive && styles.ambientGlowBottomDeep]}
-        pointerEvents="none"
-      />
+      {/* The theme's light: Campfire's ember glow, Moonlight's moon */}
+      <Ambient />
 
       <View style={[styles.flex, { paddingBottom: keyboardHeight }]}>
         <ChatHeader
@@ -1275,34 +1269,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-  },
-  ambientGlowTop: {
-    position: "absolute",
-    top: -90,
-    left: -70,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: "rgba(6, 182, 212, 0.12)",
-    opacity: 0.6,
-  },
-  ambientGlowTopDeep: {
-    backgroundColor: "rgba(139, 92, 246, 0.25)",
-    opacity: 0.85,
-  },
-  ambientGlowBottom: {
-    position: "absolute",
-    bottom: -110,
-    right: -90,
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-    opacity: 0.5,
-  },
-  ambientGlowBottomDeep: {
-    backgroundColor: "rgba(6, 182, 212, 0.18)",
-    opacity: 0.7,
   },
   deepResearchBanner: {
     paddingHorizontal: spacing.md,
