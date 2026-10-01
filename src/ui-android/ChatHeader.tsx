@@ -38,7 +38,7 @@ export function ChatHeader({
   onToggleDeepResearch,
 }: Props) {
   const { t } = useTranslation();
-  // The phone's own state, live (no request is sent): ONLINE tells the user BOAR doesn't need it.
+  // The phone's own state, live (no request is sent): ONLINE tells the user answers don't need it.
   const online = isOnline(useNetworkState());
   const explainConnection = () => {
     impact();

@@ -315,7 +315,7 @@
     "deepResearchActive": "Deep Research Active",
     "online": "ONLINE",
     "onlineTitle": "You're online",
-    "onlineBody": "Your phone is connected to the internet. BOAR never uses it: answers, search and your library all stay on this phone. Turn on airplane mode to see it work fully offline.",
+    "onlineBody": "Your phone is connected to the internet. BOAR doesn't need it: answers, search and your library all work on this phone. Only downloading models or packs and searching Hugging Face for models use the connection. Turn on airplane mode to see it work fully offline.",
     "offlineTitle": "You're offline",
     "offlineBody": "No internet connection. Everything works: answers, search and your library are all on this phone."
   },

@@ -315,7 +315,7 @@
     "deepResearchActive": "Pesquisa Aprofundada Ativa",
     "online": "ONLINE",
     "onlineTitle": "Você está online",
-    "onlineBody": "Seu celular está conectado à internet. O BOAR não a usa: respostas, busca e sua biblioteca ficam todas neste celular. Ative o modo avião para vê-lo funcionar totalmente offline.",
+    "onlineBody": "Seu celular está conectado à internet. O BOAR não precisa dela: respostas, busca e sua biblioteca funcionam neste celular. Só baixar modelos ou pacotes e buscar modelos no Hugging Face usam a conexão. Ative o modo avião para vê-lo funcionar totalmente offline.",
     "offlineTitle": "Você está offline",
     "offlineBody": "Sem conexão com a internet. Tudo funciona: respostas, busca e sua biblioteca estão neste celular."
   },
