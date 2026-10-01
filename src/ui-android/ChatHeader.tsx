@@ -1,5 +1,7 @@
 import React from "react";
-import { View, Pressable, StyleSheet, Image } from "react-native";
+import { View, Pressable, StyleSheet, Image, Alert } from "react-native";
+import { useNetworkState } from "expo-network";
+import { isOnline } from "../services/connectivity.pure";
 import { Text } from "./components/AppText";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { useTranslation } from "react-i18next";
@@ -36,6 +38,15 @@ export function ChatHeader({
   onToggleDeepResearch,
 }: Props) {
   const { t } = useTranslation();
+  // The phone's own state, live (no request is sent): ONLINE tells the user BOAR doesn't need it.
+  const online = isOnline(useNetworkState());
+  const explainConnection = () => {
+    impact();
+    Alert.alert(
+      t(online ? "chatHeader.onlineTitle" : "chatHeader.offlineTitle"),
+      t(online ? "chatHeader.onlineBody" : "chatHeader.offlineBody")
+    );
+  };
   const handlePress = (callback: () => void, feedback: ImpactFeedbackStyle = ImpactFeedbackStyle.Light) => {
     impact(feedback);
     callback();
@@ -69,10 +80,18 @@ export function ChatHeader({
           <View style={styles.titleColumn}>
             <View style={styles.titleRow}>
               <Text style={styles.titleText}>BOAR</Text>
-              <View style={styles.offlineStatusPill}>
-                <View style={styles.offlineDot} />
-                <Text style={styles.offlineText}>{t("chatHeader.offline")}</Text>
-              </View>
+              <Pressable
+                style={[styles.offlineStatusPill, online && styles.onlineStatusPill]}
+                onPress={explainConnection}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t(online ? "chatHeader.onlineTitle" : "chatHeader.offlineTitle")}
+              >
+                <View style={[styles.offlineDot, online && styles.onlineDot]} />
+                <Text style={[styles.offlineText, online && styles.onlineText]}>
+                  {t(online ? "chatHeader.online" : "chatHeader.offline")}
+                </Text>
+              </Pressable>
             </View>
             <Text style={styles.modelPillText} numberOfLines={1}>
               {activeModelLabel ? shortModelLabel(activeModelLabel).toUpperCase() : t("chatHeader.localLlmCore")}
@@ -223,6 +242,12 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     gap: 3,
   },
+  onlineStatusPill: {
+    backgroundColor: colors.amber.bgSubtle,
+    borderColor: colors.amber.border,
+  },
+  onlineDot: { backgroundColor: colors.amber[400] },
+  onlineText: { color: colors.text.accentAmber },
   offlineDot: {
     width: 5,
     height: 5,
