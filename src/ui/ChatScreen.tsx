@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Pressable,
@@ -14,6 +14,9 @@ import {
 } from "react-native";
 import { Text, TextInput } from "./components/AppText";
 import { Ambient } from "./components/Ambient";
+import { ChatEmptyState } from "./components/ChatEmptyState";
+import { suggestionsFor } from "./chat/suggestions";
+import { ModelManager } from "../models/ModelManager";
 import { LinearGradient } from "expo-linear-gradient";
 import { impact, notification, ImpactFeedbackStyle, NotificationFeedbackType } from "../services/haptics";
 import * as Clipboard from "expo-clipboard";
@@ -125,7 +128,7 @@ export function ChatScreen({
   onRelaunchWizard?: () => void;
 }) {
   const { colors, typography } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);
@@ -153,6 +156,27 @@ export function ChatScreen({
   // send() reads the loaded model for telemetry without re-creating itself on every model change.
   const activeModelRef = useRef<CatalogModel | null>(null);
   activeModelRef.current = activeModel;
+
+  // Knowledge packs on the phone: an empty chat only suggests questions they can answer.
+  const [installedCorpora, setInstalledCorpora] = useState<string[]>([]);
+  const showEmptyState = messages.length === 0 && !showPromptIdeas;
+  useEffect(() => {
+    if (!showEmptyState) return;
+    let cancelled = false;
+    const manager = new ModelManager();
+    Promise.all(CORPUS_CATALOG.map((c) => manager.statusOf(c)))
+      .then((all) => {
+        if (!cancelled) setInstalledCorpora(all.filter((st) => st.present).map((st) => st.asset.id));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [showEmptyState]);
+  const suggestions = useMemo(
+    () => suggestionsFor(activeModel?.id, i18n.language, installedCorpora),
+    [activeModel?.id, i18n.language, installedCorpora]
+  );
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   // Assistant messages whose model reasoning (<think>…</think>) is expanded.
@@ -937,7 +961,19 @@ export function ChatScreen({
           style={styles.flex}
           data={messages}
           keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, showEmptyState && styles.listEmpty]}
+          ListEmptyComponent={
+            showEmptyState ? (
+              <ChatEmptyState
+                suggestions={suggestions}
+                onAsk={(q) => (ready && !generating ? handleSend(q) : setInput(q))}
+                onFill={(q) => {
+                  setInput(q);
+                  requestAnimationFrame(() => inputRef.current?.focus());
+                }}
+              />
+            ) : null
+          }
           // Animated scrolling during active streaming fires on nearly every
           // token — each call starts a new scroll animation before the last
           // one finishes, so they fight each other and the view visibly
@@ -1319,6 +1355,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: spacing.lg,
   },
+  listEmpty: { flexGrow: 1 },
   // Flat and round, as in the new UI: no shadow, 20 radius with an 8 tail; cards are told apart by
   // a lighter fill, not a border.
   bubble: {

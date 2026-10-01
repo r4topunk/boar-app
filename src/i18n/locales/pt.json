@@ -481,5 +481,31 @@
       "notSentSection": "Não é enviado",
       "notSent": "Suas conversas, seus documentos, seu nome, sua localização, seus contatos. Este celular é identificado só por um número aleatório criado no app."
     }
+  },
+  "chat": {
+    "suggestions": {
+      "q1": "Por que existem estações do ano na Terra?",
+      "q2": "Qual a diferença entre pandemia e epidemia?",
+      "q3": "Quanto é 30 °C em Fahrenheit?",
+      "q4": "Como estancar um sangramento nasal?",
+      "q7": "O que causa o efeito estufa?",
+      "q8": "O que é uma monção?",
+      "q9": "O que é tectônica de placas?"
+    },
+    "suggestionTopics": {
+      "q1": "Ciência",
+      "q2": "Saúde",
+      "q3": "Conta rápida",
+      "q4": "Primeiros socorros",
+      "q7": "Clima",
+      "q8": "Tempo",
+      "q9": "Ciências da Terra"
+    },
+    "empty": {
+      "suggestionsLabel": "Experimente perguntar",
+      "tagline": "Respostas deste celular, com fontes",
+      "fill": "Colocar no campo para editar",
+      "ask": "Perguntar: {{question}}"
+    }
   }
 }

@@ -481,5 +481,31 @@
       "notSentSection": "Not sent",
       "notSent": "Your chats, your documents, your name, your location, your contacts. This phone is identified only by a random number created in the app."
     }
+  },
+  "chat": {
+    "suggestions": {
+      "q1": "Why do we have seasons on Earth?",
+      "q2": "What is the difference between a pandemic and an epidemic?",
+      "q3": "What is 30 °C in Fahrenheit?",
+      "q4": "How do I stop a nosebleed?",
+      "q7": "What causes the greenhouse effect?",
+      "q8": "What is a monsoon?",
+      "q9": "What is plate tectonics?"
+    },
+    "suggestionTopics": {
+      "q1": "Science",
+      "q2": "Health",
+      "q3": "Quick math",
+      "q4": "First aid",
+      "q7": "Climate",
+      "q8": "Weather",
+      "q9": "Earth science"
+    },
+    "empty": {
+      "suggestionsLabel": "Try asking",
+      "tagline": "Answers from this phone, with sources",
+      "fill": "Put in the input to edit",
+      "ask": "Ask: {{question}}"
+    }
   }
 }
