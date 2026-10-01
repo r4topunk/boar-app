@@ -65,3 +65,8 @@ export function scaledSize(size: number): number {
 export function scaledLineHeight(lineHeight: number, from: number, to: number): number {
   return from > 0 ? Math.round((lineHeight * to) / from) : lineHeight;
 }
+
+/** The Settings text size (Compact / Standard / Large) as a multiplier on every font size. */
+export function fontScaleFactor(scale: string | undefined): number {
+  return scale === "compact" ? 0.9 : scale === "large" ? 1.2 : 1;
+}

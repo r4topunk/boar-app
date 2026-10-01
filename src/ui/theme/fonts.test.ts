@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUNDLED_FAMILIES, CODE, DISPLAY, familyFor, scaledLineHeight, scaledSize } from "./fonts";
+import { BUNDLED_FAMILIES, CODE, DISPLAY, familyFor, fontScaleFactor, scaledLineHeight, scaledSize } from "./fonts";
 
 describe("familyFor", () => {
   it("reads text in Lexend at the nearest weight", () => {
@@ -47,5 +47,11 @@ describe("scaledSize", () => {
   it("grows the line height with the text", () => {
     expect(scaledLineHeight(21, 14, 16)).toBe(24);
     expect(scaledLineHeight(22, 16, 16)).toBe(22);
+  });
+});
+
+describe("fontScaleFactor", () => {
+  it("maps the Settings text size, standard when unknown", () => {
+    expect(["compact", "standard", "large", undefined].map(fontScaleFactor)).toEqual([0.9, 1, 1.2, 1]);
   });
 });

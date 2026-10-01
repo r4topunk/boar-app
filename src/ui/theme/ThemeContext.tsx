@@ -57,7 +57,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const currentColors = useMemo(() => getThemeColors(themeId), [themeId]);
-  const currentTypography = useMemo(() => getTypography(fontScale), [fontScale]);
+  // Always the standard scale: the app's Text applies the chosen size to every screen (fonts.ts
+  // fontScaleFactor), so a screen reading this must not grow its text a second time.
+  const currentTypography = useMemo(() => getTypography("standard"), []);
 
   const value = useMemo(
     () => ({
