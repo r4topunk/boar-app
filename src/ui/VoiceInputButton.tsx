@@ -138,11 +138,11 @@ export function VoiceInputButton({ disabled, onTranscript }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  container: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   btn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -150,13 +150,13 @@ const styles = StyleSheet.create({
   icon: { fontSize: 16, color: "#fff" },
   ring: {
     position: "absolute",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   ringGradient: {
     width: "100%",
     height: "100%",
-    borderRadius: 20,
+    borderRadius: 24,
   },
 });

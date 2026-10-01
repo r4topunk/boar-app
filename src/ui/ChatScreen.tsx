@@ -82,7 +82,7 @@ import { recordQueryStats, trackPeakRss, startAppMemoryTracking, QueryStats } fr
 import { recordExecution } from "../services/executionTelemetry";
 import { getMemoryInfo } from "ram-monitor";
 import { useTheme, colors, typography } from "./theme";
-import { spacing, radii, shadows } from "./theme/spacing";
+import { spacing, radii } from "./theme/spacing";
 
 interface Message {
   id: string;
@@ -973,7 +973,7 @@ export function ChatScreen({
                 style={[
                   styles.bubble,
                   item.role === "user"
-                    ? [styles.userBubble, { backgroundColor: colors.bg.cardElevated, borderColor: colors.border.focus }]
+                    ? [styles.userBubble, { backgroundColor: colors.bg.cardHover }]
                     : [styles.assistantBubble, { backgroundColor: colors.bg.surface, borderColor: colors.border.default }],
                 ]}
               >
@@ -1318,26 +1318,25 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: spacing.lg,
   },
+  // Flat and round, as in the new UI: no shadow, 20 radius with an 8 tail; cards are told apart by
+  // a lighter fill, not a border.
   bubble: {
-    padding: spacing.md,
-    borderRadius: radii.lg,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.md,
+    borderRadius: 20,
     maxWidth: "92%",
     gap: 4,
-    ...shadows.card,
   },
   userBubble: {
-    backgroundColor: "#13213B",
-    borderWidth: 1,
-    borderColor: "rgba(6, 182, 212, 0.35)",
     alignSelf: "flex-end",
-    borderBottomRightRadius: radii.xs,
+    borderBottomRightRadius: 8,
   },
   assistantBubble: {
     backgroundColor: colors.bg.surface,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: colors.border.subtle,
     alignSelf: "flex-start",
-    borderBottomLeftRadius: radii.xs,
+    borderBottomLeftRadius: 8,
     minWidth: 200,
   },
   bubbleHeader: {
@@ -1436,16 +1435,16 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     borderColor: colors.border.default,
     borderWidth: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: radii.full,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     ...typography.ui.body,
     fontSize: 14,
   },
   sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.md,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.emerald[600],
     alignItems: "center",
     justifyContent: "center",
@@ -1461,9 +1460,9 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   stopBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.md,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.crimson[600],
     alignItems: "center",
     justifyContent: "center",
