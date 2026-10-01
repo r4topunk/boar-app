@@ -159,6 +159,8 @@ export function ChatScreen({
 
   // Knowledge packs on the phone: an empty chat only suggests questions they can answer.
   const [installedCorpora, setInstalledCorpora] = useState<string[]>([]);
+  // Bumped when a download finishes, so a pack installed while the chat is empty adds its questions.
+  const [downloadsDone, setDownloadsDone] = useState(0);
   const showEmptyState = messages.length === 0 && !showPromptIdeas;
   useEffect(() => {
     if (!showEmptyState) return;
@@ -172,7 +174,8 @@ export function ChatScreen({
     return () => {
       cancelled = true;
     };
-  }, [showEmptyState]);
+    // Also re-read when Settings or My Documents closes (a pack added or removed there).
+  }, [showEmptyState, showSettings, showKnowledgeBase, downloadsDone]);
   const suggestions = useMemo(
     () => suggestionsFor(activeModel?.id, i18n.language, installedCorpora),
     [activeModel?.id, i18n.language, installedCorpora]
@@ -266,6 +269,7 @@ export function ChatScreen({
           seenDownloadingRef.current.add(assetId);
         } else if (seenDownloadingRef.current.has(assetId)) {
           seenDownloadingRef.current.delete(assetId);
+          if (!dl.error) setDownloadsDone((n) => n + 1);
           if (!dl.error && !showSettingsRef.current) {
             const known = assetLabelsRef.current[assetId];
             if (known) {
