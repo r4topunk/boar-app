@@ -1,6 +1,6 @@
 /**
  * Online or offline, from the phone's own network state (expo-network reads Android's
- * ConnectivityManager / iOS's NWPathMonitor; nothing is sent). BOAR never uses the connection;
+ * ConnectivityManager / iOS's NWPathMonitor; nothing is sent). Answers never need the connection, only downloads and model search do;
  * the header only tells the user whether the phone has one. Pure: tested without the native module.
  */
 export interface NetState {
