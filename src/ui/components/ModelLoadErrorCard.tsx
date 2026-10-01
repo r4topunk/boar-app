@@ -80,7 +80,7 @@ export function ModelLoadErrorCard({
         <View style={styles.badgeRow}>
           <Text style={styles.icon}>{isMemory ? "⚡" : "⚠️"}</Text>
           <Text style={[styles.badgeText, isMemory ? styles.badgeTextAmber : styles.badgeTextDanger]}>
-            {diagnosis.title.toUpperCase()}
+            {diagnosis.title}
           </Text>
         </View>
         <Text style={styles.codeTag}>ERR_LOCAL_INIT</Text>

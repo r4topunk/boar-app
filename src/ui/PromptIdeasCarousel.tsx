@@ -94,7 +94,7 @@ export function PromptIdeasCarousel({ onUsePrompt, onDismiss }: Props) {
 
         <ScrollView contentContainerStyle={styles.body}>
           <View style={styles.categoryPill}>
-            <Text style={styles.category}>{idea.category.toUpperCase()}</Text>
+            <Text style={styles.category}>{idea.category}</Text>
           </View>
           <Text style={styles.prompt}>{idea.prompt}</Text>
         </ScrollView>

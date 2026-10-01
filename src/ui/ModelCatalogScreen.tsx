@@ -129,7 +129,7 @@ export function ModelCatalogScreen({ onClose }: Props) {
       <View style={styles.header}>
         {onClose ? (
           <Pressable style={styles.backBtn} onPress={onClose} hitSlop={8}>
-            <Text style={styles.backBtnText}>‹ {t("common.back").toUpperCase()}</Text>
+            <Text style={styles.backBtnText}>‹ {t("common.back")}</Text>
           </Pressable>
         ) : (
           <View style={{ width: 40 }} />

@@ -1,6 +1,6 @@
 {
   "common": {
-    "done": "PRONTO",
+    "done": "Pronto",
     "cancel": "Cancelar",
     "close": "Fechar",
     "back": "Voltar",
@@ -17,20 +17,20 @@
   "drawer": {
     "subtitle": "Inteligência Local Adaptativa",
     "newChat": "Nova Sessão de Pesquisa",
-    "recentSessions": "SESSÕES RECENTES"
+    "recentSessions": "Sessões recentes"
   },
   "modelCatalogScreen": {
-    "title": "CATÁLOGO DE MODELOS",
+    "title": "Catálogo de Modelos",
     "subtitle": "Pesos Offline Locais Verificados",
     "filters": {
-      "all": "TODOS",
+      "all": "Todos",
       "llm": "LLM",
-      "corpus": "CORPUS",
-      "community": "COMUNIDADE"
+      "corpus": "Corpus",
+      "community": "Comunidade"
     },
     "removedToast": "\"{{label}}\" removido",
     "activeModelToast": "Modelo {{kind}} ativo definido como \"{{label}}\"",
-    "browserSectionTitle": "BUSCA NO REPOSITÓRIO HUGGING FACE"
+    "browserSectionTitle": "Busca no repositório Hugging Face"
   },
   "modelBrowser": {
     "hint": "Busque outros modelos GGUF no Hugging Face. Não verificados pelo BOAR — confira o uso de RAM e a licença na página do modelo antes de baixar.",
@@ -66,7 +66,7 @@
       "yellow": "RAM alta / 12GB necessários",
       "red": "Incompatível (excede a RAM do aparelho)"
     },
-    "downloadingAsset": "BAIXANDO RECURSO",
+    "downloadingAsset": "Baixando recurso",
     "eta": "Tempo restante: {{eta}}",
     "retryDownload": "🔄 Repetir Download",
     "downloadAsset": "📥 Baixar Recurso",
@@ -103,18 +103,18 @@
       "detailFallback": "O motor llama.rn falhou ao se conectar ao contexto GGUF local.",
       "recommendation": "Revise as configurações do modelo ou execute novamente o Assistente de Configuração para restaurar os padrões."
     },
-    "actionRequired": "AÇÃO NECESSÁRIA",
+    "actionRequired": "Ação necessária",
     "settings": "Configurações",
     "setupWizard": "Assistente de Configuração"
   },
   "usageStatsScreen": {
-    "back": "‹ VOLTAR",
-    "title": "TELEMETRIA DO SISTEMA",
+    "back": "‹ Voltar",
+    "title": "Telemetria do Sistema",
     "subtitle": "Auditoria de Hardware e Conformidade",
     "live": "AO VIVO"
   },
   "systemMonitor": {
-    "title": "MEDIDORES DE CONFORMIDADE",
+    "title": "Medidores de conformidade",
     "diskLabel": "Armazenamento em Disco (Limite: 50GB)",
     "ramLabel": "Memória RSS do Processo (Limite: 12GB)",
     "exceeded": "⚠️ EXCEDIDO",
@@ -127,7 +127,7 @@
   },
   "modelSetupScreen": {
     "header": {
-      "title": "CONFIGURAÇÕES",
+      "title": "Configurações",
       "subtitle": "BOAR — Inteligência Local Adaptativa"
     },
     "sections": {
@@ -141,8 +141,8 @@
       "voice": "Configuração de Entrada de Voz",
       "recovery": "Recuperação do Sistema & Zona de Perigo"
     },
-    "installedModels": "MODELOS INSTALADOS",
-    "discoverHfModels": "DESCOBRIR MODELOS GGUF NO HUGGING FACE",
+    "installedModels": "Modelos instalados",
+    "discoverHfModels": "Descobrir modelos GGUF no Hugging Face",
     "toasts": {
       "indexed": "\"{{name}}\" indexado na base de conhecimento offline",
       "removed": "\"{{name}}\" removido",
@@ -151,7 +151,7 @@
       "resetFailed": "Falha ao redefinir: {{error}}"
     },
     "recovery": {
-      "wizardTitle": "ASSISTENTE DE CONFIGURAÇÃO",
+      "wizardTitle": "Assistente de configuração",
       "wizardDesc": "Execute novamente o fluxo inicial de 3 etapas para reescanear o hardware do aparelho ou trocar o nível do modelo base.",
       "wizardButton": "Reabrir Assistente de Configuração ➔",
       "dangerBadge": "ZONA DE PERIGO CRÍTICA",
@@ -159,9 +159,9 @@
       "dangerButton": "🚨 Apagar Todos os Dados & Redefinir App"
     },
     "dangerModal": {
-      "title": "CONFIRMAR REDEFINIÇÃO DESTRUTIVA",
+      "title": "Confirmar redefinição destrutiva",
       "subtitle": "Esta ação é imediata, permanente e não pode ser desfeita.",
-      "consequencesHeader": "O SEGUINTE SERÁ REMOVIDO:",
+      "consequencesHeader": "O seguinte será removido:",
       "consequenceModels": "Todos os arquivos de modelo GGUF baixados (~2,3 GB+)",
       "consequenceEmbeddings": "Todas as coleções de documentos e embeddings do SQLite offline",
       "consequenceHistory": "Todo o histórico de sessões de chat e resumos gerados",
@@ -172,15 +172,15 @@
     "calculating": "Calculando…",
     "estimating": "Estimando…",
     "steps": {
-      "hardware": "HARDWARE",
-      "modelTier": "NÍVEL DO MODELO",
-      "install": "INSTALAÇÃO",
-      "indexing": "INDEXAÇÃO"
+      "hardware": "Hardware",
+      "modelTier": "Nível do modelo",
+      "install": "Instalação",
+      "indexing": "Indexação"
     },
     "step1": {
-      "terminalTitle": "TERMINAL DE CAMPO ISOLADO",
+      "terminalTitle": "Terminal de campo isolado",
       "terminalText": "Projetado para expedições remotas, zonas de crise e pesquisa offline. Após esta configuração inicial, o BOAR opera 100% localmente, sem telemetria de rede, contas ou dependências de nuvem.",
-      "hardwareTitle": "VERIFICAÇÃO DE HARDWARE DO APARELHO",
+      "hardwareTitle": "Verificação de hardware do aparelho",
       "deviceRam": "RAM do Aparelho",
       "verified": "Verificado",
       "availableStorage": "Armazenamento Disponível",
@@ -193,7 +193,7 @@
       "selectTierButton": "Selecionar Nível do Modelo ➔"
     },
     "step2": {
-      "title": "SELECIONE O NÍVEL DO MODELO OFFLINE",
+      "title": "Selecione o nível do modelo offline",
       "subtitle": "Os pesos são baixados uma vez para o armazenamento local e executados via mmap.",
       "recommended": "RECOMENDADO",
       "runsGreat": "🟢 Funciona Muito Bem",
@@ -202,17 +202,17 @@
       "backButton": "‹ Voltar ao Diagnóstico"
     },
     "step3": {
-      "title": "INICIALIZAÇÃO DO NÚCLEO OFFLINE",
+      "title": "Inicialização do núcleo offline",
       "subtitle": "Baixando os modelos de pesos abertos e o conhecimento que você escolheu. É a única vez que o BOAR usa a internet.",
       "assetsCached": "RECURSOS ARMAZENADOS EM DISCO",
-      "downloadingWeights": "BAIXANDO PESOS",
+      "downloadingWeights": "Baixando pesos",
       "eta": "Tempo restante: {{eta}}",
       "phaseModel": "Modelos de Raciocínio",
       "phaseEmbedding": "Modelo de Embedding & Vetores",
       "phaseKnowledgeBase": "Base de Conhecimento Offline & FTS",
-      "interfaceCustomization": "PERSONALIZAÇÃO DA INTERFACE",
+      "interfaceCustomization": "Personalização da interface",
       "customizeWhileWaiting": "Enquanto espera, deixe do seu jeito — escolha um tema e fonte abaixo.",
-      "tipLabel": "💡 AVISO DO TERMINAL DE CAMPO",
+      "tipLabel": "💡 Aviso do terminal de campo",
       "tipText": "Após a inicialização, o BOAR é completamente autônomo. Você pode ativar o modo avião e usar o app em total isolamento, sem perda de funcionalidade.",
       "launchButton": "🐗 Iniciar Terminal BOAR",
       "indexingError": "Erro de indexação: {{error}}",
@@ -220,13 +220,13 @@
       "waitingForDownloads": "Aguardando downloads…",
       "downloadFailedLabel": "Falha no download",
       "retryDownloads": "Repetir Download",
-      "keepOpenLabel": "⚠ MANTENHA O BOAR ABERTO",
+      "keepOpenLabel": "⚠ Mantenha o BOAR aberto",
       "keepOpenText": "Os downloads pausam automaticamente se você trocar de app e retomam de onde pararam quando você voltar — mas não avançam em segundo plano. Mantenha o BOAR em primeiro plano para a configuração inicial mais rápida.",
       "assetCounter": "Modelo {{current}} de {{total}} — {{label}}",
       "restartDownloads": "⟳ Download travado? Toque para reiniciar"
     },
     "step4": {
-      "title": "INDEXANDO O CONHECIMENTO OFFLINE",
+      "title": "Indexando o conhecimento offline",
       "subtitle": "Montando a base de conhecimento local e o índice de busca neste celular. Sem internet.",
       "counter": "Indexados {{done}} de {{total}}"
     },
@@ -302,7 +302,7 @@
     "hapticFeedbackValue": "Vibrar ao tocar, enviar e ao finalizar respostas — em todo o app, não só na entrada de voz."
   },
   "knowledgeBaseScreen": {
-    "title": "MEUS DOCUMENTOS"
+    "title": "Meus Documentos"
   },
   "chatHeader": {
     "openDrawer": "Abrir menu de navegação",
@@ -340,10 +340,10 @@
       "researching": "🔬 Pesquisando subpergunta {{index}}/{{count}}…",
       "synthesizing": "🔬 Sintetizando descobertas offline…"
     },
-    "roleYou": "VOCÊ",
+    "roleYou": "Você",
     "roleAssistant": "BOAR",
     "stoppedByUser": "Interrompido pelo usuário",
-    "deepResearchBanner": "MISTURA DE AGENTES: DECOMPOR ➔ EMBEDDINGS LOCAIS ➔ SINTETIZAR",
+    "deepResearchBanner": "Mistura de agentes: decompor ➔ embeddings locais ➔ sintetizar",
     "copyResponse": "Copiar resposta",
     "copied": "Copiado",
     "rateUp": "Boa resposta",
@@ -354,26 +354,26 @@
     "interruptedByBackground": "Pausado — o app foi para segundo plano. Pergunte novamente para continuar."
   },
   "aboutScreen": {
-    "title": "SOBRE O BOAR",
-    "heroSubtitle": "INTELIGÊNCIA LOCAL ADAPTATIVA",
+    "title": "Sobre o BOAR",
+    "heroSubtitle": "Inteligência local adaptativa",
     "versionBadge": "v{{version}} • {{build}}",
-    "buildDevelopment": "BUILD DE DESENVOLVIMENTO",
-    "buildRelease": "BUILD DE RELEASE",
-    "airGappedTitle": "IA SOBERANA E ISOLADA DA REDE",
+    "buildDevelopment": "Build de desenvolvimento",
+    "buildRelease": "Build de release",
+    "airGappedTitle": "IA soberana e isolada da rede",
     "airGappedBody": "O BOAR é um sistema de IA móvel offline-first que explora roteamento adaptativo de modelos, recuperação local e inferência sensível a recursos. Ele realiza inferência local de LLM via llama.rn / llama.cpp e busca híbrida local (SQLite FTS5 + embeddings no dispositivo) sem nenhuma dependência de nuvem.",
-    "hardwareTitle": "ARQUITETURA DE HARDWARE E ORÇAMENTO",
+    "hardwareTitle": "Arquitetura de hardware e orçamento",
     "hardwareBody": "Atende a restrições rígidas de uso em campo: a memória residente permanece limitada a 12GB de RAM usando pesos mapeados em memória (mmap), e o armazenamento total é auditado contra um limite de 50GB.",
-    "benchmarkTitle": "TESTE VOCÊ MESMO",
+    "benchmarkTitle": "Teste você mesmo",
     "benchmarkBody": "O BOAR mede cada resposta no seu próprio celular: tempo de carregamento do modelo, tempo até o primeiro token, tokens/s, pico de memória e quais fontes foram usadas. Rode a avaliação embutida em Telemetria de Execução → 🧪 Avaliar para comparar qualquer modelo instalado nas mesmas perguntas, ou comande pelo computador com npm run eval:device.",
-    "repoTitle": "REPOSITÓRIO DE CÓDIGO ABERTO",
+    "repoTitle": "Repositório de código aberto",
     "repoBody": "O código-fonte, os manifestos de modelos quantizados e os scripts de indexação offline estão disponíveis em:"
   },
   "sourceFootnotes": {
-    "title": "FONTES VERIFICADAS OFFLINE",
+    "title": "Fontes verificadas offline",
     "localIndex": "ÍNDICE LOCAL"
   },
   "promptIdeasCarousel": {
-    "title": "PROMPTS DE PESQUISA DE REFERÊNCIA",
+    "title": "Prompts de pesquisa de referência",
     "prev": "Anterior",
     "usePrompt": "Usar Este Prompt de Pesquisa",
     "next": "Próximo",
@@ -403,7 +403,7 @@
     }
   },
   "executionTelemetry": {
-    "title": "TELEMETRIA DE EXECUÇÃO",
+    "title": "Telemetria de Execução",
     "subtitle": "{{count}} execuções recentes",
     "exportJson": "⬇ JSON",
     "exportCsv": "⬇ CSV",
@@ -423,7 +423,7 @@
     "runEvaluation": "🧪 Avaliar"
   },
   "evaluation": {
-    "title": "AVALIAÇÃO",
+    "title": "Avaliação",
     "subtitle": "Conjunto v{{version}} · {{count}} perguntas",
     "configsTitle": "Configurações",
     "adaptiveConfig": "Roteamento adaptativo (preset: {{preset}})",

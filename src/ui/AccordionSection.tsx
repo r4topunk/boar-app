@@ -29,7 +29,7 @@ export function AccordionSection({ title, defaultOpen = false, children }: Props
   return (
     <View style={styles.container}>
       <Pressable style={styles.header} onPress={toggle}>
-        <Text style={styles.headerTitle}>{title.toUpperCase()}</Text>
+        <Text style={styles.headerTitle}>{title}</Text>
         <Text style={styles.chevron}>{open ? "▲" : "▼"}</Text>
       </Pressable>
       {open && <View style={styles.body}>{children}</View>}

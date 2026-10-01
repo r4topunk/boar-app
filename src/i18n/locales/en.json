@@ -1,6 +1,6 @@
 {
   "common": {
-    "done": "DONE",
+    "done": "Done",
     "cancel": "Cancel",
     "close": "Close",
     "back": "Back",
@@ -17,20 +17,20 @@
   "drawer": {
     "subtitle": "Adaptive Local Intelligence",
     "newChat": "New Research Session",
-    "recentSessions": "RECENT SESSIONS"
+    "recentSessions": "Recent sessions"
   },
   "modelCatalogScreen": {
-    "title": "MODEL CATALOG",
+    "title": "Model Catalog",
     "subtitle": "Verified Local Offline Weights",
     "filters": {
-      "all": "ALL",
+      "all": "All",
       "llm": "LLM",
-      "corpus": "CORPUS",
-      "community": "COMMUNITY"
+      "corpus": "Corpus",
+      "community": "Community"
     },
     "removedToast": "Removed \"{{label}}\"",
     "activeModelToast": "Active {{kind}} model set to \"{{label}}\"",
-    "browserSectionTitle": "HUGGING FACE REPOSITORY SEARCH"
+    "browserSectionTitle": "Hugging Face repository search"
   },
   "modelBrowser": {
     "hint": "Search Hugging Face for other GGUF models. Not vetted by BOAR — check RAM fit and licensing yourself on the model's page before downloading.",
@@ -66,7 +66,7 @@
       "yellow": "High RAM / 12GB Required",
       "red": "Incompatible (Exceeds Device RAM)"
     },
-    "downloadingAsset": "DOWNLOADING ASSET",
+    "downloadingAsset": "Downloading asset",
     "eta": "ETA: {{eta}}",
     "retryDownload": "🔄 Retry Download",
     "downloadAsset": "📥 Download Asset",
@@ -103,18 +103,18 @@
       "detailFallback": "Llama.rn engine failed to bind to the local GGUF context.",
       "recommendation": "Review model settings or re-run the Setup Wizard to restore defaults."
     },
-    "actionRequired": "ACTION REQUIRED",
+    "actionRequired": "Action required",
     "settings": "Settings",
     "setupWizard": "Setup Wizard"
   },
   "usageStatsScreen": {
-    "back": "‹ BACK",
-    "title": "SYSTEM TELEMETRY",
+    "back": "‹ Back",
+    "title": "System Telemetry",
     "subtitle": "Hardware & Compliance Audit",
     "live": "LIVE"
   },
   "systemMonitor": {
-    "title": "LIVE COMPLIANCE GAUGES",
+    "title": "Live compliance gauges",
     "diskLabel": "Disk Storage (Cap: 50GB)",
     "ramLabel": "Process RSS Memory (Cap: 12GB)",
     "exceeded": "⚠️ EXCEEDED",
@@ -127,7 +127,7 @@
   },
   "modelSetupScreen": {
     "header": {
-      "title": "SETTINGS",
+      "title": "Settings",
       "subtitle": "BOAR — Adaptive Local Intelligence"
     },
     "sections": {
@@ -141,8 +141,8 @@
       "voice": "Voice Input Configuration",
       "recovery": "System Recovery & Danger Zone"
     },
-    "installedModels": "INSTALLED MODELS",
-    "discoverHfModels": "DISCOVER HUGGING FACE GGUF MODELS",
+    "installedModels": "Installed models",
+    "discoverHfModels": "Discover Hugging Face GGUF models",
     "toasts": {
       "indexed": "Indexed \"{{name}}\" in offline knowledge base",
       "removed": "Removed \"{{name}}\"",
@@ -151,7 +151,7 @@
       "resetFailed": "Reset failed: {{error}}"
     },
     "recovery": {
-      "wizardTitle": "SETUP WIZARD",
+      "wizardTitle": "Setup wizard",
       "wizardDesc": "Re-run the initial 3-step onboarding flow to re-scan device hardware or switch your base model tier.",
       "wizardButton": "Relaunch Setup Wizard ➔",
       "dangerBadge": "CRITICAL DANGER ZONE",
@@ -159,9 +159,9 @@
       "dangerButton": "🚨 Purge All Data & Reset App"
     },
     "dangerModal": {
-      "title": "CONFIRM DESTRUCTIVE RESET",
+      "title": "Confirm destructive reset",
       "subtitle": "This action is immediate, permanent, and cannot be undone.",
-      "consequencesHeader": "THE FOLLOWING WILL BE REMOVED:",
+      "consequencesHeader": "The following will be removed:",
       "consequenceModels": "All downloaded GGUF model files (~2.3 GB+)",
       "consequenceEmbeddings": "All offline SQLite document collections & embeddings",
       "consequenceHistory": "All chat session history and generated summaries",
@@ -172,15 +172,15 @@
     "calculating": "Calculating…",
     "estimating": "Estimating…",
     "steps": {
-      "hardware": "HARDWARE",
-      "modelTier": "MODEL TIER",
-      "install": "INSTALL",
-      "indexing": "INDEXING"
+      "hardware": "Hardware",
+      "modelTier": "Model tier",
+      "install": "Install",
+      "indexing": "Indexing"
     },
     "step1": {
-      "terminalTitle": "AIR-GAPPED FIELD TERMINAL",
+      "terminalTitle": "Air-gapped field terminal",
       "terminalText": "Designed for remote expeditions, crisis zones, and off-grid research. After this initial setup, BOAR operates 100% locally with zero network telemetry, no accounts, and no cloud dependencies.",
-      "hardwareTitle": "DEVICE HARDWARE VERIFICATION",
+      "hardwareTitle": "Device hardware verification",
       "deviceRam": "Device RAM",
       "verified": "Verified",
       "availableStorage": "Available Disk Storage",
@@ -193,7 +193,7 @@
       "selectTierButton": "Select Model Tier ➔"
     },
     "step2": {
-      "title": "SELECT OFFLINE MODEL TIER",
+      "title": "Select offline model tier",
       "subtitle": "Weights are downloaded once to local storage and executed via mmap.",
       "recommended": "RECOMMENDED",
       "runsGreat": "🟢 Runs Great",
@@ -202,17 +202,17 @@
       "backButton": "‹ Back to Diagnostics"
     },
     "step3": {
-      "title": "OFFLINE CORE INITIALIZATION",
+      "title": "Offline core initialization",
       "subtitle": "Downloading the open-weights models and knowledge you chose. This is the only time BOAR uses the internet.",
       "assetsCached": "ASSETS CACHED TO DISK",
-      "downloadingWeights": "DOWNLOADING WEIGHTS",
+      "downloadingWeights": "Downloading weights",
       "eta": "ETA: {{eta}}",
       "phaseModel": "Reasoning Models",
       "phaseEmbedding": "Embedding Model & Vectors",
       "phaseKnowledgeBase": "Offline Knowledge Base & FTS",
-      "interfaceCustomization": "INTERFACE CUSTOMIZATION",
+      "interfaceCustomization": "Interface customization",
       "customizeWhileWaiting": "While you wait, make it yours — pick a theme and font below.",
-      "tipLabel": "💡 FIELD TERMINAL NOTICE",
+      "tipLabel": "💡 Field terminal notice",
       "tipText": "Once initialized, BOAR is completely self-contained. You can toggle airplane mode and use the app in complete isolation without loss of functionality.",
       "launchButton": "🐗 Launch BOAR Terminal",
       "indexingError": "Indexing error: {{error}}",
@@ -220,13 +220,13 @@
       "waitingForDownloads": "Waiting for downloads…",
       "downloadFailedLabel": "Download failed",
       "retryDownloads": "Retry Download",
-      "keepOpenLabel": "⚠ KEEP BOAR OPEN",
+      "keepOpenLabel": "⚠ Keep BOAR open",
       "keepOpenText": "Downloads pause automatically if you switch to another app and resume where they left off when you come back — but they don't progress while backgrounded. Keep BOAR in the foreground for the fastest one-time setup.",
       "assetCounter": "Model {{current}} of {{total}} — {{label}}",
       "restartDownloads": "⟳ Downloads stuck? Tap to restart"
     },
     "step4": {
-      "title": "INDEXING OFFLINE KNOWLEDGE",
+      "title": "Indexing offline knowledge",
       "subtitle": "Building the local knowledge base and search index on this phone. No internet needed.",
       "counter": "Indexed {{done}} of {{total}}"
     },
@@ -302,7 +302,7 @@
     "hapticFeedbackValue": "Vibrate on taps, sends, and responses finishing — app-wide, not just voice input."
   },
   "knowledgeBaseScreen": {
-    "title": "MY DOCUMENTS"
+    "title": "My Documents"
   },
   "chatHeader": {
     "openDrawer": "Open Navigation Drawer",
@@ -340,10 +340,10 @@
       "researching": "🔬 Researching sub-question {{index}}/{{count}}…",
       "synthesizing": "🔬 Synthesizing offline findings…"
     },
-    "roleYou": "YOU",
+    "roleYou": "You",
     "roleAssistant": "BOAR",
     "stoppedByUser": "Stopped by user",
-    "deepResearchBanner": "MIXTURE-OF-AGENTS: DECOMPOSE ➔ LOCAL EMBEDDINGS ➔ SYNTHESIS",
+    "deepResearchBanner": "Mixture of agents: decompose ➔ local embeddings ➔ synthesis",
     "copyResponse": "Copy response",
     "copied": "Copied",
     "rateUp": "Good response",
@@ -354,26 +354,26 @@
     "interruptedByBackground": "Paused — app was backgrounded. Ask again to continue."
   },
   "aboutScreen": {
-    "title": "ABOUT BOAR",
-    "heroSubtitle": "ADAPTIVE LOCAL INTELLIGENCE",
+    "title": "About BOAR",
+    "heroSubtitle": "Adaptive local intelligence",
     "versionBadge": "v{{version}} • {{build}}",
-    "buildDevelopment": "DEVELOPMENT BUILD",
-    "buildRelease": "RELEASE BUILD",
-    "airGappedTitle": "AIR-GAPPED SOVEREIGN AI",
+    "buildDevelopment": "Development build",
+    "buildRelease": "Release build",
+    "airGappedTitle": "Air-gapped sovereign AI",
     "airGappedBody": "BOAR is an offline-first mobile AI system exploring adaptive model routing, local retrieval, and resource-aware inference. It performs local LLM inference via llama.rn / llama.cpp and local hybrid retrieval (SQLite FTS5 + on-device embeddings) with zero cloud dependencies.",
-    "hardwareTitle": "HARDWARE ARCHITECTURE & BUDGET",
+    "hardwareTitle": "Hardware architecture & budget",
     "hardwareBody": "Complies with strict mobile field constraints: resident memory remains capped under 12GB RAM using memory-mapped weights (mmap), and total storage is audited against a 50GB storage envelope.",
-    "benchmarkTitle": "BENCHMARK IT YOURSELF",
+    "benchmarkTitle": "Benchmark it yourself",
     "benchmarkBody": "BOAR measures every answer on your own phone: model load time, time to first token, tokens/sec, peak memory and which sources were used. Run the built-in evaluation from Execution Telemetry → 🧪 Evaluate to compare any installed model on the same questions, or drive it from a computer with npm run eval:device.",
-    "repoTitle": "OPEN SOURCE REPOSITORY",
+    "repoTitle": "Open source repository",
     "repoBody": "Source code, quantized model manifests, and offline indexing scripts are available at:"
   },
   "sourceFootnotes": {
-    "title": "OFFLINE VERIFIED SOURCES",
+    "title": "Offline verified sources",
     "localIndex": "LOCAL INDEX"
   },
   "promptIdeasCarousel": {
-    "title": "RESEARCH PROMPT BENCHMARKS",
+    "title": "Research prompt benchmarks",
     "prev": "Prev",
     "usePrompt": "Use This Research Prompt",
     "next": "Next",
@@ -403,7 +403,7 @@
     }
   },
   "executionTelemetry": {
-    "title": "EXECUTION TELEMETRY",
+    "title": "Execution Telemetry",
     "subtitle": "{{count}} recent runs",
     "exportJson": "⬇ JSON",
     "exportCsv": "⬇ CSV",
@@ -423,7 +423,7 @@
     "runEvaluation": "🧪 Evaluate"
   },
   "evaluation": {
-    "title": "EVALUATION",
+    "title": "Evaluation",
     "subtitle": "Set v{{version}} · {{count}} queries",
     "configsTitle": "Configurations",
     "adaptiveConfig": "Adaptive routing (preset: {{preset}})",
