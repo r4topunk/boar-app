@@ -341,7 +341,7 @@
       "synthesizing": "🔬 Synthesizing offline findings…"
     },
     "roleYou": "YOU",
-    "roleAssistant": "🐗 BOAR",
+    "roleAssistant": "BOAR",
     "stoppedByUser": "Stopped by user",
     "deepResearchBanner": "MIXTURE-OF-AGENTS: DECOMPOSE ➔ LOCAL EMBEDDINGS ➔ SYNTHESIS",
     "copyResponse": "Copy response",

@@ -10,6 +10,7 @@ import {
   AppState,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Image,
 } from "react-native";
 import { Text, TextInput } from "./components/AppText";
 import { LinearGradient } from "expo-linear-gradient";
@@ -983,16 +984,21 @@ export function ChatScreen({
               >
                 {/* Bubble role label */}
                 <View style={styles.bubbleHeader}>
-                  <Text
-                    style={[
-                      styles.bubbleRoleLabel,
-                      item.role === "user"
-                        ? [styles.userRoleLabel, { color: colors.text.accentCyan }]
-                        : [styles.assistantRoleLabel, { color: colors.text.accentEmerald }],
-                    ]}
-                  >
-                    {item.role === "user" ? t("chatScreen.roleYou") : t("chatScreen.roleAssistant")}
-                  </Text>
+                  <View style={styles.bubbleRole}>
+                    {item.role !== "user" && (
+                      <Image source={require("../../assets/boar.png")} style={styles.bubbleAvatar} resizeMode="contain" />
+                    )}
+                    <Text
+                      style={[
+                        styles.bubbleRoleLabel,
+                        item.role === "user"
+                          ? [styles.userRoleLabel, { color: colors.text.accentCyan }]
+                          : [styles.assistantRoleLabel, { color: colors.text.accentEmerald }],
+                      ]}
+                    >
+                      {item.role === "user" ? t("chatScreen.roleYou") : t("chatScreen.roleAssistant")}
+                    </Text>
+                  </View>
                 </View>
 
                 {showProcessing ? (
@@ -1368,6 +1374,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
+  bubbleRole: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // The same mascot as the chat header, at the label's size.
+  bubbleAvatar: { width: 20, height: 20, borderRadius: 4 },
   bubbleRoleLabel: {
     ...typography.mono.xs,
     fontWeight: "600",
