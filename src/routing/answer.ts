@@ -77,6 +77,7 @@ import { attributeCitations, checkCitations } from "./citations";
 import { calculate } from "./calculators";
 import { travelDistanceAnswer } from "./travelDistance";
 import { verdictGuard } from "./verdictGuard";
+import { arithmeticAnswer } from "./arithmetic";
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
 import { isSnakebiteFirstAid, snakebiteFirstAidCard } from "./firstAidCards";
@@ -675,6 +676,19 @@ export function createAnswerer(deps: AnswerDeps) {
           emit({ type: "token", answerId, tier: "instant", text: calc.text });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
           return { answerId, tier: "instant", outcome: "success", text: calc.text, sources: [], receipt: r, cited: [] };
+        }
+        // AR (cut 3 dev, coordinator 4B-LOSS-ANATOMY arm 3): rate x quantity -> time and ceil-division word problems,
+        // exact, from the question's own numbers (EN). It also runs when the learned detector fired, because the message
+        // has no health, injury or danger word (the numeric guard: vit-sci-003 "10 tokens per second… how long?" got
+        // "I won't give health advice from memory" on every cut-2 seed).
+        const arith = isPortugueseQuestion(req.query) || isSpanishQuestion(req.query) ? null : arithmeticAnswer(req.query);
+        if (arith) {
+          markVisible();
+          const codes = [...detectorCodes, ...(learned?.fire ? ["detector:numeric-guard"] : []), `answer:calculator-${arith.kind}`];
+          const r: AnswerReceipt = { modelId: "calculator", modelLabel: "Calculator", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: codes };
+          emit({ type: "token", answerId, tier: "instant", text: arith.text });
+          emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
+          return { answerId, tier: "instant", outcome: "success", text: arith.text, sources: [], receipt: r, cited: [] };
         }
         // Travel distance between two cities (EN): an estimate from the bundled city table, never a mapped route; a place
         // not in the table -> null -> the normal path (Anvil, V-exact Paris–Rome).

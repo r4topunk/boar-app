@@ -2100,3 +2100,19 @@ describe("answer(): verdict guard (VG, cut 3 dev)", () => {
     expect((await collect("Os astronautas andaram na Lua antes de 1970?")).result.receipt.reasonCodes.some((c) => c.startsWith("verdict-guard"))).toBe(false);
   });
 });
+
+describe("answer(): arithmetic tools + detector numeric guard (AR, cut 3 dev)", () => {
+  const Q = "My phone generates 10 tokens per second and processes the prompt at 30 tokens per second. With 1,300 tokens of sources and a 400-token answer, how long until the answer is finished?";
+  it("the learned detector fired on a word problem: the calculator answers, no model, no health line", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.291, fire: true });
+    const { result } = await collect(Q);
+    expect(result.receipt.reasonCodes).toEqual(["detector:p=0.291", "detector:fire", "detector:numeric-guard", "answer:calculator-rate-time"]);
+    expect(result.text).toMatch(/^About 83\.3 seconds/);
+    expect(f.generations).toHaveLength(0);
+  });
+  it("a health message with numbers keeps the health route", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.9, fire: true });
+    const { result } = await collect("IV drip at 125 ml per hour for my dad, the bag is 1000 ml, how long until it's empty?");
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("answer:calculator"))).toBe(false);
+  });
+});
