@@ -6,9 +6,11 @@
  * answer after generation. English only; the engine runs it on model answers only (never health, cards, calculators).
  *  (a) date: a yes/no question with "before / after / by YYYY"; the Yes/No disagrees with the year of the answer's
  *      own "first …" fact (within the two sentences after the verdict).
- *  (b) compare: "Which <is more X>, A or B" / "Is A <more X> than B"; both entities get a number in the same unit, the
- *      ranges don't overlap, and the verdict names the other one (or says the wrong Yes/No).
- *  (c) rank: "Which <things> are bigger than X" answered "No <thing> is bigger…" next to "the Nth-largest" (N > 1).
+ *  (b) compare: "Which <is more X>, A or B" / "Is A <more X> than B"; both entities get a number of the compared quantity
+ *      (density, people, area, length, mass, age: v2) in the same unit, the ranges don't overlap, and the verdict names the
+ *      other one (or says the wrong Yes/No). Ambiguous, mixed units or a missing quantity: no flag.
+ *  (c) rank: "Which <things> are bigger than X" answered "No <thing> is bigger…" next to "X … the Nth-largest" (N > 1),
+ *      and any list the answer gives has N - 1 items (v2).
  * Repair is a template from the parsed facts (plus the difference and ratio when the question asks "by how much"); the
  * model's self-correction notes and restatements of the old verdict are dropped. No regeneration (template only).
  * An answer that isn't flagged is returned as null: nothing about it changes.
@@ -95,8 +97,10 @@ function unitSig(rest: string): string {
   return words.join(" ");
 }
 
-/** The first number (or range) in `s`, with its scale and unit. Bare years (1500-2100, no unit) are skipped. */
-function firstQuantity(s: string): Quantity | null {
+/** Every number (or range) in `s`, with its scale and unit, in order. Bare years (1500-2100, no unit), percentages and
+ * ranks ("7th") are skipped. */
+function allQuantities(s: string): Quantity[] {
+  const out: Quantity[] = [];
   NUMBER_RE.lastIndex = 0;
   for (let m = NUMBER_RE.exec(s); m; m = NUMBER_RE.exec(s)) {
     const scale = m[3] ? SCALE[m[3].toLowerCase()] : 1;
@@ -107,8 +111,33 @@ function firstQuantity(s: string): Quantity | null {
     if (yearLike) continue;
     // A percentage or a rank ("7th") is not a measurement of the entity.
     if (/^\s*(?:%|st\b|nd\b|rd\b|th\b)/.test(s.slice(m.index + m[0].length))) continue;
-    return { lo: Math.min(a, b), hi: Math.max(a, b), unit: unit.trim(), raw: m[0] };
+    out.push({ lo: Math.min(a, b), hi: Math.max(a, b), unit: unit.trim(), raw: m[0] });
   }
+  return out;
+}
+
+// ---- the compared quantity (VG v2, reviewer R2/R3: the number tied to the question's quantity, never just the first) ----
+
+type QuantityClass = "density" | "people" | "area" | "length" | "mass" | "age";
+/** The quantity a comparison question is about; null = unclear (no flag). Generic size words allow area, mass or length. */
+function questionClasses(q: string): QuantityClass[] | null {
+  if (/\bdens(?:e|ely|er|est|ity)\b/i.test(q)) return ["density"];
+  if (/\b(?:more|fewer|less) (?:people|inhabitants|residents)\b|\bpopul(?:ous|ation)\b/i.test(q)) return ["people"];
+  if (/\b(?:older|younger)\b/i.test(q)) return ["age"];
+  if (/\barea\b|\bsquare\b/i.test(q)) return ["area"];
+  if (/\b(?:taller|higher|longer|deeper|shallower)\b/i.test(q)) return ["length"];
+  if (/\b(?:heavier|lighter|weighs?|weight)\b/i.test(q)) return ["mass"];
+  if (/\b(?:bigger|larger|smaller|greater)\b/i.test(q)) return ["area", "mass", "length"];
+  return null;
+}
+function unitClass(unit: string): QuantityClass | null {
+  if (/\bper (?:km2|mi2)\b|\/ ?(?:km2|mi2)\b/.test(unit)) return "density";
+  if (/\b(?:years? old|year-old|years of age)\b/.test(unit)) return "age";
+  if (/\b(?:km2|mi2|hectares?|acres?)\b/.test(unit)) return "area";
+  const first = unit.replace(/^(?:thousand|million|billion|trillion) /, "").split(" ")[0] ?? "";
+  if (/^(?:kg|lb|g|tons?|tonnes?|t|grams?|ounces?|oz)$/.test(first)) return "mass";
+  if (/^(?:m|km|ft|mi|miles?|cm|mm|inch(?:es)?|in|yards?|yd)$/.test(first)) return "length";
+  if (/\b(?:people|inhabitants|residents|citizens)\b/.test(unit) || /^(?:thousand|million|billion)$/.test(unit)) return "people";
   return null;
 }
 
@@ -159,8 +188,9 @@ function mentions(s: string, res: [RegExp, RegExp]): Mention[] {
   return out.sort((x, y) => x.index - y.index);
 }
 
-/** Each entity's first stated quantity: from its mention to the other entity's next mention, within one segment. */
-function quantities(segs: Seg[], res: [RegExp, RegExp]): [Quantity | null, Quantity | null] {
+/** Each entity's stated quantity of the compared kind: from its mention to the other entity's next mention, within one
+ * segment, the numbers whose unit fits the question's quantity. Two different same-unit values in one window: ambiguous. */
+function quantities(segs: Seg[], res: [RegExp, RegExp], classes: QuantityClass[]): [Quantity | null, Quantity | null] | null {
   const found: [Quantity | null, Quantity | null] = [null, null];
   for (const { text } of segs) {
     const ms = mentions(text, res);
@@ -168,8 +198,13 @@ function quantities(segs: Seg[], res: [RegExp, RegExp]): [Quantity | null, Quant
       const m = ms[i];
       if (found[m.who]) continue;
       const nextOther = ms.slice(i + 1).find((n) => n.who !== m.who);
-      const q = firstQuantity(text.slice(m.index, nextOther ? nextOther.index : undefined));
-      if (q) found[m.who] = q;
+      const fit = allQuantities(text.slice(m.index, nextOther ? nextOther.index : undefined)).filter((q) => {
+        const c = unitClass(q.unit);
+        return c !== null && classes.includes(c);
+      });
+      if (!fit.length) continue;
+      if (fit.some((q) => q.unit === fit[0].unit && (q.lo !== fit[0].lo || q.hi !== fit[0].hi))) return null;
+      found[m.who] = fit[0];
     }
     if (found[0] && found[1]) break;
   }
@@ -252,8 +287,12 @@ function checkCompare(question: string, segs: Seg[]): VerdictGuardResult | null 
   const [ka, kb] = entityKeys(a, b);
   if (!ka.length || !kb.length) return null;
   const res: [RegExp, RegExp] = [mentionRe(ka), mentionRe(kb)];
+  const classes = questionClasses(question);
+  if (!classes) return null;
   const content = segs.filter((s) => !isMeta(s.text));
-  const [qa, qb] = quantities(content, res);
+  const qs = quantities(content, res, classes);
+  if (!qs) return null;
+  const [qa, qb] = qs;
   if (!qa || !qb || qa.unit !== qb.unit) return null;
   if (qa.lo <= qb.hi && qb.lo <= qa.hi) return null; // overlapping ranges: no decision
   const aWins = pol === "max" ? qa.lo > qb.hi : qa.hi < qb.lo;
@@ -285,7 +324,8 @@ function checkCompare(question: string, segs: Seg[]): VerdictGuardResult | null 
   const [w, l, qw, ql] = aWins ? [a, b, qa, qb] : [b, a, qb, qa];
   const verb = vp.trim().replace(/\s+/g, " ");
   let verdict = `${capitalize(display(w))} ${verb} than ${display(l)}`;
-  if (BY_HOW_MUCH.test(question)) {
+  // Difference and ratio only for two single positive values (VG v2, reviewer R4: never for ranges).
+  if (BY_HOW_MUCH.test(question) && qw.lo === qw.hi && ql.lo === ql.hi && ql.lo > 0) {
     const diff = Math.abs(qw.lo - ql.lo);
     const ratio = Math.max(qw.lo, ql.lo) / Math.min(qw.lo, ql.lo);
     const unit = qw.unit.replace(/\bkm2\b/, "km²").replace(/\bmi2\b/, "mi²");
@@ -304,13 +344,18 @@ const RANK_Q = /^\s*which\s+([\p{L} ]+?)\s+(are|is)\s+((?:bigger|larger|greater)
 const DENIAL = /\b(?:no|none of the)\s+[\p{L}]+(?:\s+[\p{L}]+)?\s+(?:is|are|has|have)\s+(?:any\s+)?(?:bigger|larger|greater)\b|\bthere (?:is|are) no\s+[\p{L}]+(?:\s+[\p{L}]+)?\s+(?:bigger|larger|greater)\b/iu;
 const RANK = /\b(second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|(\d{1,2})(?:st|nd|rd|th))[- ](?:largest|biggest)\b/i;
 const LIST = /\b(?:after|following|behind)\s+((?:the\s+)?[A-Z][\p{L}.]*(?:\s+[A-Z][\p{L}.]*)*(?:\s*,\s*(?:and\s+)?(?:the\s+)?[A-Z][\p{L}.]*(?:\s+[A-Z][\p{L}.]*)*)+)/u;
+const INCLUDE_LIST = /\b(?:include|includes|including)\s*:?\s+((?:the\s+)?[A-Z][\p{L}.]*(?:\s+[A-Z][\p{L}.]*)*(?:\s*,\s*(?:and\s+)?(?:the\s+)?[A-Z][\p{L}.]*(?:\s+[A-Z][\p{L}.]*)*)+)/u;
+const BULLET = /^\s*(?:[-*•]|\d{1,2}[.)])\s+\S/;
 
 function checkRank(question: string, segs: Seg[]): VerdictGuardResult | null {
   const q = RANK_Q.exec(question);
   if (!q) return null;
   const denialAt = segs.findIndex((s) => DENIAL.test(s.text));
   if (denialAt < 0) return null;
-  const rankSeg = segs.find((s) => RANK.test(s.text));
+  // VG v2 (reviewer R9): the rank must be the subject's own ("India is the seventh-largest").
+  const subject = /\bthan\s+(?:the\s+)?(.+?)(?:\s+(?:by|in|when|on)\b.*)?$/i.exec(q[3])?.[1]?.trim() ?? "";
+  if (!subject) return null;
+  const rankSeg = segs.find((s) => RANK.test(s.text) && s.text.toLowerCase().includes(subject.toLowerCase()));
   if (!rankSeg) return null;
   const r = RANK.exec(rankSeg.text)!;
   const n = r[2] ? Number(r[2]) : ORDINALS[r[1].toLowerCase()];
@@ -323,11 +368,16 @@ function checkRank(question: string, segs: Seg[]): VerdictGuardResult | null {
     be = "is";
   } else be = "are";
   let verdict = `${capitalize(count <= 20 ? CARDINALS[count] : String(count))} ${noun} ${be} ${q[3].trim()}`;
+  // VG v2 (reviewer R1, V5 #32): the answer's own list must agree with the new count, else no flag. A bulleted or
+  // numbered list, or a prose list ("after A, B and C", "include A, B and C").
+  const bullets = segs.filter((s) => BULLET.test(s.text));
+  if (bullets.length && bullets.length !== count) return null;
   for (const s of segs) {
-    const l = LIST.exec(s.text);
+    const l = LIST.exec(s.text) ?? INCLUDE_LIST.exec(s.text);
     if (!l) continue;
     const items = l[1].split(/\s*,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim().replace(/[.]+$/, "")).filter(Boolean);
-    if (items.length === count) verdict += `: ${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+    if (items.length !== count) return null;
+    verdict += `: ${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
     break;
   }
   verdict += ".";

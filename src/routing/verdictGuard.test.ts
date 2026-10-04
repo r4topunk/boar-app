@@ -87,3 +87,62 @@ describe("verdictGuard: flags a verdict its own facts contradict (VG, cut 3 dev)
     expect(verdictGuard("Did X happen before 1970?", "")).toBeNull();
   });
 });
+
+describe("verdictGuard v2: the compared quantity, list consistency (reviewer V5 #32, R1/R2/R4/R9)", () => {
+  it("(b) a population figure next to a density comparison is not the density: the density figures decide", () => {
+    // Populations alone (18 M vs 216 M) would wrongly favour Brazil; only the per-km² figures are compared.
+    expect(
+      verdictGuard(
+        "Which is more densely populated, the Netherlands or Brazil?",
+        "The Netherlands is more densely populated than Brazil. The Netherlands has about 18 million people and a density of about 520 people per km², while Brazil has about 216 million people and about 25 people per km²."
+      )
+    ).toBeNull();
+    // Populations only, no density figure: a quantity is missing, so no flag (v1 flipped this correct verdict).
+    expect(
+      verdictGuard(
+        "Which is more densely populated, the Netherlands or Brazil?",
+        "The Netherlands is more densely populated than Brazil. The Netherlands has about 18 million people, while Brazil has about 216 million people."
+      )
+    ).toBeNull();
+    // The density figure after a population figure still decides a real contradiction.
+    expect(
+      verdictGuard(
+        "Which is more densely populated, Japan or Germany?",
+        "Germany is more densely populated than Japan. Germany has 84 million people and 235 people per km², while Japan has 124 million people and 330 people per km²."
+      )?.text
+    ).toMatch(/^Japan is more densely populated than Germany\./);
+  });
+  it("(b) mixed units (km² vs sq mi) are never compared", () => {
+    expect(
+      verdictGuard(
+        "Which is more densely populated, Japan or Germany?",
+        "Germany is more densely populated than Japan. Germany has about 600 people per square mile, while Japan has about 330 people per km²."
+      )
+    ).toBeNull();
+  });
+  it("(b) 'older' needs ages, not years; ranges give no difference or ratio", () => {
+    expect(verdictGuard("Which is older, Oxford or Cambridge?", "Cambridge is older than Oxford. Oxford dates from 1096, while Cambridge was founded in 1209.")).toBeNull();
+    const r = verdictGuard(
+      "Which is heavier, a polar bear or a grizzly bear, and by how much?",
+      "A grizzly bear is heavier than a polar bear. Polar bears weigh 350 to 700 kg, while grizzly bears weigh 180 to 300 kg."
+    );
+    expect(r?.text).toMatch(/^A polar bear is heavier than a grizzly bear\. /);
+    expect(r?.text).not.toMatch(/times as much|by about/);
+  });
+  it("(c) a rank answer whose own list disagrees with the new count is left alone (V5 #32)", () => {
+    expect(
+      verdictGuard(
+        "Which countries are bigger than India by area?",
+        "No country is larger in area than India. India is the seventh-largest country in the world by area.\n\nCountries larger than India include:\n- Russia\n- Canada\n- United States\n- China\n- Brazil\n- Australia\n- Kazakhstan"
+      )
+    ).toBeNull();
+    expect(
+      verdictGuard(
+        "Which countries are bigger than India by area?",
+        "No country is bigger than India by area. India is the seventh-largest country, after Russia, Canada, China and the United States."
+      )
+    ).toBeNull();
+    // A rank about another subject doesn't count.
+    expect(verdictGuard("Which countries are bigger than India by area?", "No country is bigger than India. China is the third-largest country.")).toBeNull();
+  });
+});
