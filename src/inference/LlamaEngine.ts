@@ -100,6 +100,13 @@ export interface GenerationTimings {
  * inventing new "User:" turns rather than stopping. These match our own
  * template's role markers so generation halts the moment it tries to do that.
  */
+/** FNV-1a, hex: names a session file after the prompt text it holds. */
+function hash32(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 const DEFAULT_STOP_SEQUENCES = ["\nUser:", "\n\nUser:", "\nQuestion:", "\n\nQuestion:"];
 
 export interface LoadedModelInfo {
@@ -189,6 +196,10 @@ export class LlamaEngine {
   private prefix: PromptPrefix | null = null;
   /** Whether the KV cache holds `prefix` (a load or another prompt drops it). */
   private prefixCached = false;
+  // Route gate (Anvil B4 arm, anvil/specs/probe-gate-prefix-cache.md): the gate's fixed prompt and the answer prefix
+  // take turns in the one KV sequence, so each is restored from a llama.rn session file (saveSession/loadSession)
+  // instead of re-prefilled: ~260 tokens of the 4B are 15-20 s on an 8 GB Android phone. Null = neither is in the cache.
+  private gateCachedKey: string | null = null;
   private warmTimer: ReturnType<typeof setTimeout> | null = null;
   /** generate() calls not settled yet: a prefix refill never waits in front of one of them. */
   private pending = 0;
@@ -373,6 +384,7 @@ export class LlamaEngine {
     const context = this.context;
     this.context = null;
     this.prefixCached = false;
+    this.gateCachedKey = null;
     this.modelInfo = null;
     this.loadedMeta = null;
     this.lastLoad = { fit: null, warning: null };
@@ -456,13 +468,17 @@ export class LlamaEngine {
     if (!prefix || !context || this.prefixCached || this.pending > 0) return;
     const params = context.isJinjaSupported()
       ? // The empty user turn keeps templates that require one (Qwen3) rendering; the prefix ends before it.
-        { messages: [{ role: "system", content: prefix.system }, { role: "user", content: "" }], jinja: true, n_predict: 0 }
-      : { prompt: prefix.prompt, n_predict: 0 };
+        { messages: [{ role: "system", content: prefix.system }, { role: "user", content: "" }], jinja: true, n_predict: 0, n_probs: 0 }
+      : { prompt: prefix.prompt, n_predict: 0, n_probs: 0 };
     const completion = context.completion(params);
     this.inFlight = completion;
     try {
       const result = (await completion) as { timings?: { prompt_n?: number; prompt_ms?: number } };
-      if (this.prefix === prefix && this.context === context) this.prefixCached = true;
+      if (this.prefix === prefix && this.context === context) {
+        this.prefixCached = true;
+        this.gateCachedKey = null;
+        await this.saveKv(context, this.answerKvKey(prefix)).catch((e: any) => console.warn("[engine] answer prefix save failed:", e?.message ?? e));
+      }
       const t = result?.timings;
       if (t) console.log(`[engine] answer prefix prefilled: ${t.prompt_n} tokens in ${Math.round(t.prompt_ms ?? 0)} ms`);
     } catch (e: any) {
@@ -512,6 +528,8 @@ export class LlamaEngine {
           jinja: true,
           n_predict: nPredict + (enableThinking === false ? 0 : thinkingBudget ?? 0),
           temperature,
+          // Sampling params persist on the llama.rn context (rc.4 JSIParams): reset what the route gate set.
+          n_probs: 0,
           stop: stop ?? [],
           // llama.rn only enforces the budget when it knows the block's tags; when the budget
           // runs out it forces the end tag and generation continues with the answer.
@@ -525,8 +543,16 @@ export class LlamaEngine {
             : {}),
           ...(enableThinking === false ? { enable_thinking: false } : {}),
         }
-      : { prompt: prompt!, n_predict: nPredict, temperature, stop: stop ?? DEFAULT_STOP_SEQUENCES };
+      : { prompt: prompt!, n_predict: nPredict, temperature, n_probs: 0, stop: stop ?? DEFAULT_STOP_SEQUENCES };
 
+    if (this.prefix && !this.prefixCached && this.sharesPrefix({ prompt, messages })) {
+      const ms = await this.loadKv(this.context, this.answerKvKey(this.prefix));
+      if (ms !== null) {
+        this.prefixCached = true;
+        console.warn(`[gate] answer prefix restored in ${ms} ms`);
+      }
+    }
+    this.gateCachedKey = null;
     let full = "";
     const completion = this.context.completion(completionParams, (data) => {
       full += data.token;
@@ -549,6 +575,103 @@ export class LlamaEngine {
     } finally {
       if (this.inFlight === completion) this.inFlight = null;
       if (timer) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Route gate (src/routing/routeGate.ts): the top-N next-token probabilities after `messages`, without generating.
+   * The system message is the fixed part, kept in a session file and restored instead of re-prefilled.
+   * llama.rn rc.4 (anvil llamarn-nprobs.md): probabilities are post-sampling (fine for the 0.5 threshold) and
+   * `completion_probabilities` is never cleared between completions, so this call's token is the LAST entry.
+   */
+  nextTokenProbs(
+    messages: ChatMessageInput[],
+    opts: { modelFilename: string; nProbs: number }
+  ): Promise<{ token: string; prob: number }[] | null> {
+    const run = this.genQueue.then(() => this.nextTokenProbsNow(messages, opts));
+    this.genQueue = run.catch(() => {});
+    return run;
+  }
+
+  private async nextTokenProbsNow(
+    messages: ChatMessageInput[],
+    { modelFilename, nProbs }: { modelFilename: string; nProbs: number }
+  ): Promise<{ token: string; prob: number }[] | null> {
+    const context = this.context;
+    // Only on the resident model: a load here would put seconds before the rule fallback could answer.
+    if (!context || this.modelInfo?.filename !== modelFilename || !context.isJinjaSupported()) return null;
+    const key = `${modelFilename}.${hash32(messages[0]?.content ?? "")}.gate`;
+    let loadGateMs: number | null = null;
+    if (this.gateCachedKey !== key) {
+      loadGateMs = await this.loadKv(context, key);
+      if (loadGateMs === null) {
+        // First gate on this model: prefill the fixed part once, the same way warmNow does the answer prefix.
+        const warm = context.completion({ messages: [messages[0], { role: "user", content: "" }], jinja: true, n_predict: 0, n_probs: 0 });
+        this.inFlight = warm;
+        try {
+          await warm;
+        } finally {
+          if (this.inFlight === warm) this.inFlight = null;
+        }
+        await this.saveKv(context, key).catch((e: any) => console.warn("[gate] session save failed:", e?.message ?? e));
+      }
+    }
+    this.prefixCached = false;
+    this.gateCachedKey = key;
+    const t0 = Date.now();
+    const completion = context.completion({ messages, jinja: true, n_predict: 1, n_probs: nProbs, temperature: 1 });
+    this.inFlight = completion;
+    try {
+      const result = (await completion) as {
+        completion_probabilities?: { probs?: { tok_str: string; prob: number }[] }[];
+        timings?: { prompt_n?: number };
+        tokens_cached?: number;
+      };
+      const all = result.completion_probabilities ?? [];
+      const last = all[all.length - 1]?.probs ?? [];
+      console.warn(
+        `[gate] model=${modelFilename} newTok=${result.timings?.prompt_n ?? "?"} cachedTok=${result.tokens_cached ?? "?"} ` +
+          `loadGateMs=${loadGateMs ?? "-"} gateMs=${Date.now() - t0} probsLen=${all.length} top=${last.slice(0, 3).map((p) => `${p.tok_str}:${p.prob.toFixed(3)}`).join(",")}`
+      );
+      return last.map((p) => ({ token: p.tok_str, prob: p.prob }));
+    } finally {
+      if (this.inFlight === completion) this.inFlight = null;
+    }
+  }
+
+  private answerKvKey(prefix: PromptPrefix): string {
+    return `${this.modelInfo?.filename}.${hash32(prefix.system || prefix.prompt)}.answer`;
+  }
+
+  /** `<cache>/kv/<key>.bin` as a file:// URI (expo-file-system) and as a plain path (llama.rn saveSession takes no URI). */
+  private kvPath(key: string): { uri: string; path: string } {
+    const uri = `${FileSystem.cacheDirectory}kv/${key}.bin`;
+    return { uri, path: uri.replace(/^file:\/\//, "") };
+  }
+
+  private async saveKv(context: LlamaContext, key: string): Promise<void> {
+    try {
+      await FileSystem.makeDirectoryAsync(`${FileSystem.cacheDirectory}kv/`, { intermediates: true });
+    } catch {}
+    await context.saveSession(this.kvPath(key).path);
+  }
+
+  /** Restores a saved prefix into the KV cache; the ms it took, or null when there is no file (or it failed). */
+  private async loadKv(context: LlamaContext, key: string): Promise<number | null> {
+    let uri = "";
+    try {
+      const kv = this.kvPath(key);
+      uri = kv.uri;
+      if (!(await FileSystem.getInfoAsync(uri)).exists) return null;
+      const t0 = Date.now();
+      await context.loadSession(kv.path);
+      return Date.now() - t0;
+    } catch (e: any) {
+      console.warn(`[gate] session load failed (${key}):`, e?.message ?? e);
+      try {
+        if (uri) await FileSystem.deleteAsync(uri, { idempotent: true });
+      } catch {}
+      return null;
     }
   }
 

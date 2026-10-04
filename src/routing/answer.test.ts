@@ -5,7 +5,8 @@ import { AnswerDeps, createAnswerer, InstalledLlm } from "./answer";
 import type { AnswerEvent } from "./events";
 import type { AnswerSettings } from "../models/settings";
 import type { GenerateOptions } from "../inference/LlamaEngine";
-import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION, PT_ANSWER_LANGUAGE } from "./context";
+import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION, noHealthSourceAnswer, PT_ANSWER_LANGUAGE } from "./context";
+import { conditionCardText } from "./conditionCards";
 import { ModelLoadError } from "../inference/loadError";
 import { answerReducer, initialAnswer } from "./answerReducer";
 
@@ -17,6 +18,14 @@ const chunk = (chunkId: string, title: string, body: string): RetrievedChunk => 
   score: 1,
   matchType: "hybrid",
 });
+/** The no-source health answer: the condition's first-aid card when the question names exactly one, else the generic card
+ * (Sonar exp-29 arm instcards). Returns the card's condition, or null for the generic card. */
+function expectNoSourceCard(result: { text: string; receipt: { reasonCodes: string[] } }, query: string, pt = false): string | null {
+  const code = result.receipt.reasonCodes.find((c) => c.startsWith("grounding:fa-card-") && c !== "grounding:fa-card-multi" && c !== "grounding:fa-card-from-history");
+  expect(result.receipt.reasonCodes, query).toContain("grounding:health-no-source");
+  expect(result.text, query).toBe(code ? conditionCardText(code.slice("grounding:fa-card-".length), query, pt) : noHealthSourceAnswer(pt));
+  return code ? code.slice("grounding:fa-card-".length) : null;
+}
 const WALIPINI_KB = chunk("wk", "Walipini", "A Walipini is an earth-sheltered cold frame. A greenhouse can be built by digging a hole in the ground. It uses the heat stored in the earth during the cold season.");
 const CANBERRA = chunk(
   "c1",
@@ -349,7 +358,7 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
       f = makeFake();
       f.retrieved = [off];
       const { result } = await collect(q);
-      expect(result.text, q).toMatch(/don't have a reliable offline source/);
+      expectNoSourceCard(result, q);
       expect(result.sources, q).toEqual([]);
       expect(f.generations).toHaveLength(0);
     }
@@ -409,7 +418,7 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
     expect(events.some((e) => e.type === "sources")).toBe(false);
     expect(events.some((e) => e.type === "instant")).toBe(false);
     expect(result.sources).toEqual([]);
-    expect(result.text).toMatch(/don't have a reliable offline source/);
+    expect(expectNoSourceCard(result, "How do I stop a nosebleed?")).toBe("nosebleed");
     expect(f.generations).toHaveLength(0);
 
     f = makeFake();
@@ -538,6 +547,28 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
     }
   });
 
+  it("CO hazard (EN): a generator in an attached garage gets the fixed safety fact, no model", async () => {
+    f = makeFake();
+    const { result } = await collect("Can I run my portable generator in the attached garage if I keep the door open?");
+    expect(f.generations).toHaveLength(0);
+    expect(result.receipt.reasonCodes).toContain("answer:safety-fact-co-hazard");
+    expect(result.text).toMatch(/^No\. Carbon monoxide/);
+    expect(result.text).toMatch(/even with the doors or windows open/);
+    expect(result.text).toMatch(/20 feet \(6 metres\)/);
+    f = makeFake();
+    const pt = await collect("Posso ligar o gerador na garagem com a porta aberta?");
+    expect(pt.result.receipt.reasonCodes).not.toContain("answer:safety-fact-co-hazard");
+  });
+
+  it("CO exposure with symptoms (generator in the garage + dizzy, no 'carbon monoxide') gets the CO card, not the generic line", async () => {
+    f = makeFake();
+    f.retrieved = [];
+    const { result } = await collect("Since we started the generator in the garage my head hurts and I feel dizzy and sick. What should I do?");
+    expect(f.generations).toHaveLength(0);
+    expect(result.receipt.reasonCodes).not.toContain("answer:safety-fact-co-hazard");
+    expect(result.text).toMatch(/Possible carbon monoxide poisoning: get everyone out into fresh air now/);
+  });
+
   it("leaves Portuguese questions alone (English sources can't be matched word for word)", async () => {
     f.retrieved = [CANBERRA];
     const { result } = await collect("Por que Canberra virou a capital da Austrália?");
@@ -644,8 +675,9 @@ describe("answer(): topic guard for every snippet (Prism RT-1)", () => {
       expect(sources.map((c) => c.title), q).toEqual(["Season"]);
       expect(queries, q).toEqual([q]); // retrieve() translates a PT question itself
       expect(result.receipt.reasonCodes).toContain("match:pt-en-names");
-      const instant = events.find((e) => e.type === "instant") as any;
-      expect(instant && sources[instant.snippet.sourceIndex].title, q).toBe("Season");
+      // Sonar exp-29 knob (a): sources matched against a translation (lexicon names) never give an instant snippet.
+      expect(events.some((e) => e.type === "instant"), q).toBe(false);
+      expect(result.receipt.reasonCodes).toContain("instant:off-translated");
     }
     // Without the names, no English title is named by the PT words: the guard keeps nothing.
     f = makeFake();
@@ -1076,10 +1108,12 @@ describe("answer(): the instant snippet says when the source is in another langu
     f.retrieved = [MONSOON];
     f.deps.englishNames = () => ["Monsoon"];
     const pt = await collect("O que é uma monção?");
+    // Sonar exp-29: a one-subject PT definition question keeps its instant snippet when the sentence defines the name.
     const inst = pt.events.find((e) => e.type === "instant") as any;
     expect(inst.snippet.text).toMatch(/^Da fonte offline \(em inglês\):\nA monsoon is/);
     expect(pt.result.tier).toBe("instant");
     expect(pt.result.text).toMatch(/^Da fonte offline \(em inglês\):/);
+    expect(pt.result.receipt.reasonCodes).toContain("instant:pt-definitional");
     f = makeFake();
     f.retrieved = [MONSOON];
     const en = await collect("What is a monsoon?");
@@ -1244,9 +1278,11 @@ describe("answer(): cry-004-pt, EIP-4844 (gate a11d730)", () => {
     ];
     f.deps.englishNames = () => ["Ethereum"];
     const { events, result } = await collect("O que é a EIP-4844 e o que são blobs no Ethereum?");
-    const inst = events.find((e) => e.type === "instant") as any;
-    expect(inst.snippet.text).toMatch(/Shard Blob Transactions scale data-availability/);
-    expect(result.receipt.reasonCodes).not.toContain("instant:off-topic");
+    // Sonar exp-29 knob (a): matched through a translation (names + identifier) → no instant snippet; the page still
+    // reaches the sources.
+    expect(events.some((e) => e.type === "instant")).toBe(false);
+    expect(result.receipt.reasonCodes).toContain("instant:off-translated");
+    expect((((events.find((e) => e.type === "sources") as any)?.sources ?? []) as RetrievedChunk[]).map((c) => c.title)).toContain(T);
   });
 });
 
@@ -1288,10 +1324,12 @@ describe("answer(): dng-001 snakebite, never a contested or dangerous procedure 
   const CONTESTED_FIRST_AID = chunk("s1", "Snakebite", "Treatment > First aid: Some have little local effect, but life-threatening systemic effects, in which case containing the venom in the region of the bite by pressure immobilization is desirable. Other venoms instigate localized tissue damage, and immobilization may increase the severity of the damage; whether this trade-off is desirable remains a point of controversy.");
   const OLD_MANUAL = chunk("fm", "US government: US Army Survival Manual FM 21-76: CHAPTER 4 - BASIC SURVIVAL MEDICINE", "Snakebite: Keep the victim still. Put a constricting band 5 to 10 centimeters above the bite. Make an incision over the bite and suck out the venom.");
   const SAFE_LAY = chunk("wb", "Wikibooks: First Aid/Snake Bites", "Treatment: Call emergency services. Keep the person still and calm, with the bitten limb below the heart. Do not cut the wound or suck out the venom. Do not apply a tourniquet or ice.");
-  it("only a contested section and an outdated manual: the emergency number and 'get care', no steps", async () => {
+  it("only a contested section and an outdated manual: no steps from them; the condition's card (Sonar exp-29), else the emergency number", async () => {
     f.retrieved = [CONTESTED_FIRST_AID, OLD_MANUAL];
     const { result } = await collect(q);
-    expect(result.text).toMatch(/^Não encontrei no acervo offline instruções de primeiros socorros seguras para isso\. Ligue agora/);
+    // The snakebite question names one condition with a card (the WHO snakebite card), shown instead of the fixed line.
+    expect(result.receipt.reasonCodes).toContain("grounding:fa-card-snakebite");
+    expect(result.text).toMatch(/emergência|emergency|SAMU|192/i);
     expect(result.text).not.toMatch(/immobiliz|constricting|incision|suck/i);
     expect(result.receipt.reasonCodes).toContain("grounding:health-no-safe-excerpt");
   });
@@ -1949,5 +1987,93 @@ describe("answer(): multi-pass answer language", () => {
     await deepen("Compare Canberra e Sydney: qual é a capital da Austrália?", [CANBERRA], () => {}, ctx).done;
     await deepen("Compare Canberra and Sydney", [CANBERRA], () => {}, ctx).done;
     expect(seen).toEqual([PT_ANSWER_LANGUAGE, undefined]);
+  });
+});
+
+describe("answer(): travel distance calculator (Anvil, EN)", () => {
+  it("answers 'how far … from X to Y' instantly from the city table, as an estimate", async () => {
+    const { result } = await collect("How far is it to walk from Paris to Rome and back?");
+    expect(result.receipt.reasonCodes).toEqual(["answer:calculator-travel-distance"]);
+    expect(result.text).toMatch(/estimate/);
+    expect(f.generations).toHaveLength(0);
+  });
+  it("leaves PT and unknown places to the normal path", async () => {
+    expect((await collect("Qual a distância de Paris a Roma?")).result.receipt.reasonCodes).not.toContain("answer:calculator-travel-distance");
+    expect((await collect("how far is it from my hotel to the beach?")).result.receipt.reasonCodes).not.toContain("answer:calculator-travel-distance");
+  });
+});
+
+describe("answer(): route gate (Anvil B4 arm)", () => {
+  const qwen4: InstalledLlm = { id: "qwen3-4b-instruct-2507-q4km", label: "Qwen3 4B", filename: "models/q4b.gguf", sizeBytes: 2.5 * GB, roles: ["general", "fast"], isDefault: true };
+  const gate = (probs: { token: string; prob: number }[] | null) => {
+    const calls: { messages: { role: string; content: string }[]; opts: { modelFilename: string; nProbs: number } }[] = [];
+    f.deps.engine.nextTokenProbs = async (messages, opts) => {
+      calls.push({ messages, opts });
+      return probs;
+    };
+    return calls;
+  };
+  const codes = (r: { receipt: { reasonCodes: string[] } }) => r.receipt.reasonCodes.filter((c) => c.startsWith("route-gate") || c.startsWith("task:"));
+
+  it("ANSWER on the 4B: no retrieval, the model answers", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    let retrieved = 0;
+    f.deps.retrieve = async () => (retrieved++, f.retrieved);
+    const calls = gate([{ token: "ANS", prob: 0.97 }, { token: "SEARCH", prob: 0.02 }]);
+    const { result } = await collect("tell me something fun about yourself");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].opts).toEqual({ modelFilename: "models/q4b.gguf", nProbs: 20 });
+    expect(calls[0].messages[1].content).toBe("tell me something fun about yourself");
+    expect(retrieved).toBe(0);
+    expect(f.generations).toHaveLength(1);
+    expect(codes(result)).toEqual(["task:conversation", "route-gate:cold-load", "route-gate:answer", "route-gate:score-0.020", "route-gate:chat->conversation"]);
+  });
+
+  it("SEARCH on the 4B keeps the rule's route", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    gate([{ token: "SEARCH", prob: 0.99 }]);
+    const { result } = await collect("What is the capital of Australia?");
+    expect(codes(result)).toEqual(["task:lookup", "route-gate:cold-load", "route-gate:search", "route-gate:score-1.000"]);
+  });
+
+  it("a health question searches even when the gate says ANSWER", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    gate([{ token: "ANS", prob: 0.9 }, { token: "SEARCH", prob: 0.1 }]);
+    const { result } = await collect("what should I do for a burn on my hand?");
+    expect(codes(result)).toContain("route-gate:health-guard");
+    expect(codes(result)).toContain("route-gate:search");
+    expect(codes(result)).not.toContain("task:conversation");
+  });
+
+  it("cold start: the first message loads the 4B before the gate (once), so it gets a gate verdict, not the rules", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    const order: string[] = [];
+    const load0 = f.deps.engine.load.bind(f.deps.engine);
+    f.deps.engine.load = async (fn, o) => (order.push(`load:${fn}`), load0(fn, o));
+    f.deps.engine.nextTokenProbs = async (_m, o) => (order.push(`gate:${f.loaded === o.modelFilename ? "resident" : "cold"}`), [{ token: "ANS", prob: 0.97 }, { token: "SEARCH", prob: 0.03 }]);
+    const { result } = await collect("tell me something fun about yourself");
+    expect(order).toEqual([`load:${qwen4.filename}`, "gate:resident"]);
+    expect(f.loads).toEqual([qwen4.filename]);
+    expect(codes(result)).toContain("route-gate:answer");
+    expect(codes(result)).not.toContain("route-gate:unavailable");
+    // Warm (second message): no second load, no cold-load code.
+    const second = await collect("and another fun fact?");
+    expect(f.loads).toEqual([qwen4.filename]);
+    expect(codes(second.result)).not.toContain("route-gate:cold-load");
+  });
+
+  it("rules when the engine can't run it, and never on the 1.5B", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    gate(null);
+    expect(codes((await collect("tell me something fun about yourself")).result)).toEqual(["task:chat", "route-gate:cold-load", "route-gate:unavailable"]);
+    f = makeFake();
+    const calls = gate([{ token: "ANS", prob: 1 }]);
+    expect(codes((await collect("tell me something fun about yourself")).result)).toEqual(["task:chat"]);
+    expect(calls).toHaveLength(0);
   });
 });

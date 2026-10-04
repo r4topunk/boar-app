@@ -449,7 +449,7 @@ describe("answer prefix kept in the KV cache (iPhone 13: 4-5 s to the first toke
       (created[0] as any).isJinjaSupported = () => false;
       await engine.generate({ prompt: "Title: q" });
       await vi.advanceTimersByTimeAsync(PREFIX_WARM_IDLE_MS + 20);
-      expect(warms(seen)[2]).toEqual({ prompt: PREFIX.prompt, n_predict: 0 });
+      expect(warms(seen)[2]).toEqual({ prompt: PREFIX.prompt, n_predict: 0, n_probs: 0 });
     } finally {
       vi.useRealTimers();
     }
@@ -491,6 +491,33 @@ describe("answer prefix kept in the KV cache (iPhone 13: 4-5 s to the first toke
       await vi.advanceTimersByTimeAsync(20);
       expect(warms(seen)).toHaveLength(2);
       expect(warms(seen)[1].messages[0].content).toBe("Thorough.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("route gate: reads the last probabilities entry (rc.4 never clears them) and resets n_probs for the answer", async () => {
+    try {
+      const { engine, seen } = await loadedEngine();
+      Object.assign(created[0] as any, {
+        completion: (p: any) => {
+          seen.push(p);
+          // rc.4: completion_probabilities keeps every earlier gate's token; this call's is the last one.
+          const stale = { probs: [{ tok_str: "SEARCH", prob: 1 }] };
+          const fresh = { probs: [{ tok_str: "ANS", prob: 0.8 }, { tok_str: "SEARCH", prob: 0.2 }] };
+          return Promise.resolve({ text: "", completion_probabilities: p.n_probs ? [stale, fresh] : undefined, timings: { prompt_n: 9 } });
+        },
+        saveSession: vi.fn(async () => 1),
+        loadSession: vi.fn(async () => ({})),
+      });
+      const gateMsgs = [{ role: "system", content: "router" }, { role: "user", content: "oi" }];
+      const probs = await engine.nextTokenProbs(gateMsgs, { modelFilename: "models/a.gguf", nProbs: 20 });
+      expect(probs).toEqual([{ token: "ANS", prob: 0.8 }, { token: "SEARCH", prob: 0.2 }]);
+      expect(seen.at(-1)).toEqual({ messages: gateMsgs, jinja: true, n_predict: 1, n_probs: 20, temperature: 1 });
+      // Another model than the loaded one: no gate (the answer path keeps the rules).
+      expect(await engine.nextTokenProbs(gateMsgs, { modelFilename: "models/other.gguf", nProbs: 20 })).toBeNull();
+      await engine.generate({ messages: answerMsgs });
+      expect(seen.at(-1)).toMatchObject({ n_probs: 0, temperature: 0.7 });
     } finally {
       vi.useRealTimers();
     }
