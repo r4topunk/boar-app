@@ -146,3 +146,33 @@ describe("verdictGuard v2: the compared quantity, list consistency (reviewer V5 
     expect(verdictGuard("Which countries are bigger than India by area?", "No country is bigger than India. China is the third-largest country.")).toBeNull();
   });
 });
+
+describe("verdictGuard v3: abstain on ambiguous attribution, rank scope/subject, multi-year facts (reviewer F1–F4)", () => {
+  it("no flag: P1 sub-region figure, P6b another attribute, P11 regional rank, P12 substring subject, P13 two years", () => {
+    const cases: [string, string, string][] = [
+      ["P1", "Which is more densely populated, Japan or Germany?", "Japan is more densely populated than Germany. Japan has about 339 people per km², while in Germany the city-state of Berlin reaches about 4,100 people per km²."],
+      ["P6b", "Which is bigger, Jupiter or Saturn?", "Jupiter is bigger than Saturn. Jupiter is about 139,820 km wide, while Saturn's rings are about 282,000 km wide."],
+      ["P11", "Which countries are bigger than Sudan?", "No country is bigger than Sudan. Sudan is the third-largest country in Africa."],
+      ["P12", "Which countries are bigger than Sudan by area?", "No country is bigger than Sudan by area. South Sudan is the 42nd-largest country."],
+      ["P13", "Was the Channel Tunnel opened before 1990?", "No, it was not. The first plans for a tunnel date from 1802, but it opened in 1994."],
+    ];
+    for (const [id, q, a] of cases) expect(verdictGuard(q, a), id).toBeNull();
+  });
+  it("positive: P2 density chosen over population, P9 elevation, P17 'smaller' polarity", () => {
+    expect(
+      verdictGuard(
+        "Which is more densely populated, the Netherlands or Brazil?",
+        "Brazil is more densely populated than the Netherlands. The Netherlands has about 18 million people and about 520 people per km², while Brazil has about 216 million people and about 25 people per km²."
+      )?.text
+    ).toMatch(/^The Netherlands is more densely populated than Brazil\./);
+    expect(
+      verdictGuard("Which is higher, Quito or La Paz?", "Quito is higher than La Paz. Quito sits at about 2,850 m, while La Paz is at about 3,640 m.")?.text
+    ).toMatch(/^La Paz is higher than Quito\. Quito sits at about 2,850 m/);
+    expect(
+      verdictGuard(
+        "Which is smaller, Belgium or the Netherlands?",
+        "The Netherlands is smaller than Belgium. Belgium covers about 30,689 km², while the Netherlands covers about 41,850 km²."
+      )?.text
+    ).toMatch(/^Belgium is smaller than the Netherlands\./);
+  });
+});

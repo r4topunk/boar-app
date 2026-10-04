@@ -13,7 +13,9 @@
  *      and any list the answer gives has N - 1 items (v2).
  * Repair is a template from the parsed facts (plus the difference and ratio when the question asks "by how much"); the
  * model's self-correction notes and restatements of the old verdict are dropped. No regeneration (template only).
- * An answer that isn't flagged is returned as null: nothing about it changes.
+ * v3 (reviewer F1–F3): abstain when a number may belong to someone else (a capitalised name or "in <Name>" before it, a
+ * possessive of another attribute), on a non-world rank scope or a subject inside another name, and on a "first …"
+ * sentence with two years. An answer that isn't flagged is returned as null: nothing about it changes.
  */
 
 export type VerdictGuardKind = "date" | "compare" | "rank";
@@ -73,6 +75,8 @@ interface Quantity {
   hi: number;
   unit: string;
   raw: string;
+  /** Where the number starts in the text it was read from. */
+  index: number;
 }
 
 const UNIT_STOP = new Set(["while", "and", "whereas", "compared", "than", "which", "in", "on", "at", "for", "but", "making", "so", "or", "as", "with", "versus", "vs"]);
@@ -111,7 +115,7 @@ function allQuantities(s: string): Quantity[] {
     if (yearLike) continue;
     // A percentage or a rank ("7th") is not a measurement of the entity.
     if (/^\s*(?:%|st\b|nd\b|rd\b|th\b)/.test(s.slice(m.index + m[0].length))) continue;
-    out.push({ lo: Math.min(a, b), hi: Math.max(a, b), unit: unit.trim(), raw: m[0] });
+    out.push({ lo: Math.min(a, b), hi: Math.max(a, b), unit: unit.trim(), raw: m[0], index: m.index });
   }
   return out;
 }
@@ -178,19 +182,30 @@ function mentionRe(keys: string[]): RegExp {
 interface Mention {
   who: 0 | 1;
   index: number;
+  end: number;
 }
 function mentions(s: string, res: [RegExp, RegExp]): Mention[] {
   const out: Mention[] = [];
   for (const who of [0, 1] as const) {
     const re = new RegExp(res[who].source, res[who].flags);
-    for (let m = re.exec(s); m; m = re.exec(s)) out.push({ who, index: m.index });
+    for (let m = re.exec(s); m; m = re.exec(s)) out.push({ who, index: m.index, end: m.index + m[0].length });
   }
   return out.sort((x, y) => x.index - y.index);
 }
 
 /** Each entity's stated quantity of the compared kind: from its mention to the other entity's next mention, within one
  * segment, the numbers whose unit fits the question's quantity. Two different same-unit values in one window: ambiguous. */
-function quantities(segs: Seg[], res: [RegExp, RegExp], classes: QuantityClass[]): [Quantity | null, Quantity | null] | null {
+/** After a possessive mention ("Germany's …"), the words before the number must name the compared quantity itself. */
+const OWN_MEASURE =
+  /^\s*(?:(?:total|land|average|overall|population|surface|estimated|current|mean|peak|summit|official)\s+)*(?:population density|density|population|area|size|height|elevation|altitude|length|weight|mass|diameter|width|age)\b|^\s*(?:is|was|are|were|of|stands|sits|reaches|averages|measures|weighs|covers)\b/i;
+/** A capitalised word (not the entities' own key words) or "in <Name>" between an entity's mention and its number. */
+function otherOwner(between: string, keys: string[]): boolean {
+  const own = new Set(keys.map((k) => k.toLowerCase()));
+  for (const m of between.matchAll(/(?<![\p{L}\p{N}])\p{Lu}[\p{L}-]*/gu)) if (!own.has(m[0].toLowerCase().replace(/['’]s$/, ""))) return true;
+  return false;
+}
+
+function quantities(segs: Seg[], res: [RegExp, RegExp], classes: QuantityClass[], keys: string[] = []): [Quantity | null, Quantity | null] | null {
   const found: [Quantity | null, Quantity | null] = [null, null];
   for (const { text } of segs) {
     const ms = mentions(text, res);
@@ -198,11 +213,18 @@ function quantities(segs: Seg[], res: [RegExp, RegExp], classes: QuantityClass[]
       const m = ms[i];
       if (found[m.who]) continue;
       const nextOther = ms.slice(i + 1).find((n) => n.who !== m.who);
-      const fit = allQuantities(text.slice(m.index, nextOther ? nextOther.index : undefined)).filter((q) => {
+      const window = text.slice(m.index, nextOther ? nextOther.index : undefined);
+      const fit = allQuantities(window).filter((q) => {
         const c = unitClass(q.unit);
         return c !== null && classes.includes(c);
       });
       if (!fit.length) continue;
+      // VG v3 F1 (reviewer P1, P6b): the number must be the entity's own. Abstain when a capitalised name or an "in <Name>"
+      // phrase sits between the mention and the number ("in Germany the city-state of Berlin reaches 4,100 per km²"), or
+      // the mention is a possessive of something other than the compared quantity ("Saturn's rings are 282,000 km wide").
+      const between = window.slice(m.end - m.index, fit[0].index);
+      if (otherOwner(between, keys)) return null;
+      if (/['’]s$/i.test(text.slice(m.index, m.end)) && !OWN_MEASURE.test(between)) return null;
       if (fit.some((q) => q.unit === fit[0].unit && (q.lo !== fit[0].lo || q.hi !== fit[0].hi))) return null;
       found[m.who] = fit[0];
     }
@@ -242,6 +264,10 @@ function checkDate(question: string, segs: Seg[]): VerdictGuardResult | null {
   const said = v[1].toLowerCase() === "yes";
   const factAt = segs.findIndex((s, i) => i > 0 && i <= 2 && /\bfirst\b/i.test(s.text) && /\b(?:1\d{3}|20\d{2})\b/.test(s.text));
   if (factAt < 0) return null;
+  // VG v3 F3 (reviewer R7/P13): a "first …" sentence with more than one year ("first plans from 1802, but it opened in
+  // 1994") can't say which year is the event's: abstain.
+  const years = new Set(segs[factAt].text.match(/\b(?:1\d{3}|20\d{2})\b/g) ?? []);
+  if (years.size > 1) return null;
   const first = Number(/\b(1\d{3}|20\d{2})\b/.exec(segs[factAt].text)![1]);
   // The first time it happened decides "before / by" both ways; "after" only when the first time is already after.
   const truth = rel === "before" ? first < year : rel === "by" ? first <= year : first > year ? true : null;
@@ -290,7 +316,7 @@ function checkCompare(question: string, segs: Seg[]): VerdictGuardResult | null 
   const classes = questionClasses(question);
   if (!classes) return null;
   const content = segs.filter((s) => !isMeta(s.text));
-  const qs = quantities(content, res, classes);
+  const qs = quantities(content, res, classes, [...ka, ...kb]);
   if (!qs) return null;
   const [qa, qb] = qs;
   if (!qa || !qb || qa.unit !== qb.unit) return null;
@@ -355,8 +381,13 @@ function checkRank(question: string, segs: Seg[]): VerdictGuardResult | null {
   // VG v2 (reviewer R9): the rank must be the subject's own ("India is the seventh-largest").
   const subject = /\bthan\s+(?:the\s+)?(.+?)(?:\s+(?:by|in|when|on)\b.*)?$/i.exec(q[3])?.[1]?.trim() ?? "";
   if (!subject) return null;
-  const rankSeg = segs.find((s) => RANK.test(s.text) && s.text.toLowerCase().includes(subject.toLowerCase()));
+  // VG v3 F2 (reviewer P11, P12): the subject on word boundaries and not right after another capitalised word ("South
+  // Sudan" is not "Sudan"); and the rank must be a world rank: any other scope ("in Africa", "in the EU") abstains.
+  const subjectRe = new RegExp(`(?<![\\p{Lu}][\\p{L}.-]*\\s+)(?<![\\p{L}\\p{N}])${escapeRe(subject)}(?![\\p{L}\\p{N}])`, "u");
+  const rankSeg = segs.find((s) => RANK.test(s.text) && subjectRe.test(s.text));
   if (!rankSeg) return null;
+  const afterRank = rankSeg.text.slice(RANK.exec(rankSeg.text)!.index);
+  if (/\b(?:in|of|within)\s+(?:the\s+)?(?!world\b)(?:\p{Lu}[\p{L}-]*|EU|continent|region|hemisphere)/u.test(afterRank)) return null;
   const r = RANK.exec(rankSeg.text)!;
   const n = r[2] ? Number(r[2]) : ORDINALS[r[1].toLowerCase()];
   if (!(n > 1 && n <= 50)) return null;
