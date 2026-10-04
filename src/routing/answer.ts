@@ -76,6 +76,7 @@ import { cleanPlaceName } from "../rag/poiPack";
 import { attributeCitations, checkCitations } from "./citations";
 import { calculate } from "./calculators";
 import { travelDistanceAnswer } from "./travelDistance";
+import { verdictGuard } from "./verdictGuard";
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
 import { isSnakebiteFirstAid, snakebiteFirstAidCard } from "./firstAidCards";
@@ -1412,6 +1413,17 @@ export function createAnswerer(deps: AnswerDeps) {
         if (attributed.added.length) {
           reasonCodes.push(`citations:added-${attributed.added.join("-")}`);
           text = attributed.text;
+          finalText = text;
+        }
+      }
+      // VG (cut 3 dev, coordinator 4B-LOSS-ANATOMY arm 1): a Yes/No or winner that the answer's own facts contradict
+      // ("No, astronauts did not walk on the Moon before 1970… July 20, 1969") is rewritten from those facts. EN model
+      // answers only: never health (cards, excerpts), PT or ES. Unflagged answers are untouched.
+      if (!health && !pt && !isSpanishQuestion(req.query) && text.trim() && !stopRequested) {
+        const vg = verdictGuard(req.query, text);
+        if (vg) {
+          reasonCodes.push(`verdict-guard:${vg.kind}`);
+          text = vg.text;
           finalText = text;
         }
       }

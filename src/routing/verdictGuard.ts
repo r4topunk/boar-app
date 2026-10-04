@@ -1,0 +1,347 @@
+/**
+ * VG, the verdict guard (cut 3 dev; coordinator 4B-LOSS-ANATOMY, arm 1). The 4B commits to its first-sentence verdict
+ * before it states the facts, and the facts are often right: "No, astronauts did not walk on the Moon before 1970. The
+ * first human moonwalk occurred on July 20, 1969" (every 4B run), "Germany is more densely populated than Japan… Germany
+ * 230/km², Japan 339/km²", "No country is bigger than India… India is the seventh-largest". A pure check of question +
+ * answer after generation. English only; the engine runs it on model answers only (never health, cards, calculators).
+ *  (a) date: a yes/no question with "before / after / by YYYY"; the Yes/No disagrees with the year of the answer's
+ *      own "first …" fact (within the two sentences after the verdict).
+ *  (b) compare: "Which <is more X>, A or B" / "Is A <more X> than B"; both entities get a number in the same unit, the
+ *      ranges don't overlap, and the verdict names the other one (or says the wrong Yes/No).
+ *  (c) rank: "Which <things> are bigger than X" answered "No <thing> is bigger…" next to "the Nth-largest" (N > 1).
+ * Repair is a template from the parsed facts (plus the difference and ratio when the question asks "by how much"); the
+ * model's self-correction notes and restatements of the old verdict are dropped. No regeneration (template only).
+ * An answer that isn't flagged is returned as null: nothing about it changes.
+ */
+
+export type VerdictGuardKind = "date" | "compare" | "rank";
+export interface VerdictGuardResult {
+  kind: VerdictGuardKind;
+  text: string;
+}
+
+// ---- text segments (sentences and list lines), kept with their separators so a repair only touches what it drops ----
+
+interface Seg {
+  text: string;
+  sep: string;
+}
+
+/** Inline self-correction notes: "(Note: This response contains a factual error…)", "[Note: …]". */
+const INLINE_NOTE = /\s*[([]\s*note:[^)\]]*[)\]]/gi;
+const META =
+  /^(?:wait\b|correct(?:ed|ion|ing)?\s*:|\(?\[?note\s*:)|\bthis (?:response|answer) contains (?:a |an )?(?:factual )?error\b|\bcontradicts the previous\b/i;
+
+function segments(text: string): Seg[] {
+  const parts = text.split(/((?<=[.!?:])[ \t]+(?=["'(\[*A-Z-])|\s*\n+\s*)/);
+  const out: Seg[] = [];
+  for (let i = 0; i < parts.length; i += 2) {
+    const t = parts[i] ?? "";
+    const sep = parts[i + 1] ?? "";
+    if (!t.trim()) {
+      if (out.length) out[out.length - 1].sep += sep;
+      continue;
+    }
+    out.push({ text: t, sep });
+  }
+  return out;
+}
+
+function join(segs: Seg[]): string {
+  return segs
+    .map((s, i) => s.text + (i < segs.length - 1 ? s.sep : ""))
+    .join("")
+    .trim();
+}
+
+const isMeta = (s: string) => META.test(s.trim());
+
+// ---- numbers ----
+
+const NUM = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
+const SCALE: Record<string, number> = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
+const NUMBER_RE = new RegExp(
+  `${NUM}(?:\\s*(?:–|—|-|to)\\s*${NUM})?(?:\\s+(thousand|million|billion|trillion)\\b)?`,
+  "gi"
+);
+const num = (s: string) => Number(s.replace(/,/g, ""));
+
+interface Quantity {
+  lo: number;
+  hi: number;
+  unit: string;
+  raw: string;
+}
+
+const UNIT_STOP = new Set(["while", "and", "whereas", "compared", "than", "which", "in", "on", "at", "for", "but", "making", "so", "or", "as", "with", "versus", "vs"]);
+
+/** "people per square kilometer, while…" -> "people per km2"; "lb (700 kg)" -> "lb". */
+function unitSig(rest: string): string {
+  const head = (/^\s*([^,;.()[\]]{0,48})/.exec(rest)?.[1] ?? "")
+    .toLowerCase()
+    .replace(/\b(?:square|sq\.?)\s+(?:kilomet(?:er|re)s?|km)\b|\bkm²|\bkm2\b/g, "km2")
+    .replace(/\b(?:square|sq\.?)\s+miles?\b|\bmi²/g, "mi2")
+    .replace(/\bkilomet(?:er|re)s?\b/g, "km")
+    .replace(/\bmet(?:er|re)s?\b/g, "m")
+    .replace(/\b(?:pounds?|lbs?)\b/g, "lb")
+    .replace(/\bkilo(?:gram)?s?\b|\bkgs\b/g, "kg")
+    .replace(/\b(?:feet|foot)\b/g, "ft")
+    .replace(/\bpersons\b/g, "people");
+  const words: string[] = [];
+  for (const w of head.split(/\s+/).filter(Boolean)) {
+    if (UNIT_STOP.has(w) || words.length >= 4) break;
+    words.push(w);
+  }
+  return words.join(" ");
+}
+
+/** The first number (or range) in `s`, with its scale and unit. Bare years (1500-2100, no unit) are skipped. */
+function firstQuantity(s: string): Quantity | null {
+  NUMBER_RE.lastIndex = 0;
+  for (let m = NUMBER_RE.exec(s); m; m = NUMBER_RE.exec(s)) {
+    const scale = m[3] ? SCALE[m[3].toLowerCase()] : 1;
+    const a = num(m[1]) * scale;
+    const b = m[2] !== undefined ? num(m[2]) * scale : a;
+    const unit = (m[3] ? `${m[3].toLowerCase()} ` : "") + unitSig(s.slice(m.index + m[0].length));
+    const yearLike = !m[2] && !m[3] && /^\d{4}$/.test(m[1]) && a >= 1500 && a <= 2100 && !unitSig(s.slice(m.index + m[0].length));
+    if (yearLike) continue;
+    // A percentage or a rank ("7th") is not a measurement of the entity.
+    if (/^\s*(?:%|st\b|nd\b|rd\b|th\b)/.test(s.slice(m.index + m[0].length))) continue;
+    return { lo: Math.min(a, b), hi: Math.max(a, b), unit: unit.trim(), raw: m[0] };
+  }
+  return null;
+}
+
+// ---- comparatives ----
+
+const MORE_WORDS =
+  "more|bigger|larger|greater|higher|denser|older|taller|longer|heavier|deeper|hotter|warmer|faster|richer|wider|farther|further|stronger|wealthier|busier|louder|brighter";
+const LESS_WORDS = "less|fewer|smaller|lower|younger|shorter|lighter|shallower|colder|cooler|slower|poorer|narrower|weaker|cheaper";
+const MORE = new RegExp(`\\b(?:${MORE_WORDS})\\b`, "i");
+const LESS = new RegExp(`\\b(?:${LESS_WORDS})\\b`, "i");
+const COMPARATIVE = `(?:${MORE_WORDS}|${LESS_WORDS})`;
+
+/** "max" when the bigger number wins ("more densely populated"), "min" for "smaller / fewer", null when unclear. */
+function polarity(s: string): "max" | "min" | null {
+  const less = LESS.test(s);
+  const more = MORE.test(s);
+  if (less && !/\bmore\b/i.test(s.replace(new RegExp(`\\b(?:${LESS_WORDS})\\b`, "gi"), ""))) return "min";
+  if (/\b(?:less|fewer)\b/i.test(s)) return "min";
+  if (more) return "max";
+  return null;
+}
+
+const ENTITY_STOP = new Set(["the", "a", "an", "of", "adult", "male", "female", "average", "on", "in", "typical", "common", "wild"]);
+const words = (s: string) => s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+
+/** Words that tell the two entities apart ("saltwater" vs "nile"; "moose" vs "american", "bison"). */
+function entityKeys(a: string, b: string): [string[], string[]] {
+  const wa = words(a).filter((w) => !ENTITY_STOP.has(w));
+  const wb = words(b).filter((w) => !ENTITY_STOP.has(w));
+  return [wa.filter((w) => !wb.includes(w)), wb.filter((w) => !wa.includes(w))];
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function mentionRe(keys: string[]): RegExp {
+  return new RegExp(`(?<![\\p{L}])(?:${keys.map(escapeRe).join("|")})(?:'s|’s|s|es)?(?![\\p{L}])`, "giu");
+}
+
+interface Mention {
+  who: 0 | 1;
+  index: number;
+}
+function mentions(s: string, res: [RegExp, RegExp]): Mention[] {
+  const out: Mention[] = [];
+  for (const who of [0, 1] as const) {
+    const re = new RegExp(res[who].source, res[who].flags);
+    for (let m = re.exec(s); m; m = re.exec(s)) out.push({ who, index: m.index });
+  }
+  return out.sort((x, y) => x.index - y.index);
+}
+
+/** Each entity's first stated quantity: from its mention to the other entity's next mention, within one segment. */
+function quantities(segs: Seg[], res: [RegExp, RegExp]): [Quantity | null, Quantity | null] {
+  const found: [Quantity | null, Quantity | null] = [null, null];
+  for (const { text } of segs) {
+    const ms = mentions(text, res);
+    for (let i = 0; i < ms.length; i++) {
+      const m = ms[i];
+      if (found[m.who]) continue;
+      const nextOther = ms.slice(i + 1).find((n) => n.who !== m.who);
+      const q = firstQuantity(text.slice(m.index, nextOther ? nextOther.index : undefined));
+      if (q) found[m.who] = q;
+    }
+    if (found[0] && found[1]) break;
+  }
+  return found;
+}
+
+// ---- formatting ----
+
+const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: n >= 100 ? 0 : n >= 10 ? 1 : 2 });
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const CARDINALS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+const ORDINALS: Record<string, number> = {
+  second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
+  eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16, seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20,
+};
+
+/** A shown entity name: "an adult male moose" -> "an adult male moose" (the question's own words, article kept). */
+const display = (s: string) => s.trim().replace(/\s+/g, " ");
+
+// ---- (a) date threshold ----
+
+const YESNO_Q = /^\s*(?:did|was|were|has|have|had|is|are|do|does)\b/i;
+const THRESHOLD = /\b(before|after|by)\s+(?:the\s+(?:year\s+)?)?(1\d{3}|20\d{2})\b/i;
+const VERDICT = /^\s*(yes|no)\b[,.!:;—–-]?\s*/i;
+const NEGATION = /\b(did|was|were|had|has|have|is|are|could|would)(?:\s+not\b|n't\b)/i;
+
+function checkDate(question: string, segs: Seg[]): VerdictGuardResult | null {
+  if (!YESNO_Q.test(question)) return null;
+  const t = THRESHOLD.exec(question);
+  if (!t) return null;
+  const rel = t[1].toLowerCase();
+  const year = Number(t[2]);
+  const v = VERDICT.exec(segs[0].text);
+  if (!v) return null;
+  const said = v[1].toLowerCase() === "yes";
+  const factAt = segs.findIndex((s, i) => i > 0 && i <= 2 && /\bfirst\b/i.test(s.text) && /\b(?:1\d{3}|20\d{2})\b/.test(s.text));
+  if (factAt < 0) return null;
+  const first = Number(/\b(1\d{3}|20\d{2})\b/.exec(segs[factAt].text)![1]);
+  // The first time it happened decides "before / by" both ways; "after" only when the first time is already after.
+  const truth = rel === "before" ? first < year : rel === "by" ? first <= year : first > year ? true : null;
+  if (truth === null || truth === said) return null;
+
+  const rest = segs[0].text.slice(v[0].length);
+  let verdict: string;
+  if (truth) {
+    const neg = rest.match(new RegExp(NEGATION.source, "gi")) ?? [];
+    verdict =
+      neg.length === 1 && !/\b(?:never|no|none|nobody)\b/i.test(rest)
+        ? `Yes, ${rest.replace(NEGATION, (_m, aux: string) => aux)}`
+        : "Yes.";
+  } else {
+    verdict = "No.";
+  }
+  const phrase = new RegExp(`\\b(?:${t[1]}\\s+(?:the\\s+(?:year\\s+)?)?|${rel === "before" ? "pre-" : rel === "after" ? "post-" : "x^"})${t[2]}\\b`, "i");
+  const kept = segs.slice(1).filter((s) => !isMeta(s.text) && !(phrase.test(s.text) && /\b(?:no|not|never|none|n't)\b/i.test(s.text)));
+  return { kind: "date", text: join([{ text: verdict, sep: segs[0].sep }, ...kept]) };
+}
+
+// ---- (b) two-entity numeric comparison ----
+
+const WHICH_Q = new RegExp(
+  String.raw`^\s*(?:which|who|what)\s+(.*?\b${COMPARATIVE}\b.*?)\s*[,:]\s*(.+?)\s+or\s+(.+?)(?:\s*,\s*and\b.*?|\s+and\s+by\s+how\s+much.*?)?\s*\?\s*$`,
+  "i"
+);
+const YESNO_CMP_Q = new RegExp(
+  String.raw`^\s*(?:is|are|was|were|does|do|did|has|have)\s+(.+?)\s+((?:have\s+|has\s+)?(?:a\s+)?${COMPARATIVE}\b.*?)\s+than\s+(.+?)\s*\?\s*$`,
+  "i"
+);
+const BY_HOW_MUCH = /\bby how much\b|\bhow much (?:more|less|bigger|larger|denser)\b|\bhow many more\b/i;
+
+function checkCompare(question: string, segs: Seg[]): VerdictGuardResult | null {
+  const which = WHICH_Q.exec(question);
+  const yesno = which ? null : YESNO_CMP_Q.exec(question);
+  if (!which && !yesno) return null;
+  const vp = which ? which[1] : yesno![2];
+  const a = which ? which[2] : yesno![1];
+  const b = which ? which[3] : yesno![3];
+  const pol = polarity(vp);
+  if (!pol) return null;
+  const [ka, kb] = entityKeys(a, b);
+  if (!ka.length || !kb.length) return null;
+  const res: [RegExp, RegExp] = [mentionRe(ka), mentionRe(kb)];
+  const content = segs.filter((s) => !isMeta(s.text));
+  const [qa, qb] = quantities(content, res);
+  if (!qa || !qb || qa.unit !== qb.unit) return null;
+  if (qa.lo <= qb.hi && qb.lo <= qa.hi) return null; // overlapping ranges: no decision
+  const aWins = pol === "max" ? qa.lo > qb.hi : qa.hi < qb.lo;
+
+  const v0 = segs[0].text;
+  if (yesno) {
+    const v = VERDICT.exec(v0);
+    if (!v) return null;
+    if ((v[1].toLowerCase() === "yes") === aWins) return null;
+    const verdict = aWins ? "Yes." : "No.";
+    const both = (s: string) => mentions(s, res).some((m) => m.who === 0) && mentions(s, res).some((m) => m.who === 1);
+    const kept = segs.slice(1).filter((s) => !isMeta(s.text) && !(both(s.text) && polarity(s.text) && !/\d/.test(s.text)));
+    return { kind: "compare", text: join([{ text: verdict, sep: segs[0].sep }, ...kept]) };
+  }
+
+  // Which-form: whom does the verdict sentence name as the winner?
+  const ms = mentions(v0, res);
+  if (!ms.length) return null;
+  const vpol = polarity(v0);
+  if (!vpol) return null;
+  const than = /\bthan\b/i.exec(v0);
+  let named: 0 | 1;
+  if (than && ms.some((m) => m.index < than.index) && ms.some((m) => m.index > than.index)) named = ms.find((m) => m.index < than.index)!.who;
+  else if (new Set(ms.map((m) => m.who)).size === 1) named = ms[0].who;
+  else return null;
+  const claimedA = vpol === pol ? named === 0 : named === 1;
+  if (claimedA === aWins) return null;
+
+  const [w, l, qw, ql] = aWins ? [a, b, qa, qb] : [b, a, qb, qa];
+  const verb = vp.trim().replace(/\s+/g, " ");
+  let verdict = `${capitalize(display(w))} ${verb} than ${display(l)}`;
+  if (BY_HOW_MUCH.test(question)) {
+    const diff = Math.abs(qw.lo - ql.lo);
+    const ratio = Math.max(qw.lo, ql.lo) / Math.min(qw.lo, ql.lo);
+    const unit = qw.unit.replace(/\bkm2\b/, "km²").replace(/\bmi2\b/, "mi²");
+    verdict += `, by about ${fmt(diff)}${unit ? ` ${unit}` : ""} (${fmt(qw.lo)} versus ${fmt(ql.lo)}, about ${ratio.toFixed(1)} times as much)`;
+  }
+  verdict += ".";
+  const both = (s: string) => mentions(s, res).some((m) => m.who === 0) && mentions(s, res).some((m) => m.who === 1);
+  // Restatements of the verdict (both entities and a comparative, no figures) go; the figures stay.
+  const kept = segs.slice(1).filter((s) => !isMeta(s.text) && !(both(s.text) && polarity(s.text) && !/\bwhile\b|\bwhereas\b/i.test(s.text)));
+  return { kind: "compare", text: join([{ text: verdict, sep: segs[0].sep }, ...kept]) };
+}
+
+// ---- (c) rank ----
+
+const RANK_Q = /^\s*which\s+([\p{L} ]+?)\s+(are|is)\s+((?:bigger|larger|greater)\b.*?)\s*\?\s*$/iu;
+const DENIAL = /\b(?:no|none of the)\s+[\p{L}]+(?:\s+[\p{L}]+)?\s+(?:is|are|has|have)\s+(?:any\s+)?(?:bigger|larger|greater)\b|\bthere (?:is|are) no\s+[\p{L}]+(?:\s+[\p{L}]+)?\s+(?:bigger|larger|greater)\b/iu;
+const RANK = /\b(second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|(\d{1,2})(?:st|nd|rd|th))[- ](?:largest|biggest)\b/i;
+const LIST = /\b(?:after|following|behind)\s+((?:the\s+)?[A-Z][\p{L}.]*(?:\s+[A-Z][\p{L}.]*)*(?:\s*,\s*(?:and\s+)?(?:the\s+)?[A-Z][\p{L}.]*(?:\s+[A-Z][\p{L}.]*)*)+)/u;
+
+function checkRank(question: string, segs: Seg[]): VerdictGuardResult | null {
+  const q = RANK_Q.exec(question);
+  if (!q) return null;
+  const denialAt = segs.findIndex((s) => DENIAL.test(s.text));
+  if (denialAt < 0) return null;
+  const rankSeg = segs.find((s) => RANK.test(s.text));
+  if (!rankSeg) return null;
+  const r = RANK.exec(rankSeg.text)!;
+  const n = r[2] ? Number(r[2]) : ORDINALS[r[1].toLowerCase()];
+  if (!(n > 1 && n <= 50)) return null;
+  const count = n - 1;
+  let noun = q[1].trim();
+  let be = q[2];
+  if (count === 1) {
+    noun = noun.replace(/ies$/i, "y").replace(/(?<!s)s$/i, "");
+    be = "is";
+  } else be = "are";
+  let verdict = `${capitalize(count <= 20 ? CARDINALS[count] : String(count))} ${noun} ${be} ${q[3].trim()}`;
+  for (const s of segs) {
+    const l = LIST.exec(s.text);
+    if (!l) continue;
+    const items = l[1].split(/\s*,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim().replace(/[.]+$/, "")).filter(Boolean);
+    if (items.length === count) verdict += `: ${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+    break;
+  }
+  verdict += ".";
+  const kept = segs.filter((s, i) => i !== 0 && !isMeta(s.text) && !DENIAL.test(s.text));
+  return { kind: "rank", text: join([{ text: verdict, sep: segs[0].sep }, ...kept]) };
+}
+
+/**
+ * The verdict guard: null when the answer is not flagged (it stays byte-identical), else the repaired text and which
+ * check fired. English questions only (the caller checks the language).
+ */
+export function verdictGuard(question: string, answer: string): VerdictGuardResult | null {
+  if (!question.trim() || !answer.trim()) return null;
+  const segs = segments(answer.replace(INLINE_NOTE, ""));
+  if (!segs.length) return null;
+  return checkDate(question, segs) ?? checkCompare(question, segs) ?? checkRank(question, segs);
+}

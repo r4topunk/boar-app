@@ -2077,3 +2077,26 @@ describe("answer(): route gate (Anvil B4 arm)", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("answer(): verdict guard (VG, cut 3 dev)", () => {
+  it("rewrites a model verdict its own facts contradict; the done event carries the final text", async () => {
+    f.installed = [lfm];
+    f.activeId = "lfm8";
+    f.retrieved = [];
+    f.deps.engine.generate = async () =>
+      "No, astronauts did not walk on the Moon before 1970. The first human moonwalk occurred on July 20, 1969, during NASA's Apollo 11 mission.";
+    const { events, result } = await collect("Did astronauts walk on the Moon before 1970?");
+    expect(result.receipt.reasonCodes).toContain("verdict-guard:date");
+    expect(result.text).toMatch(/Yes, astronauts did walk on the Moon before 1970\. The first human moonwalk occurred on July 20, 1969/);
+    expect((events.find((e) => e.type === "done") as any).finalText).toBe(result.text);
+  });
+  it("leaves a consistent answer and a PT question alone", async () => {
+    f.installed = [lfm];
+    f.activeId = "lfm8";
+    f.retrieved = [];
+    f.deps.engine.generate = async () => "Yes, astronauts walked on the Moon before 1970. The first moonwalk was on July 20, 1969.";
+    expect((await collect("Did astronauts walk on the Moon before 1970?")).result.receipt.reasonCodes.some((c) => c.startsWith("verdict-guard"))).toBe(false);
+    f.deps.engine.generate = async () => "Não, os astronautas não andaram na Lua antes de 1970. A primeira vez foi em 1969.";
+    expect((await collect("Os astronautas andaram na Lua antes de 1970?")).result.receipt.reasonCodes.some((c) => c.startsWith("verdict-guard"))).toBe(false);
+  });
+});
