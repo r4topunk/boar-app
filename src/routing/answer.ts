@@ -80,7 +80,7 @@ import { verdictGuard } from "./verdictGuard";
 import { arithmeticAnswer } from "./arithmetic";
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
-import { isSnakebiteFirstAid, snakebiteFirstAidCard } from "./firstAidCards";
+import { isSnakebiteFirstAid, snakebiteFirstAidCard as cut2SnakebiteCard } from "./firstAidCards";
 import { DETECTOR_FLOOR } from "./emergencyHead";
 import type { LoadFailureKind } from "../inference/loadError";
 import { DepthModel, planAnswer, resolveDeepModel, AnswerPlan, deepAutoIneligibility } from "./depth";
@@ -125,7 +125,13 @@ import type { AnswerSettings } from "../models/settings";
 import type { ResearchOptions, ResearchProgress, ResearchResult } from "../services/orchestrator";
 import type { ExecutionOutcome, ExecutionTelemetryRecord, ModelResidency } from "../services/executionTelemetry.pure";
 import { smallTalkReply } from "./smallTalk";
-import { conditionCardText, conversationCondition, isCardEmergency } from "./conditionCards";
+import { conditionCardText as cut2ConditionCardText, conversationCondition, isCardEmergency } from "./conditionCards";
+import { withReviewedSnakebiteText } from "./snakebiteCardText";
+
+// SBt (cut-3 final candidate): the snakebite card's EN text is the reviewed text (snakebiteCardText.ts); the trigger and
+// the card code in firstAidCards.ts / conditionCards.ts are cut 2's, byte for byte.
+const snakebiteFirstAidCard = (query: string, pt: boolean, es = false) => withReviewedSnakebiteText(cut2SnakebiteCard(query, pt, es));
+const conditionCardText = (...args: Parameters<typeof cut2ConditionCardText>) => withReviewedSnakebiteText(cut2ConditionCardText(...args));
 
 /**
  * The no-source health card (Sonar exp-29, r4to 2026-10-03: never answer an emergency from memory, recover with

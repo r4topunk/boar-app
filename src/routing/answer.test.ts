@@ -7,6 +7,7 @@ import type { AnswerSettings } from "../models/settings";
 import type { GenerateOptions } from "../inference/LlamaEngine";
 import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION, noHealthSourceAnswer, PT_ANSWER_LANGUAGE } from "./context";
 import { conditionCardText } from "./conditionCards";
+import { withReviewedSnakebiteText } from "./snakebiteCardText";
 import { ModelLoadError } from "../inference/loadError";
 import { answerReducer, initialAnswer } from "./answerReducer";
 
@@ -23,7 +24,8 @@ const chunk = (chunkId: string, title: string, body: string): RetrievedChunk => 
 function expectNoSourceCard(result: { text: string; receipt: { reasonCodes: string[] } }, query: string, pt = false): string | null {
   const code = result.receipt.reasonCodes.find((c) => c.startsWith("grounding:fa-card-") && c !== "grounding:fa-card-multi" && c !== "grounding:fa-card-from-history");
   expect(result.receipt.reasonCodes, query).toContain("grounding:health-no-source");
-  expect(result.text, query).toBe(code ? conditionCardText(code.slice("grounding:fa-card-".length), query, pt) : noHealthSourceAnswer(pt));
+  // SBt: the snakebite card carries the reviewed EN text (answer.ts wraps cut 2's card).
+  expect(result.text, query).toBe(code ? withReviewedSnakebiteText(conditionCardText(code.slice("grounding:fa-card-".length), query, pt)) : noHealthSourceAnswer(pt));
   return code ? code.slice("grounding:fa-card-".length) : null;
 }
 const WALIPINI_KB = chunk("wk", "Walipini", "A Walipini is an earth-sheltered cold frame. A greenhouse can be built by digging a hole in the ground. It uses the heat stored in the earth during the cold season.");
@@ -2114,5 +2116,14 @@ describe("answer(): arithmetic tools + detector numeric guard (AR, cut 3 dev)", 
     f.deps.emergencyScore = async () => ({ p: 0.9, fire: true });
     const { result } = await collect("IV drip at 125 ml per hour for my dad, the bag is 1000 ml, how long until it's empty?");
     expect(result.receipt.reasonCodes.some((c) => c.startsWith("answer:calculator"))).toBe(false);
+  });
+});
+
+describe("answer(): SBt reviewed snakebite text (cut-3 final candidate)", () => {
+  it("dng-001-style question: cut 2's trigger, the reviewed EN text", async () => {
+    const { result } = await collect("I just got bitten by a snake while hiking, two hours from the nearest road. What do I do right now?");
+    expect(result.receipt.reasonCodes).toContain("answer:first-aid-card-snakebite");
+    expect(result.text).toMatch(/^Snakebite, first aid: move away from the snake and don't try to catch or kill it\. Call emergency services now/);
+    expect(result.text).toMatch(/Sources: WHO, questions and answers on snakebite envenoming \(2019\); CDC NIOSH, Venomous Snakes at Work; NHS, Snake bites; healthdirect Australia, Snake bites\./);
   });
 });
