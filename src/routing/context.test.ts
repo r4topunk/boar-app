@@ -241,6 +241,25 @@ describe("instantFinalBlock", () => {
     ).toBe("not-definition");
   });
 
+  it("INSTANT-FRAG: a list/heading fragment, or a figurative 'capital', is not final", () => {
+    const q = "What is the capital of France?";
+    expect(instantFinalBlock(q, "- \u2014 France's gastronomic capital with a history from Roman times to the Resistance")).toBe("fragment");
+    expect(instantFinalBlock(q, "\u2022 Paris is the capital")).toBe("fragment");
+    expect(instantFinalBlock(q, "## Capital")).toBe("fragment");
+    expect(instantFinalBlock(q, "Lyon is France's gastronomic capital with a history from Roman times.")).toBe("figurative");
+    expect(instantFinalBlock("What is the capital of Switzerland?", "Zurich is the financial capital and largest city of Switzerland.")).toBe("figurative");
+    expect(instantFinalBlock("What is the capital of Brazil?", "Sao Paulo is Brazil's cultural and economic capital.")).toBe("figurative");
+  });
+
+  it("INSTANT-FRAG: correct capital answers still finish", () => {
+    const q = "What is the capital of France?";
+    expect(instantFinalBlock(q, "Paris is the capital and most populous city of France.")).toBeNull();
+    expect(instantFinalBlock(q, "Paris is the capital of France and its cultural capital.")).toBeNull();
+    expect(instantFinalBlock("What is the cultural capital of France?", "Paris is France's cultural capital.")).toBeNull();
+    expect(instantFinalBlock("Who invented the telephone?", "-5 degrees is cold, and Alexander Graham Bell invented the telephone.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of South Africa?", "Pretoria is the administrative capital of South Africa.")).toBeNull();
+  });
+
   it("lets a self-contained single-fact sentence finish", () => {
     expect(instantFinalBlock("What is the capital of Australia?", "Canberra is the capital city of Australia.")).toBeNull();
     expect(instantFinalBlock("What is ML-DSA?", "ML-DSA (Module-Lattice-Based Digital Signature Algorithm) is a post-quantum signature scheme.")).toBeNull();

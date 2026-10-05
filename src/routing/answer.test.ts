@@ -197,6 +197,26 @@ describe("answer(): instant tier", () => {
     expect(f.generations).toHaveLength(1);
   });
 
+  it("INSTANT-FRAG (A15 warm-up): 'capital of France' is not answered by Wikivoyage's Lyon line; the model path runs", async () => {
+    f.retrieved = [
+      chunk("wv", "Wikivoyage: France", "- \u2014 France's gastronomic capital with a history from Roman times to the Resistance. Paris is the capital and largest city of France, a global centre of art and fashion."),
+    ];
+    const { events, result } = await collect("What is the capital of France?");
+    expect(result.receipt.reasonCodes).not.toContain("instant:final");
+    expect(result.receipt.reasonCodes.join(" ")).toMatch(/instant:not-final-(fragment|figurative)/);
+    expect(result.tier).not.toBe("instant");
+    expect(types(events)).toContain("done");
+    expect(f.generations.length).toBeGreaterThan(0);
+  });
+
+  it("INSTANT-FRAG: a correct capital sentence next to a figurative one still finishes instant", async () => {
+    f.retrieved = [chunk("wv", "France", "Paris is the capital and largest city of France. Lyon is its gastronomic capital, a city with a long history from Roman times to the Resistance.")];
+    const { result } = await collect("What is the capital of France?");
+    expect(result.tier).toBe("instant");
+    expect(result.text).toMatch(/^Paris is the capital/);
+    expect(f.loads).toHaveLength(0);
+  });
+
   it("keeps generating when the confident snippet can't answer the question alone", async () => {
     const { events, result } = await collect("What is the capital of Australia and where is it?");
     expect(types(events)).toContain("instant");

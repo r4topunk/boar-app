@@ -181,14 +181,35 @@ export function selectInstant(query: string, chunks: RetrievedChunk[]): InstantS
  */
 const POINTER = /\b(can be found|is available (at|in|from)|see (the|also|below|above)|for more (information|details)|refer to|repository|see https?:|https?:\/\/)/i;
 
+/** Bullet, dash or heading marker followed by a space ("- —", "• ", "## "), or a "==" heading. A dash glued to a word or digit ("-5 C", "—France") is text. */
+const FRAGMENT_START = /^\s*(?:[-\u2013\u2014\u2022*\u00b7]+\s|#{1,6}\s|={2,})/;
+/** Modifiers that turn "capital" into a figure of speech ("gastronomic capital of France"), not the seat of government. */
+const FIGURATIVE_MODIFIER =
+  "gastronomic|gastronomical|culinary|cultural|financial|economic|commercial|industrial|spiritual|religious|intellectual|artistic|fashion|wine|beer|music|musical|film|tech|technology|entertainment|sports?|sporting|party|literary|medical|banking|business|trade|shopping|design|art|food|culture|style|crime|murder";
+const FIG_CAPITAL = new RegExp(`\\b(${FIGURATIVE_MODIFIER})\\s+capital\\b`, "gi");
+/**
+ * "What is the capital of X?" answered by "X's gastronomic capital ...": every "capital" in the sentence is figurative
+ * and the question did not use the modifier. One literal "capital" in the sentence is enough to leave it alone.
+ */
+function figurativeCapital(q: string, snippet: string): boolean {
+  if (!/\bcapital\b/i.test(q)) return false;
+  const all = snippet.match(/\bcapital\b/gi)?.length ?? 0;
+  if (!all) return false;
+  const mods = [...snippet.matchAll(FIG_CAPITAL)].map((m) => m[1].toLowerCase()).filter((m) => !new RegExp(`\\b${m}\\b`, "i").test(q));
+  return mods.length === all;
+}
+
 export function instantFinalBlock(
   query: string,
   snippet: string,
   matchQuery: string = query
-): "anaphora" | "list" | "compound" | "not-definition" | "health" | "pointer" | "title-only" | null {
+): "anaphora" | "list" | "compound" | "not-definition" | "health" | "pointer" | "title-only" | "fragment" | "figurative" | null {
   const q = query.trim().replace(/[?!.\s]+$/, "");
   // One sentence is never a complete first-aid answer.
   if (isHealthQuestion(q)) return "health";
+  // A list entry or heading that lost its subject ("- — France's gastronomic capital ...") is not a statement.
+  if (FRAGMENT_START.test(snippet)) return "fragment";
+  if (figurativeCapital(q, snippet)) return "figurative";
   if (/^(it|its|this|that|these|those|they|their|he|she|his|her|such|both)\b/i.test(snippet.trim())) return "anaphora";
   if (/\b(and|or)\s+(what|how|why|which|who|when|where)\b/i.test(q)) return "compound";
   if (/^(which|what)\b.*\b(are|were)\b/i.test(q)) return "list";
