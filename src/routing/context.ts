@@ -199,17 +199,90 @@ function figurativeCapital(q: string, snippet: string): boolean {
   return mods.length === all;
 }
 
+/**
+ * INSTANT-SUBJ. Entity aliases (normalised: lower case, no accents, dots dropped), the first entry being the canonical name.
+ * Includes the adjective where "the French capital" is the usual possessor form.
+ */
+const ENTITY_ALIASES: string[][] = [
+  ["usa", "us", "united states", "united states of america", "america", "american"],
+  ["uk", "united kingdom", "britain", "great britain", "british"],
+  ["uae", "united arab emirates", "emirates"],
+  ["netherlands", "holland", "dutch"],
+  ["russia", "russian federation", "russian"],
+  ["south korea", "republic of korea", "korea", "korean"],
+  ["czech republic", "czechia", "czech"],
+  ["myanmar", "burma", "burmese"],
+  ["ivory coast", "cote d'ivoire"],
+  ["france", "french"],
+  ["germany", "german"],
+  ["italy", "italian"],
+  ["spain", "spanish"],
+  ["china", "chinese", "prc"],
+  ["japan", "japanese"],
+  ["india", "indian"],
+  ["brazil", "brazilian"],
+  ["mexico", "mexican"],
+  ["canada", "canadian"],
+  ["australia", "australian"],
+  ["ethereum", "eth"],
+  ["bitcoin", "btc"],
+];
+
+const normSubj = (s: string): string =>
+  s
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u2019\u2018]/g, "'")
+    .replace(/(?<=\b[a-z])\.(?=[a-z]\b)/g, "")
+    .replace(/\b([a-z])\.(?=\s|$|,)/g, "$1");
+
+/**
+ * "What is the capital of the USA?" must not be answered by "Baton Rouge is the capital of Louisiana": the question's
+ * entity has to be the subject of the snippet sentence or the possessor of the answered slot ("capital of <E>", "<E>'s
+ * capital"). Only questions of the form "<wh> is the <slot> of <E>" / "<wh> is <E>'s <slot>" are judged (E at most 4
+ * words); every other shape returns false (not blocked).
+ */
+function entityMismatch(query: string, snippet: string): boolean {
+  const q = normSubj(query.trim()).replace(/[?!.\s]+$/, "");
+  let slot: string | undefined;
+  let entity: string | undefined;
+  let m = q.match(/^(?:what|who|which|where)\s+(?:is|was|are|were)\s+(?:the\s+)?(?:(?!of\b)[\w'-]+\s+){0,3}?([\w'-]+)\s+of\s+(?:the\s+)?(.+)$/);
+  if (m) [, slot, entity] = m;
+  else if ((m = q.match(/^(?:what|who|which|where)\s+(?:is|was|are|were)\s+(?:the\s+)?(.+?)'s\s+(?:[\w'-]+\s+){0,2}?([\w'-]+)$/))) [, entity, slot] = m;
+  if (!slot || !entity) return false;
+  entity = entity.split(/\s+(?:in|on|at|for|during|from|by|with|to)\s+/)[0].replace(/^(?:the|a|an)\s+/, "").trim();
+  if (!entity || entity.split(/\s+/).length > 4) return false;
+  const group = ENTITY_ALIASES.find((g) => g.includes(entity!));
+  const names = group ?? [entity];
+  const alt = names.map(escRe).join("|");
+  const E = `(?:${alt})`;
+  const sn = normSubj(snippet).replace(/\s+/g, " ").trim();
+  const slotRe = escRe(slot);
+  // possessor: "<slot> ... of <E>" with no other "of" in between, "<E>'s ... <slot>", or "<E> <slot>" (the French capital)
+  const possessor = new RegExp(
+    `\\b${slotRe}\\b(?:(?!\\bof\\b)[^.;])*?\\bof\\s+(?:the\\s+)?${E}(?![\\w])|(?<![\\w])${E}'s?\\s+(?:[\\w'-]+\\s+){0,3}?${slotRe}\\b|(?<![\\w])${E}\\s+(?:[\\w'-]+\\s+){0,2}?${slotRe}\\b`
+  );
+  if (possessor.test(sn)) return false;
+  // subject: E opens the sentence (optionally after "in"/"the")
+  const subject = new RegExp(`^(?:(?:in|for|according to)\\s+)?(?:the\\s+)?${E}(?![\\w])`);
+  if (subject.test(sn)) return false;
+  return true;
+}
+
 export function instantFinalBlock(
   query: string,
   snippet: string,
   matchQuery: string = query
-): "anaphora" | "list" | "compound" | "not-definition" | "health" | "pointer" | "title-only" | "fragment" | "figurative" | null {
+): "anaphora" | "list" | "compound" | "not-definition" | "health" | "pointer" | "title-only" | "fragment" | "figurative" | "subject" | null {
   const q = query.trim().replace(/[?!.\s]+$/, "");
   // One sentence is never a complete first-aid answer.
   if (isHealthQuestion(q)) return "health";
   // A list entry or heading that lost its subject ("- — France's gastronomic capital ...") is not a statement.
   if (FRAGMENT_START.test(snippet)) return "fragment";
   if (figurativeCapital(q, snippet)) return "figurative";
+  // INSTANT-SUBJ: the sentence must be about the question's entity, not a neighbouring one (Baton Rouge for "capital of the USA").
+  if (entityMismatch(q, snippet)) return "subject";
   if (/^(it|its|this|that|these|those|they|their|he|she|his|her|such|both)\b/i.test(snippet.trim())) return "anaphora";
   if (/\b(and|or)\s+(what|how|why|which|who|when|where)\b/i.test(q)) return "compound";
   if (/^(which|what)\b.*\b(are|were)\b/i.test(q)) return "list";

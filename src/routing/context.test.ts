@@ -260,6 +260,34 @@ describe("instantFinalBlock", () => {
     expect(instantFinalBlock("What is the capital of South Africa?", "Pretoria is the administrative capital of South Africa.")).toBeNull();
   });
 
+  it("INSTANT-SUBJ: a sentence about another entity is not final", () => {
+    expect(instantFinalBlock("what is the capital of the usa", "Baton Rouge is the capital of Louisiana, USA.")).toBe("subject");
+    expect(instantFinalBlock("What is the capital of Australia?", "Sydney is the capital of New South Wales, Australia's most populous state.")).toBe("subject");
+  });
+
+  it("INSTANT-SUBJ: the entity as subject or slot possessor still finishes", () => {
+    expect(instantFinalBlock("what is the capital of the usa", "Washington, D.C. is the capital of the United States.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of the USA?", "The capital of the United States of America is Washington, D.C.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of France?", "France's capital is Paris.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of Germany?", "Berlin is the capital and largest city of Germany.")).toBeNull();
+    expect(instantFinalBlock("What is the population of Canada?", "Canada has a population of about 40 million.")).toBeNull();
+    expect(instantFinalBlock("Who invented the telephone?", "Alexander Graham Bell invented the telephone.")).toBeNull();
+  });
+
+  it("INSTANT-SUBJ: aliases (UK/Britain/United Kingdom)", () => {
+    expect(instantFinalBlock("What is the capital of the UK?", "London is the capital of the United Kingdom.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of Britain?", "London is the capital and largest city of the UK.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of the UK?", "Britain's capital is London.")).toBeNull();
+    expect(instantFinalBlock("What is the capital of the UK?", "Edinburgh is the capital of Scotland, part of the UK.")).toBe("subject");
+  });
+
+  it("INSTANT-SUBJ: France/Lyon stays blocked", () => {
+    const q = "What is the capital of France?";
+    expect(instantFinalBlock(q, "Lyon is France's gastronomic capital with a history from Roman times.")).not.toBeNull();
+    expect(instantFinalBlock(q, "Lyon is the capital of the Auvergne-Rhone-Alpes region.")).toBe("subject");
+    expect(instantFinalBlock(q, "- \u2014 France's gastronomic capital with a history from Roman times to the Resistance")).toBe("fragment");
+  });
+
   it("lets a self-contained single-fact sentence finish", () => {
     expect(instantFinalBlock("What is the capital of Australia?", "Canberra is the capital city of Australia.")).toBeNull();
     expect(instantFinalBlock("What is ML-DSA?", "ML-DSA (Module-Lattice-Based Digital Signature Algorithm) is a post-quantum signature scheme.")).toBeNull();
