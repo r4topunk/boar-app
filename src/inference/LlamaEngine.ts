@@ -643,17 +643,18 @@ export class LlamaEngine {
     return `${this.modelInfo?.filename}.${hash32(prefix.system || prefix.prompt)}.answer`;
   }
 
-  /** `<cache>/kv/<key>.bin` as a file:// URI (expo-file-system) and as a plain path (llama.rn saveSession takes no URI). */
+  /** `<cache>/kv/<key>.bin` as a file:// URI (expo-file-system) and as a plain path (llama.rn saveSession takes no URI). The key is flattened: model filenames carry "models/..." and would nest the file in a directory nobody creates. */
   private kvPath(key: string): { uri: string; path: string } {
-    const uri = `${FileSystem.cacheDirectory}kv/${key}.bin`;
+    const uri = `${FileSystem.cacheDirectory}kv/${key.replace(/[^A-Za-z0-9._-]/g, "_")}.bin`;
     return { uri, path: uri.replace(/^file:\/\//, "") };
   }
 
   private async saveKv(context: LlamaContext, key: string): Promise<void> {
+    const kv = this.kvPath(key);
     try {
-      await FileSystem.makeDirectoryAsync(`${FileSystem.cacheDirectory}kv/`, { intermediates: true });
+      await FileSystem.makeDirectoryAsync(kv.uri.slice(0, kv.uri.lastIndexOf("/") + 1), { intermediates: true });
     } catch {}
-    await context.saveSession(this.kvPath(key).path);
+    await context.saveSession(kv.path);
   }
 
   /** Restores a saved prefix into the KV cache; the ms it took, or null when there is no file (or it failed). */

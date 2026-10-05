@@ -73,9 +73,18 @@ vi.mock("llama.rn", () => ({
     return ctx;
   },
 }));
+/** In-memory cache dir: like Android, a file can only be written into a directory that exists. */
+const kvFs = { dirs: new Set<string>(), files: new Set<string>() };
 vi.mock("expo-file-system/legacy", () => ({
   documentDirectory: "file:///docs/",
-  getInfoAsync: async () => ({ exists: true, size: fileSize }),
+  cacheDirectory: "file:///cache/",
+  getInfoAsync: async (uri: string) => (uri.startsWith("file:///cache/") ? { exists: kvFs.files.has(uri) || kvFs.dirs.has(uri) } : { exists: true, size: fileSize }),
+  makeDirectoryAsync: async (uri: string) => {
+    kvFs.dirs.add(uri);
+  },
+  deleteAsync: async (uri: string) => {
+    kvFs.files.delete(uri);
+  },
 }));
 vi.mock("ram-monitor", () => ({
   getDeviceTotalRamBytes: () => ram.total,
@@ -98,6 +107,8 @@ beforeEach(() => {
   initFailures.length = 0;
   platform.OS = "android";
   stopReturnsNothing = false;
+  kvFs.dirs.clear();
+  kvFs.files.clear();
 });
 
 describe("LlamaEngine Metal fallback (iPhone 13)", () => {
@@ -521,5 +532,96 @@ describe("answer prefix kept in the KV cache (iPhone 13: 4-5 s to the first toke
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("KV session files (A15 smoke: models/ in the key left saveSession without a directory)", () => {
+  const PREFIX = { system: "You are Boar. Use the context below.", prompt: "You are Boar. Use the context below.\n\n" };
+  const gateMsgs = [{ role: "system", content: "router" }, { role: "user", content: "oi" }];
+
+  /** A context that records warm-ups and session calls, and fails a save when its directory is missing (ENOENT). */
+  async function engineWithSessions(model = "models/Qwen3-4B-Q4_K_M.gguf") {
+    const engine = new LlamaEngine();
+    await engine.load(model);
+    const ctx = created.at(-1) as any;
+    const log = { saved: [] as string[], loaded: [] as string[], warms: 0 };
+    Object.assign(ctx, {
+      isJinjaSupported: () => true,
+      completion: (p: any) => {
+        if (p.n_predict === 0) log.warms++;
+        return Promise.resolve({
+          text: p.n_predict === 0 ? "" : "ok",
+          completion_probabilities: p.n_probs ? [{ probs: [{ tok_str: "SEARCH", prob: 1 }] }] : undefined,
+          timings: { prompt_n: 60, prompt_ms: 600 },
+        });
+      },
+      saveSession: async (path: string) => {
+        const dir = "file://" + path.slice(0, path.lastIndexOf("/") + 1);
+        if (!kvFs.dirs.has(dir)) throw new Error("Failed to save session");
+        kvFs.files.add("file://" + path);
+        log.saved.push(path);
+        return 1;
+      },
+      loadSession: async (path: string) => {
+        if (!kvFs.files.has("file://" + path)) throw new Error("Failed to load session");
+        log.loaded.push(path);
+        return {};
+      },
+    });
+    return { engine, log, model };
+  }
+
+  it("a key with '/' (the model path) is flattened into cache/kv/ and round-trips save -> load", async () => {
+    const { engine, log, model } = await engineWithSessions();
+    await engine.nextTokenProbs(gateMsgs, { modelFilename: model, nProbs: 20 });
+    expect(log.warms).toBe(1);
+    expect(log.saved).toHaveLength(1);
+    expect(log.saved[0]).toMatch(/^\/cache\/kv\/[^/]+\.bin$/);
+    expect(log.saved[0]).toContain("Qwen3-4B-Q4_K_M.gguf");
+    // A new process (fresh engine, same cache dir) restores the file instead of prefilling again.
+    const again = await engineWithSessions();
+    await again.engine.nextTokenProbs(gateMsgs, { modelFilename: again.model, nProbs: 20 });
+    expect(again.log.loaded).toEqual(log.saved);
+    expect(again.log.warms).toBe(0);
+    expect(again.log.saved).toHaveLength(0);
+  });
+
+  it("the gate prefix is saved once and reused on the next questions", async () => {
+    const { engine, log, model } = await engineWithSessions();
+    for (let i = 0; i < 3; i++) await engine.nextTokenProbs(gateMsgs, { modelFilename: model, nProbs: 20 });
+    expect(log.warms).toBe(1);
+    expect(log.saved).toHaveLength(1);
+  });
+
+  it("the answer prefix is saved once, and a later engine restores it instead of prefilling", async () => {
+    const a = await engineWithSessions();
+    vi.useFakeTimers();
+    try {
+      a.engine.setAnswerPrefix(PREFIX);
+      await vi.advanceTimersByTimeAsync(20);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(a.log.warms).toBe(1);
+    expect(a.log.saved).toHaveLength(1);
+    const b = await engineWithSessions();
+    b.engine.setAnswerPrefix(PREFIX);
+    await b.engine.generate({ messages: [{ role: "system", content: `${PREFIX.system}\n\nContext:\nx` }, { role: "user", content: "q" }] });
+    expect(b.log.loaded).toEqual(a.log.saved);
+    expect(b.log.warms).toBe(0);
+  });
+
+  it("gate and answer files differ and neither contains a path separator beyond cache/kv/", async () => {
+    const { engine, log, model } = await engineWithSessions();
+    await engine.nextTokenProbs(gateMsgs, { modelFilename: model, nProbs: 20 });
+    vi.useFakeTimers();
+    try {
+      engine.setAnswerPrefix(PREFIX);
+      await vi.advanceTimersByTimeAsync(20);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(new Set(log.saved).size).toBe(2);
+    for (const p of log.saved) expect(p.replace("/cache/kv/", "")).not.toContain("/");
   });
 });
