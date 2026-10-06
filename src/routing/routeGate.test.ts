@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 const ROUTE_GATE_SYSTEM_B5_LENGTH = ROUTE_GATE_SYSTEM.length;
-import { BOAR_SELF_DESCRIPTION, gatedTaskType, routeGateMessages, routeGateVerdict, ROUTE_GATE_SYSTEM } from "./routeGate";
+import { BOAR_SELF_DESCRIPTION, gatedTaskType, routeGateSkip, routeGateMessages, routeGateVerdict, ROUTE_GATE_SYSTEM } from "./routeGate";
 
 describe("routeGateMessages", () => {
   it("sends a single message as is, after the B4 system prompt", () => {
@@ -61,5 +61,55 @@ describe("gatedTaskType", () => {
     expect(gatedTaskType("compare", "search")).toBe("compare");
     expect(gatedTaskType("greeting", "search")).toBe("chat");
     expect(gatedTaskType("conversation", "search")).toBe("chat");
+  });
+});
+
+describe("routeGateSkip (CUT5-SPEED)", () => {
+  const base = { ruleTaskType: "lookup" as const, query: "What is the capital of Australia?", historyTurns: 0, detectorFired: false, emergencyLexical: false };
+  it("skips when the rules decide: lookup, research, compare, no history, no detector fire, not about BOAR", () => {
+    for (const t of ["lookup", "research", "compare"] as const) expect(routeGateSkip({ ...base, ruleTaskType: t })).toBe(true);
+    expect(routeGateSkip({ ...base, ruleTaskType: "research", query: "Explain Mozi's views on universal love." })).toBe(true);
+    expect(routeGateSkip({ ...base, query: "What is the capital of the U.S.?" })).toBe(true);
+  });
+  it("runs the gate for every other rule type", () => {
+    for (const t of ["chat", "conversation", "greeting", "calculate", "translate", "code", "unknown"] as const) expect(routeGateSkip({ ...base, ruleTaskType: t })).toBe(false);
+  });
+  it("runs the gate for hazard wording the detector may miss (boil advisories, floods, bleach)", () => {
+    for (const q of ["How long do I need to boil my tap water before I can drink it?", "Is it fine to use unscented bleach in well water?", "What to do after the hurricane floods the basement?"])
+      expect(routeGateSkip({ ...base, query: q }), q).toBe(false);
+  });
+  it("runs the gate for one- and two-word messages", () => {
+    for (const q of ["e aí?", "and you?", "thanks"]) expect(routeGateSkip({ ...base, query: q }), q).toBe(false);
+  });
+  it("runs the gate with history, a detector fire or an emergency", () => {
+    expect(routeGateSkip({ ...base, historyTurns: 2 })).toBe(false);
+    expect(routeGateSkip({ ...base, detectorFired: true })).toBe(false);
+    expect(routeGateSkip({ ...base, emergencyLexical: true })).toBe(false);
+  });
+  it("runs the gate for questions about BOAR or addressed to it (EN, PT, ES)", () => {
+    for (const q of [
+      "What is BOAR?",
+      "What can you do?",
+      "Who are you?",
+      "Where do your answers come from?",
+      "Does this work without internet?",
+      "What does the app know about Paris?",
+      "Who made this assistant?",
+      "How does it work?",
+      "Is my data private?",
+      "What is in your library?",
+      "O que você sabe sobre Roma?",
+      "Qual é a sua fonte?",
+      "Quem é o seu criador?",
+      "¿Qué eres tú?",
+      "quem te fez?",
+      "como eu apago o histórico da conversa?",
+      "e aí, tudo bem?",
+      "boa noite! o que causa as marés?",
+      "Hi! What is the capital of Australia?",
+      "thanks, and what is a rollup?",
+      "how do I clear this chat?",
+    ])
+      expect(routeGateSkip({ ...base, query: q }), q).toBe(false);
   });
 });

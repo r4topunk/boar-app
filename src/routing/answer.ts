@@ -11,7 +11,7 @@
  * a double send can never run two completions on one context.
  */
 import { classifyTask } from "./classify";
-import { gatedTaskType, routeGateMessages, routeGateVerdict, ROUTE_GATE_CONFIG, ROUTE_GATE_MODEL_IDS, ROUTE_GATE_N_PROBS, type GateMessage, type TokenProb } from "./routeGate";
+import { gatedTaskType, routeGateSkip, routeGateMessages, routeGateVerdict, ROUTE_GATE_CONFIG, ROUTE_GATE_MODEL_IDS, ROUTE_GATE_N_PROBS, type GateMessage, type TokenProb } from "./routeGate";
 import {
   compressContext,
   selectInstant,
@@ -747,6 +747,7 @@ export function createAnswerer(deps: AnswerDeps) {
       const gateCodes: string[] = [];
       let gateLoadMs = 0;
       let taskType = ruleTaskType;
+      let gateSkip = false;
       if (
         fastLlm &&
         deps.engine.nextTokenProbs &&
@@ -754,7 +755,15 @@ export function createAnswerer(deps: AnswerDeps) {
         (ROUTE_GATE_CONFIG.anyModel || ROUTE_GATE_MODEL_IDS.has(fastLlm.id)) &&
         (req.tier ?? "auto") === "auto" &&
         !req.reuseSources &&
-        !req.answerAnyway
+        !req.answerAnyway &&
+        // CUT5-SPEED: the rules decide (lookup/research/compare, no detector fire, no history, not about BOAR): no gate pass.
+        !(gateSkip = routeGateSkip({
+          ruleTaskType,
+          query: req.query,
+          historyTurns: ctx.history?.turns?.length ?? 0,
+          detectorFired: !!learned?.fire,
+          emergencyLexical: isCardEmergency(req.query) || isSafetyQuery(req.query),
+        }))
       ) {
         // Cold start (the first message after launch): the gate runs only on the resident model, so load the fast model
         // now. The answer below would load the same file anyway (ensureLoaded then finds it resident); a failed load
@@ -786,7 +795,7 @@ export function createAnswerer(deps: AnswerDeps) {
           if (decision !== v.decision) gateCodes.push("route-gate:health-guard");
           if (taskType !== ruleTaskType) gateCodes.push(`route-gate:${ruleTaskType}->${taskType}`);
         }
-      }
+      } else if (gateSkip) gateCodes.push("route-gate:skip-rules");
       const plan: AnswerPlan = planAnswer({
         taskType,
         requestedTier: req.tier ?? "auto",

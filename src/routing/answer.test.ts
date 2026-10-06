@@ -159,10 +159,10 @@ beforeEach(() => {
   f = makeFake();
 });
 
-async function collect(query: string, tier?: "auto" | "fast" | "deep") {
+async function collect(query: string, tier?: "auto" | "fast" | "deep", c: Record<string, unknown> = ctx) {
   const events: AnswerEvent[] = [];
   const { answer } = createAnswerer(f.deps);
-  const h = answer({ query, tier }, (e) => events.push(e), ctx);
+  const h = answer({ query, tier }, (e) => events.push(e), c as typeof ctx);
   const result = await h.done;
   return { events, result, h };
 }
@@ -259,9 +259,22 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
     expect(events.filter((e) => e.type === "warning")).toEqual([expect.objectContaining({ code: "weak_sources" })]);
     expect(f.generations).toHaveLength(1);
     expect(f.generations[0].messages!.at(-1)!.content).toContain(NO_SOURCE_INSTRUCTION);
+    expect(f.generations[0].staticSystem).toBe(true); // CUT5-SPEED: static no-source system message -> its own KV session
     expect(f.generations[0].messages!.map((m) => m.content).join("\n")).not.toContain("Dean Lee");
     expect(result.sources).toEqual([]);
     expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["grounding:off-topic-dropped-2", "grounding:no-good-source", "grounding:no-source-memory"]));
+  });
+
+  it("CUT5-SPEED: an answer with sources, or with a conversation summary, is not marked staticSystem", async () => {
+    f.installed = [lfm];
+    f.activeId = "lfm8";
+    f.retrieved = [CANBERRA];
+    await collect("Why was Canberra chosen as the capital of Australia?");
+    expect(f.generations[0].staticSystem).toBeUndefined();
+    f.generations.length = 0;
+    f.retrieved = [DEAN_LEE, PUBLIC_KEY];
+    await collect("Which signature algorithms are quantum resistant?", undefined, { ...ctx, history: { turns: [], summary: "Earlier we talked about wallets." } });
+    expect(f.generations[0].staticSystem).toBeUndefined();
   });
 
   it("drops an off-topic source when an on-topic one exists", async () => {
@@ -2056,8 +2069,23 @@ describe("answer(): route gate (Anvil B4 arm)", () => {
     f.installed = [qwen4];
     f.activeId = qwen4.id;
     gate([{ token: "SEARCH", prob: 0.99 }]);
-    const { result } = await collect("What is the capital of Australia?");
+    // A lookup the rules decide skips the gate (CUT5-SPEED); with an earlier turn the gate runs as before.
+    const { result } = await collect("What is the capital of Australia?", undefined, { ...ctx, history: { turns: [{ role: "user", text: "hi" }, { role: "assistant", text: "Hello." }] } });
     expect(codes(result)).toEqual(["task:lookup", "route-gate:cold-load", "route-gate:search", "route-gate:score-1.000"]);
+  });
+
+  it("CUT5-SPEED: no gate pass (and no gate load) for a lookup/research the rules decide; the gate still runs for BOAR questions", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    const calls = gate([{ token: "SEARCH", prob: 0.99 }]);
+    const { result } = await collect("What is the capital of Australia?");
+    expect(calls).toHaveLength(0);
+    expect(codes(result)).toEqual(["task:lookup", "route-gate:skip-rules"]);
+    const res = await collect("Explain Mozi's views on universal love.");
+    expect(calls).toHaveLength(0);
+    expect(codes(res.result)).toEqual(["task:research", "route-gate:skip-rules"]);
+    await collect("Where do your answers come from?");
+    expect(calls).toHaveLength(1);
   });
 
   it("a health question searches even when the gate says ANSWER", async () => {

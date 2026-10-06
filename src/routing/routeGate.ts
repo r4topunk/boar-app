@@ -122,3 +122,43 @@ export function gatedTaskType(rule: TaskType, decision: GateVerdict["decision"])
   if (decision === "answer") return isRetrievalIrrelevant(rule) ? rule : "conversation";
   return isRetrievalIrrelevant(rule) ? "chat" : rule;
 }
+
+/**
+ * CUT5-SPEED: when the rules already decide, the gate (one model forward pass, 3-5 s warm on the A15) is skipped.
+ * Skipping is equivalent to a gate verdict of SEARCH (gatedTaskType(rule, "search") = rule for these types), so it only
+ * ever removes the gate's chance to divert a message to conversation. It is therefore limited to rule types that are
+ * questions about the world, and never taken for: a detector fire, a lexical emergency or safety/health message (isSafetyQuery), a hazard word (boil, flood, bleach, ...), any earlier turn (a follow-up like "and the price?" is judged with its history), or a message that may be about
+ * BOAR itself or addressed to it ("you", "your", the app, the assistant, the library, ...). Otherwise the gate runs as before.
+ */
+export const GATE_SKIP_RULE_TYPES: ReadonlySet<TaskType> = new Set<TaskType>(["lookup", "research", "compare"]);
+
+const ABOUT_BOAR_RE =
+  /(?<![\p{L}])(boar|you|your|yours|yourself|you'?re|you'?ll|you'?ve|youre|app|apps|application|assistant|chatbot|chat bot|bot|ai|llm|model|models|offline|online|internet|library|libraries|knowledge pack|privacy|private|vo[cç]ês?|voce|vc|seu|sua|seus|suas|e a[ií]|tudo bem|beleza|te|teu|tua|teus|tuas|contigo|conversa|conversation|conversaci[oó]n|chat|hist[oó]rico|aplicativo|aplicação|assistente|biblioteca|t[uú]|usted|ustedes|eres|tu|tus|aplicaci[oó]n)(?![\p{L}])|\bhow (does|do|did) (it|this|that) work\b|\bwhat (can|does|do) (it|this) (do|know|have|hold)\b|\bwho (made|built|created|developed|wrote|owns|runs)\b|\bthis (thing|tool|program|software|system)\b/iu;
+
+/** Hazard words beyond isSafetyQuery (context.ts): water-safety and disaster wording the learned detector may or may not flag. Never skipped. */
+const HAZARD_RE =
+  /(?<![\p{L}])(boil(ed|ing)?|flood(s|ed|ing|water)?|bleach|iodine|chlorin\w*|contaminat\w*|advisory|do not drink|don'?t drink|tap water|well water|safe to drink|potable|poison\w*|toxic|overdos\w*|bitten|bleed\w*|chok\w*|unconscious|smoke|carbon monoxide|earthquake|hurricane|tsunami|wildfire)(?![\p{L}])/iu;
+
+/** A message that opens with a greeting ("boa noite! o que causa as marés?") is left to the gate, which judges it. */
+const GREETING_LEAD_RE = /^\s*[¡¿]?(oi+|ol[aá]|opa|e a[ií]|bom dia|boa (tarde|noite|noitee)|hello|hi|hey|yo|good (morning|evening|afternoon|night)|hola|buen(os|as)|thanks|thank you|obrigad[oa]|valeu|gracias)(?![\p{L}])/iu;
+
+export interface GateSkipInput {
+  ruleTaskType: TaskType;
+  query: string;
+  /** Number of earlier turns in the conversation. */
+  historyTurns: number;
+  /** The learned emergency detector fired on this message. */
+  detectorFired: boolean;
+  /** Lexical emergency: a first-aid condition card applies, or isSafetyQuery (health, safety, disaster), whatever the detector said. */
+  emergencyLexical: boolean;
+}
+
+export function routeGateSkip(i: GateSkipInput): boolean {
+  if (!GATE_SKIP_RULE_TYPES.has(i.ruleTaskType)) return false;
+  if (i.detectorFired || i.emergencyLexical) return false;
+  if (i.historyTurns > 0) return false;
+  // One or two words ("e aí?", "and you?") are conversation more often than a question about the world.
+  if (i.query.trim().split(/\s+/).length < 3) return false;
+  if (GREETING_LEAD_RE.test(i.query) || ABOUT_BOAR_RE.test(i.query) || HAZARD_RE.test(i.query)) return false;
+  return true;
+}
