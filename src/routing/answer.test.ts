@@ -2175,3 +2175,44 @@ describe("answer(): SBt reviewed snakebite text (cut-3 final candidate)", () => 
     expect(result.text).toMatch(/Sources: WHO, questions and answers on snakebite envenoming \(2019\); CDC NIOSH, Venomous Snakes at Work; NHS, Snake bites; healthdirect Australia, Snake bites\./);
   });
 });
+
+describe("answer(): DETMAX detector max over the window and the turn alone", () => {
+  const Q = "my daughter was bitten by a street dog two days ago, the skin broke a little";
+  const hist = (...u: string[]) => ({ ...ctx, history: { turns: u.map((text) => ({ role: "user", text })) } });
+  // A diluted window: any call carrying earlier turns scores low, the turn alone scores high.
+  const scorer = (calls: string[][]) => async (_q: string, turns: string[]) => {
+    calls.push(turns);
+    return turns.length ? { p: 0.049, fire: false } : { p: 0.554, fire: true };
+  };
+  it("with history: two calls (window, then the turn alone); fires when the turn alone fires", async () => {
+    const calls: string[][] = [];
+    f.deps.emergencyScore = scorer(calls);
+    const { result } = await collect(Q, undefined, hist("Hi, quick question."));
+    expect(calls).toEqual([["Hi, quick question."], []]);
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:p=0.554", "detector:fire"]));
+  });
+  it("without history: one call, unchanged", async () => {
+    const calls: string[][] = [];
+    f.deps.emergencyScore = scorer(calls);
+    const { result } = await collect(Q);
+    expect(calls).toEqual([[]]);
+    expect(result.receipt.reasonCodes).toContain("detector:fire");
+  });
+  it("the larger score wins and fire is either; a failing second call keeps the window's verdict", async () => {
+    f.deps.emergencyScore = async (_q: string, turns: string[]) => (turns.length ? { p: 0.6, fire: true } : { p: 0.1, fire: false });
+    const a = await collect(Q, undefined, hist("earlier"));
+    expect(a.result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:p=0.600", "detector:fire"]));
+    let n = 0;
+    f.deps.emergencyScore = async (_q: string, turns: string[]) => {
+      if (n++ === 1) throw new Error("boom");
+      return { p: 0.3, fire: true };
+    };
+    const b = await collect(Q, undefined, hist("earlier"));
+    expect(b.result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:p=0.300", "detector:fire"]));
+  });
+  it("a window that does not fire and a turn alone that does not fire: no fire (nothing added)", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.001, fire: false });
+    const { result } = await collect("What is the capital of Australia?", undefined, hist("hi"));
+    expect(result.receipt.reasonCodes).not.toContain("detector:fire");
+  });
+});

@@ -630,7 +630,13 @@ export function createAnswerer(deps: AnswerDeps) {
       // Sonar exp-30: the learned emergency detector runs first, so an emergency never takes the small-talk or
       // calculator shortcut ("help", "e agora?"). Unavailable or failing -> null -> the lexical predicate.
       const userTurns = (ctx.history?.turns ?? []).filter((t) => t.role === "user").map((t) => t.text);
-      const learned = deps.emergencyScore && !req.reuseSources ? await deps.emergencyScore(req.query, userTurns).catch(() => null) : null;
+      let learned = deps.emergencyScore && !req.reuseSources ? await deps.emergencyScore(req.query, userTurns).catch(() => null) : null;
+      // DETMAX: earlier user turns dilute the detector window ("Hi, quick question." + a dog bite: 0.554 -> 0.049). With history, the current turn
+      // is also scored alone and the larger score wins (fire if either window fires). Same threshold and model; no history -> no extra call.
+      if (learned && userTurns.length && deps.emergencyScore) {
+        const alone = await deps.emergencyScore(req.query, []).catch(() => null);
+        if (alone) learned = { p: Math.max(learned.p, alone.p), fire: learned.fire || alone.fire };
+      }
       const detectorCodes: string[] = learned ? [`detector:p=${learned.p.toFixed(3)}`, ...(learned.fire ? ["detector:fire"] : [])] : [];
 
       // Arithmetic (temperature, fuel economy, Naismith, currency at a given rate, battery Wh) is answered
