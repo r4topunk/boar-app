@@ -1324,7 +1324,12 @@ export function createAnswerer(deps: AnswerDeps) {
           text = withoutModelReferences(
             await deps.engine.generate(
               useTemplate
-                ? { ...common, messages: deps.assembleChatMessages(req.query, sources, ctx.systemPrompt, ctx.history, styleReminder) }
+                ? {
+                    ...common,
+                    messages: deps.assembleChatMessages(req.query, sources, ctx.systemPrompt, ctx.history, styleReminder),
+                    // CUT5-SPEED: with no sources and no conversation summary the system message is static -> its own KV session file.
+                    ...(sources.length === 0 && !ctx.history?.summary?.trim() ? { staticSystem: true } : {}),
+                  }
                 : { ...common, prompt: deps.assemblePrompt(req.query, sources, ctx.systemPrompt, ctx.history, styleReminder) }
             )
           );

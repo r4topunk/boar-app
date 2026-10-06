@@ -66,6 +66,12 @@ export interface GenerateOptions {
   enableThinking?: boolean;
   /** llama.cpp's own measurements for this completion (prompt = prefill). */
   onTimings?: (t: GenerationTimings) => void;
+  /**
+   * CUT5-SPEED: the first message is a static system message (the no-source answer: persona + grounding rule, no sources,
+   * no conversation summary). Its prefilled KV is kept in its own session file (`<model>.<hash>.nosrc`) and restored
+   * instead of re-prefilled; the prompt itself is unchanged. Chat-template path only.
+   */
+  staticSystem?: boolean;
 }
 
 /** The fixed start of the answer prompt (src/rag/pure.ts answerPromptPrefix): chat-template and plain variants. */
@@ -200,6 +206,8 @@ export class LlamaEngine {
   // take turns in the one KV sequence, so each is restored from a llama.rn session file (saveSession/loadSession)
   // instead of re-prefilled: ~260 tokens of the 4B are 15-20 s on an 8 GB Android phone. Null = neither is in the cache.
   private gateCachedKey: string | null = null;
+  /** Whether the KV cache holds the static no-source system message (CUT5-SPEED, `staticSystem`). Any other prompt drops it. */
+  private nosrcCached = false;
   private warmTimer: ReturnType<typeof setTimeout> | null = null;
   /** generate() calls not settled yet: a prefix refill never waits in front of one of them. */
   private pending = 0;
@@ -311,6 +319,7 @@ export class LlamaEngine {
     }
     this.lastLoad = { fit, warning: fit ? describeFit(modelFilename, fit) : null, backend };
     this.prefixCached = false;
+    this.nosrcCached = false;
     this.scheduleWarm(0);
     return this.lastLoad;
   }
@@ -385,6 +394,7 @@ export class LlamaEngine {
     this.context = null;
     this.prefixCached = false;
     this.gateCachedKey = null;
+    this.nosrcCached = false;
     this.modelInfo = null;
     this.loadedMeta = null;
     this.lastLoad = { fit: null, warning: null };
@@ -477,6 +487,7 @@ export class LlamaEngine {
       if (this.prefix === prefix && this.context === context) {
         this.prefixCached = true;
         this.gateCachedKey = null;
+        this.nosrcCached = false;
         await this.saveKv(context, this.answerKvKey(prefix)).catch((e: any) => console.warn("[engine] answer prefix save failed:", e?.message ?? e));
       }
       const t = result?.timings;
@@ -500,6 +511,7 @@ export class LlamaEngine {
     onTimings,
     thinkingBudget,
     enableThinking,
+    staticSystem,
   }: GenerateOptions): Promise<string> {
     if (!this.context) throw new Error("LlamaEngine: model not loaded");
     if (!prompt && !messages) {
@@ -553,6 +565,18 @@ export class LlamaEngine {
       }
     }
     this.gateCachedKey = null;
+    // CUT5-SPEED: the no-source answer's static system message comes from its own session file (or is prefilled once and saved).
+    const staticMsg = staticSystem && messages?.[0]?.role === "system" && this.context.isJinjaSupported() ? messages[0] : null;
+    let staticReady = !!staticMsg && this.nosrcCached;
+    if (staticMsg && !this.nosrcCached) {
+      const ok = await this.restoreStaticSystem(this.context, this.noSourceKvKey(staticMsg.content), staticMsg).catch((e: any) => {
+        console.warn("[engine] no-source prefix failed:", e?.message ?? e);
+        return false;
+      });
+      if (ok) this.prefixCached = false;
+      staticReady = ok;
+    }
+    this.nosrcCached = staticReady;
     let full = "";
     const completion = this.context.completion(completionParams, (data) => {
       full += data.token;
@@ -617,6 +641,7 @@ export class LlamaEngine {
       }
     }
     this.prefixCached = false;
+    this.nosrcCached = false;
     this.gateCachedKey = key;
     const t0 = Date.now();
     const completion = context.completion({ messages, jinja: true, n_predict: 1, n_probs: nProbs, temperature: 1 });
@@ -637,6 +662,29 @@ export class LlamaEngine {
     } finally {
       if (this.inFlight === completion) this.inFlight = null;
     }
+  }
+
+  /** Session key of the no-source system message: model + hash of its text (the persona is part of it), flattened by kvPath. */
+  noSourceKvKey(system: string): string {
+    return `${this.modelInfo?.filename}.${hash32(system)}.nosrc`;
+  }
+
+  /** Restores the static no-source prefix, or prefills it once (n_predict 0, same format as warmNow) and saves it. */
+  private async restoreStaticSystem(context: LlamaContext, key: string, system: ChatMessageInput): Promise<boolean> {
+    const ms = await this.loadKv(context, key);
+    if (ms !== null) {
+      console.warn(`[engine] no-source prefix restored in ${ms} ms`);
+      return true;
+    }
+    const warm = context.completion({ messages: [system, { role: "user", content: "" }], jinja: true, n_predict: 0, n_probs: 0 });
+    this.inFlight = warm;
+    try {
+      await warm;
+    } finally {
+      if (this.inFlight === warm) this.inFlight = null;
+    }
+    await this.saveKv(context, key).catch((e: any) => console.warn("[engine] no-source prefix save failed:", e?.message ?? e));
+    return true;
   }
 
   private answerKvKey(prefix: PromptPrefix): string {

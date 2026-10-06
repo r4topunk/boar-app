@@ -624,4 +624,49 @@ describe("KV session files (A15 smoke: models/ in the key left saveSession witho
     expect(new Set(log.saved).size).toBe(2);
     for (const p of log.saved) expect(p.replace("/cache/kv/", "")).not.toContain("/");
   });
+  it("CUT5-SPEED: the no-source system message gets its own flattened .nosrc session file, saved once and restored by a later engine", async () => {
+    const SYS = "You are Boar. Answer from your library only.";
+    const msgs = [{ role: "system", content: SYS }, { role: "user", content: "q" }];
+    const a = await engineWithSessions();
+    await a.engine.generate({ messages: msgs, staticSystem: true });
+    await a.engine.generate({ messages: msgs, staticSystem: true });
+    expect(a.log.warms).toBe(1); // prefilled once, the second question finds it in the KV cache
+    expect(a.log.saved).toHaveLength(1);
+    expect(a.log.saved[0]).toMatch(/^\/cache\/kv\/[^/]+\.nosrc\.bin$/);
+    expect(a.log.saved[0]).toContain("Qwen3-4B-Q4_K_M.gguf");
+    expect(kvFs.dirs.has("file:///cache/kv/")).toBe(true); // mkdir before the save (ENOENT otherwise)
+    const key = a.engine.noSourceKvKey(SYS);
+    expect(key).toMatch(/\.nosrc$/);
+    expect(a.engine.noSourceKvKey(SYS + "x")).not.toBe(key);
+    const b = await engineWithSessions();
+    await b.engine.generate({ messages: msgs, staticSystem: true });
+    expect(b.log.loaded).toEqual(a.log.saved);
+    expect(b.log.warms).toBe(0);
+    expect(b.log.saved).toHaveLength(0);
+  });
+
+  it("CUT5-SPEED: without staticSystem nothing is saved or restored, and the generation prompt is unchanged", async () => {
+    const { engine, log } = await engineWithSessions();
+    const seen: any[] = [];
+    const ctx = created.at(-1) as any;
+    const orig = ctx.completion;
+    ctx.completion = (p: any) => (seen.push(p), orig(p));
+    const msgs = [{ role: "system", content: "sys" }, { role: "user", content: "q" }];
+    await engine.generate({ messages: msgs });
+    expect(log.saved).toHaveLength(0);
+    expect(log.warms).toBe(0);
+    await engine.generate({ messages: msgs, staticSystem: true });
+    const gens = seen.filter((p) => p.n_predict !== 0);
+    expect(gens).toHaveLength(2);
+    expect(gens[1].messages).toEqual(gens[0].messages); // token-identical prompt
+  });
+
+  it("CUT5-SPEED: the no-source prefix is restored again after the gate took the KV cache", async () => {
+    const { engine, log, model } = await engineWithSessions();
+    const msgs = [{ role: "system", content: "sys" }, { role: "user", content: "q" }];
+    await engine.generate({ messages: msgs, staticSystem: true });
+    await engine.nextTokenProbs(gateMsgs, { modelFilename: model, nProbs: 20 });
+    await engine.generate({ messages: msgs, staticSystem: true });
+    expect(log.loaded.filter((p) => p.endsWith(".nosrc.bin"))).toHaveLength(1);
+  });
 });
