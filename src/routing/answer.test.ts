@@ -93,6 +93,8 @@ function makeFake(): Fake {
     deps: null as unknown as AnswerDeps,
   };
   f.deps = {
+    // These fixtures ask fact questions ("capital of Australia") to exercise the model path; FACTS has its own tests.
+    facts: false,
     now: () => (clock += 5),
     engine: {
       async load(filename) {
@@ -2214,5 +2216,28 @@ describe("answer(): DETMAX detector max over the window and the turn alone", () 
     f.deps.emergencyScore = async () => ({ p: 0.001, fire: false });
     const { result } = await collect("What is the capital of Australia?", undefined, hist("hi"));
     expect(result.receipt.reasonCodes).not.toContain("detector:fire");
+  });
+});
+
+describe("answer(): FACTS instant tier (offline Wikidata table)", () => {
+  it("a one-property fact question is answered from the table: no retrieval, no model load", async () => {
+    f.deps.facts = undefined; // default: on
+    const { events, result } = await collect("Does Brazil have more people than Russia?");
+    expect(types(events)).toEqual(["token", "done"]);
+    expect(result.tier).toBe("instant");
+    expect(result.receipt.modelId).toBe("grounding-guard");
+    expect(result.receipt.reasonCodes).toEqual(["answer:facts-population"]);
+    expect(result.text).toMatch(/^Yes\. Brazil has more people than Russia/);
+    expect(f.loads).toEqual([]);
+  });
+  it("never on a health message or when the emergency detector fires; off → the normal path", async () => {
+    f.deps.facts = undefined;
+    f.deps.emergencyScore = async () => ({ p: 0.9, fire: true });
+    expect((await collect("What is the capital of Australia?")).result.receipt.reasonCodes).not.toContain("answer:facts-capital");
+    f.deps.emergencyScore = undefined;
+    f.deps.facts = false;
+    expect((await collect("What is the capital of Australia?")).result.receipt.reasonCodes).not.toContain("answer:facts-capital");
+    f.deps.facts = undefined;
+    expect((await collect("What is the capital of Australia?")).result.receipt.reasonCodes).toEqual(["answer:facts-capital"]);
   });
 });

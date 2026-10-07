@@ -79,6 +79,7 @@ import { travelDistanceAnswer } from "./travelDistance";
 import { verdictGuard } from "./verdictGuard";
 import { arithmeticAnswer } from "./arithmetic";
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
+import { factsAnswer } from "../rag/facts";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
 import { isSnakebiteFirstAid, snakebiteFirstAidCard as cut2SnakebiteCard } from "./firstAidCards";
 import { DETECTOR_FLOOR } from "./emergencyHead";
@@ -225,6 +226,8 @@ export interface AnswerDeps {
    * health predicate (OR the card triggers and the health follow-up). null = unavailable -> lexical.
    */
   emergencyScore?(query: string, userTurns: string[]): Promise<{ p: number; fire: boolean } | null>;
+  /** FACTS instant tier (src/rag/facts.ts); default on. false = off (model-path tests whose fixtures are fact questions). */
+  facts?: boolean;
   /**
    * English article names a Portuguese question mentions (Bramble's lexicon, src/rag/ptLexicon.ts
    * englishNamesIn): "Por que existem as estações do ano?" -> ["Season"]. The grounding guard matches
@@ -711,6 +714,20 @@ export function createAnswerer(deps: AnswerDeps) {
           emit({ type: "token", answerId, tier: "instant", text: travel.text });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
           return { answerId, tier: "instant", outcome: "success", text: travel.text, sources: [], receipt: r, cited: [] };
+        }
+        // FACTS (coordinator arm, criterion arms/facts 4328960e): a fact from the offline Wikidata table when the question names a
+        // table entity and asks exactly one property (population, area, capital, height, length, depth, dates, plugs/voltage,
+        // host city, award winner); comparisons get a computed verdict. Never on a health or emergency message (EN only).
+        const fact =
+          deps.facts === false || learned?.fire || isPortugueseQuestion(req.query) || isSpanishQuestion(req.query) || isHealthQuestion(req.query) || isCardEmergency(req.query)
+            ? null
+            : factsAnswer(req.query);
+        if (fact) {
+          markVisible();
+          const r: AnswerReceipt = { modelId: "grounding-guard", modelLabel: "Offline facts (Wikidata)", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: [`answer:facts-${fact.template}`] };
+          emit({ type: "token", answerId, tier: "instant", text: fact.text });
+          emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
+          return { answerId, tier: "instant", outcome: "success", text: fact.text, sources: [], receipt: r, cited: [] };
         }
       }
 
