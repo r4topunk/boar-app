@@ -120,6 +120,37 @@ class PinDeviceTest {
         assertTrue(b.chats.listSessions().isEmpty())
     }
 
+    /** The lock screen of a PIN-protected store, with "Forgot the PIN?" tapped. */
+    private fun forgetDialog(): Pair<Store, () -> Boolean> {
+        val a = open()
+        val s = a.chats.createSession("Secret")
+        a.chats.addMessage(s.id, "user", "hidden", "u1")
+        a.lock.enable("4821")
+        val b = open()
+        var unlocked = false
+        compose.setContent { BoarTheme { LockScreen(b.lock) { unlocked = true } } }
+        compose.onNodeWithText(t("native.pin.forgot")).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
+        compose.onNodeWithText(t("native.pin.forgotTitle")).assertExists()
+        return b to { unlocked }
+    }
+
+    @Test fun theEraseQuestionClosesByItselfAfterEightSecondsAndErasesNothing() {
+        val (b, _) = forgetDialog()
+        Thread.sleep(9_000) // real time: the countdown runs on the wall clock
+        compose.waitUntil(5_000) { runCatching { compose.onNodeWithText(t("native.pin.forgotTitle")).assertDoesNotExist() }.isSuccess }
+        assertTrue(b.lock.isSet)
+        assertEquals(1, b.chats.listSessions().size)
+    }
+
+    @Test fun tappingEraseInTimeErasesTheChatsAndTheLock() {
+        val (b, unlocked) = forgetDialog()
+        compose.onNodeWithText(t("native.pin.forgotConfirm"), substring = true).performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { unlocked() }
+        assertFalse(b.lock.isSet)
+        assertTrue(b.chats.listSessions().isEmpty())
+    }
+
     @Test fun setupEndsOnThePinOfferUnlessAPinIsSet() {
         assertEquals("pinOffer", afterSetup(pinSet = false))
         assertEquals("chat", afterSetup(pinSet = true))

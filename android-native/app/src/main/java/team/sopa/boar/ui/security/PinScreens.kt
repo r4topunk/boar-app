@@ -55,7 +55,7 @@ private fun PinPad(title: String, subtitle: String?, error: String?, busy: Boole
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.weight(1f))
-        Image(painterResource(R.drawable.boar), null, Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)))
+        Image(painterResource(R.drawable.brand_pfp), null, Modifier.size(64.dp).clip(CircleShape))
         Text(title, style = Boar.type.titleLg, color = c.textHeading, textAlign = TextAlign.Center)
         subtitle?.let { Text(it, style = Boar.type.body, color = c.textSecondary, textAlign = TextAlign.Center) }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(vertical = 8.dp)) {
@@ -110,10 +110,40 @@ fun LockScreen(lock: PinLock, onUnlocked: () -> Unit) {
     }) {
         Text(t("native.pin.forgot"), style = Boar.type.caption, color = Boar.colors.textAccentCyan, modifier = Modifier.clickable { forgetting = true }.padding(8.dp))
     }
-    if (forgetting) AlertDialog({ forgetting = false },
-        title = { Text(t("native.pin.forgotTitle")) }, text = { Text(t("native.pin.forgotBody")) },
-        confirmButton = { TextButton({ forgetting = false; scope.launch { withContext(Dispatchers.IO) { lock.forget() }; onUnlocked() } }) { Text(t("native.pin.forgotConfirm"), color = Boar.colors.crimson400) } },
-        dismissButton = { TextButton({ forgetting = false }) { Text(t("common.cancel")) } })
+    if (forgetting) ForgetDialog(onErase = { forgetting = false; scope.launch { withContext(Dispatchers.IO) { lock.forget() }; onUnlocked() } }) { forgetting = false }
+}
+
+/** How long "Erase your chats?" stays open: time to read it and decide; then it closes by itself. */
+private const val FORGET_WINDOW_MS = 8_000L
+
+/**
+ * The self-destruct question, with a countdown: the erase must be read and tapped within [FORGET_WINDOW_MS], or the
+ * dialog closes and nothing is erased. Counted on the wall clock, so a test's virtual time can't close it early.
+ */
+@Composable
+private fun ForgetDialog(onErase: () -> Unit, onClose: () -> Unit) {
+    val openedAt = remember { android.os.SystemClock.elapsedRealtime() }
+    var left by remember { mutableLongStateOf(FORGET_WINDOW_MS) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            left = FORGET_WINDOW_MS - (android.os.SystemClock.elapsedRealtime() - openedAt)
+            if (left <= 0) { onClose(); break }
+            delay(200)
+        }
+    }
+    val seconds = (left + 999) / 1000
+    AlertDialog(onClose,
+        title = { Text(t("native.pin.forgotTitle")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(t("native.pin.forgotBody"))
+                androidx.compose.material3.LinearProgressIndicator(progress = { (left.toFloat() / FORGET_WINDOW_MS).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(), color = Boar.colors.crimson400, trackColor = Boar.colors.bgSubtle)
+                Text(t("native.pin.forgotCountdown", "seconds" to seconds), style = Boar.type.caption, color = Boar.colors.textSecondary)
+            }
+        },
+        confirmButton = { TextButton(onErase) { Text("${t("native.pin.forgotConfirm")} ($seconds)", color = Boar.colors.crimson400) } },
+        dismissButton = { TextButton(onClose) { Text(t("common.cancel")) } })
 }
 
 enum class PinFlow { NEW, CHANGE, REMOVE }
@@ -168,7 +198,7 @@ fun PinOffer(onSet: () -> Unit, onSkip: () -> Unit) {
     val c = Boar.colors
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
-        Image(painterResource(R.drawable.boar), null, Modifier.size(72.dp).clip(RoundedCornerShape(16.dp)))
+        Image(painterResource(R.drawable.brand_pfp), null, Modifier.size(72.dp).clip(CircleShape))
         Text(t("native.pin.offerTitle"), style = Boar.type.titleLg, color = c.textHeading, textAlign = TextAlign.Center)
         Text(t("native.pin.offerBody"), style = Boar.type.body, color = c.textSecondary, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
