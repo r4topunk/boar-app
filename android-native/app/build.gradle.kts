@@ -24,6 +24,7 @@ android {
         versionCode = 4
         versionName = "2.0.0-dev"
         ndk { abiFilters += listOf("arm64-v8a") }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // The Expo app's upload key, named in ~/.gradle/gradle.properties (never in the repo), as plugins/withReleaseSigning.js
     // reads it. Without it the release is debug-signed, which can't install over a store or release build of BOAR.
@@ -81,4 +82,10 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    // On-device checks (the PIN, its Keystore key, the sealed database, the PIN screens), run with adb am instrument.
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

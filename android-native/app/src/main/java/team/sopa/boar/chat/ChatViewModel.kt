@@ -131,6 +131,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         refreshTone()
         refreshModel()
         _state.update { it.copy(deepResearch = services.settings.deepResearchMode) }
+        // The open chat was erased (Clear all chat history, or a forgotten PIN): start a new one.
+        val open = _state.value.sessionId
+        if (open != null && services.chats.listSessions().none { it.id == open }) newChat()
     }
 
     /** The header's tone button: the next style ("custom" only when a custom prompt is written). */

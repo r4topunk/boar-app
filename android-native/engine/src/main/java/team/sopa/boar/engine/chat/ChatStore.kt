@@ -1,6 +1,8 @@
 package team.sopa.boar.engine.chat
 
 import team.sopa.boar.engine.db.SqlDatabase
+import team.sopa.boar.engine.security.PlainCipher
+import team.sopa.boar.engine.security.TextCipher
 import kotlin.random.Random
 
 data class ChatSession(val id: String, val title: String, val summary: String?, val createdAt: Long, val updatedAt: Long)
@@ -21,8 +23,14 @@ data class ChatMessageRecord(
 /**
  * Chat sessions and messages in the knowledge base's own tables (port of src/services/chatHistory.ts), so chats made
  * in the Expo app reopen after an upgrade. The schema is created by KnowledgeBase; chat_message_meta here.
+ *
+ * With a PIN, [cipher] seals every text a chat stores (titles, summaries, messages, their sources) before it reaches
+ * the database, and opens it on the way out; ids, times and ratings stay plain.
  */
 class ChatStore(private val db: SqlDatabase, private val now: () -> Long = System::currentTimeMillis) {
+    @Volatile var cipher: TextCipher = PlainCipher
+    private fun seal(s: String) = cipher.seal(s)
+    private fun open(s: String) = cipher.open(s)
     init {
         db.exec("CREATE TABLE IF NOT EXISTS chat_message_meta (message_id TEXT PRIMARY KEY REFERENCES chat_messages(id), meta TEXT NOT NULL)")
     }
@@ -33,13 +41,13 @@ class ChatStore(private val db: SqlDatabase, private val now: () -> Long = Syste
     fun createSession(title: String = "New chat"): ChatSession {
         val t = now()
         val s = ChatSession(newId(), title, null, t, t)
-        db.execute("INSERT INTO chat_sessions (id, title, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", listOf(s.id, s.title, null, t, t))
+        db.execute("INSERT INTO chat_sessions (id, title, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", listOf(s.id, seal(s.title), null, t, t))
         return s
     }
 
     fun listSessions(): List<ChatSession> =
         db.query("SELECT id, title, summary, created_at, updated_at FROM chat_sessions ORDER BY updated_at DESC") {
-            ChatSession(it.string(0)!!, it.string(1)!!, it.string(2), it.long(3), it.long(4))
+            ChatSession(it.string(0)!!, open(it.string(1)!!), it.string(2)?.let(::open), it.long(3), it.long(4))
         }
 
     fun messages(sessionId: String): List<ChatMessageRecord> = db.query(
@@ -49,15 +57,15 @@ class ChatStore(private val db: SqlDatabase, private val now: () -> Long = Syste
            LEFT JOIN chat_message_meta x ON x.message_id = m.id
            WHERE m.session_id = ? ORDER BY m.created_at ASC""",
         listOf(sessionId),
-    ) { ChatMessageRecord(it.string(0)!!, it.string(1)!!, it.string(2)!!, it.string(3)!!, it.long(4), it.string(5), it.string(6)) }
+    ) { ChatMessageRecord(it.string(0)!!, it.string(1)!!, it.string(2)!!, open(it.string(3)!!), it.long(4), it.string(5), it.string(6)?.let(::open)) }
 
     fun setMessageMeta(messageId: String, meta: String) {
-        db.execute("INSERT OR REPLACE INTO chat_message_meta (message_id, meta) VALUES (?, ?)", listOf(messageId, meta))
+        db.execute("INSERT OR REPLACE INTO chat_message_meta (message_id, meta) VALUES (?, ?)", listOf(messageId, seal(meta)))
     }
 
     fun addMessage(sessionId: String, role: String, text: String, id: String = newId()) {
         val t = now()
-        db.execute("INSERT INTO chat_messages (id, session_id, role, text, created_at) VALUES (?, ?, ?, ?, ?)", listOf(id, sessionId, role, text, t))
+        db.execute("INSERT INTO chat_messages (id, session_id, role, text, created_at) VALUES (?, ?, ?, ?, ?)", listOf(id, sessionId, role, seal(text), t))
         db.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", listOf(t, sessionId))
     }
 
@@ -67,7 +75,7 @@ class ChatStore(private val db: SqlDatabase, private val now: () -> Long = Syste
         db.execute(
             """INSERT INTO chat_messages (id, session_id, role, text, created_at) VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET text = excluded.text""",
-            listOf(id, sessionId, role, text, t),
+            listOf(id, sessionId, role, seal(text), t),
         )
         db.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", listOf(t, sessionId))
     }
@@ -77,8 +85,8 @@ class ChatStore(private val db: SqlDatabase, private val now: () -> Long = Syste
         else db.execute("INSERT OR REPLACE INTO answer_feedback (message_id, rating, created_at) VALUES (?, ?, ?)", listOf(messageId, rating, now()))
     }
 
-    fun setTitle(sessionId: String, title: String) { db.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", listOf(title, sessionId)) }
-    fun setSummary(sessionId: String, summary: String) { db.execute("UPDATE chat_sessions SET summary = ? WHERE id = ?", listOf(summary, sessionId)) }
+    fun setTitle(sessionId: String, title: String) { db.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", listOf(seal(title), sessionId)) }
+    fun setSummary(sessionId: String, summary: String) { db.execute("UPDATE chat_sessions SET summary = ? WHERE id = ?", listOf(seal(summary), sessionId)) }
 
     fun deleteSession(sessionId: String) = db.transaction {
         val inSession = "SELECT id FROM chat_messages WHERE session_id = ?"
@@ -90,6 +98,22 @@ class ChatStore(private val db: SqlDatabase, private val now: () -> Long = Syste
 
     fun clearAll() = db.transaction {
         for (t in listOf("chat_message_meta", "answer_feedback", "chat_messages", "chat_sessions")) db.execute("DELETE FROM $t")
+    }
+
+    /**
+     * Re-stores every chat text with [to], reading it with [from]: turning the PIN on (plain → sealed) or off (sealed →
+     * plain). One transaction, so a crash leaves either all rows in the old form or all in the new.
+     */
+    fun reseal(from: TextCipher, to: TextCipher) = db.transaction {
+        db.query("SELECT id, title, summary FROM chat_sessions") { Triple(it.string(0)!!, it.string(1)!!, it.string(2)) }.forEach { (id, title, summary) ->
+            db.execute("UPDATE chat_sessions SET title = ?, summary = ? WHERE id = ?", listOf(to.seal(from.open(title)), summary?.let { to.seal(from.open(it)) }, id))
+        }
+        db.query("SELECT id, text FROM chat_messages") { it.string(0)!! to it.string(1)!! }.forEach { (id, text) ->
+            db.execute("UPDATE chat_messages SET text = ? WHERE id = ?", listOf(to.seal(from.open(text)), id))
+        }
+        db.query("SELECT message_id, meta FROM chat_message_meta") { it.string(0)!! to it.string(1)!! }.forEach { (id, meta) ->
+            db.execute("UPDATE chat_message_meta SET meta = ? WHERE message_id = ?", listOf(to.seal(from.open(meta)), id))
+        }
     }
 
     /** Keeps the [maxSessions] most recently used sessions. */

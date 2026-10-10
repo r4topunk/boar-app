@@ -52,6 +52,8 @@ class BoarServices private constructor(private val context: Context) {
     private val kbDb = NativeSqlite.open(File(files, "SQLite").apply { mkdirs() }.resolve("aoair_knowledge.db").path)
     val knowledgeBase = KnowledgeBase(kbDb)
     val chats = ChatStore(kbDb)
+    /** The PIN that opens the app and seals the chats (none until the user sets one). */
+    val pinLock = team.sopa.boar.security.PinLock(settings, chats)
 
     private fun asset(path: String) = context.assets.open(path).bufferedReader().use { it.readText() }
 
@@ -61,8 +63,8 @@ class BoarServices private constructor(private val context: Context) {
     }
 
     fun fileOf(asset: CatalogAsset) = File(files, asset.filename)
-    /** Bytes of the catalog's models and packs on disk (ModelManager.currentStorageUsageBytes). */
-    fun storageUsedBytes(): Long = (catalog.models + catalog.corpusCatalog).sumOf { fileOf(it).takeIf { f -> f.isFile }?.length() ?: 0L }
+    /** Everything BOAR keeps on the phone: models, packs, the knowledge base with imported documents, chats, settings. */
+    fun storageUsedBytes(): Long = files.walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
     fun installed(kind: AssetKind) = catalog.models.filter { it.kind == kind && fileOf(it).isFile }
 

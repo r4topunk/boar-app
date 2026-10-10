@@ -63,6 +63,13 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Settings → Recovery: the wizard from step 1 again (hardware, model, knowledge, downloads, indexing). */
+    fun restart() {
+        job?.cancel()
+        job = null
+        _state.update { it.copy(step = 1, error = null, finished = false) }
+    }
+
     fun next() = _state.update { it.copy(step = minOf(it.step + 1, 2)) }
     fun back() = _state.update { it.copy(step = maxOf(it.step - 1, 1)) }
     fun choose(id: String) = _state.update { it.copy(chosenId = id) }

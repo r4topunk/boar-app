@@ -67,7 +67,9 @@ fun BoarDrawer(
 ) {
     val c = Boar.colors
     Column(Modifier.fillMaxHeight().widthIn(max = 310.dp).background(c.bgCardElevated).statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp).padding(top = 16.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        // Fixed parts at the top and bottom; the chat history takes the height left between them and scrolls inside
+        // it, so the menu doesn't move when the sessions load.
+        Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                 Image(painterResource(R.drawable.boar), null, Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)))
                 Column {
@@ -81,9 +83,8 @@ fun BoarDrawer(
                 Text("＋", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = c.textAccentEmerald)
                 Text(t("drawer.newChat"), style = Boar.type.titleSm.copy(fontSize = 13.sp), color = c.textAccentEmerald)
             }
-            if (sessions.isNotEmpty()) {
-                Text(t("drawer.recentSessions"), style = Boar.type["mono.xs"], color = c.textDim, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
-                LazyColumn(Modifier.heightIn(max = 220.dp)) {
+            Text(t("drawer.recentSessions"), style = Boar.type["mono.xs"], color = c.textDim, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                     items(sessions, key = { it.id }) { s ->
                         val active = s.id == activeSessionId
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
@@ -98,8 +99,7 @@ fun BoarDrawer(
                         }
                     }
                 }
-                Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp).background(c.borderSubtle))
-            }
+            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp).background(c.borderSubtle))
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items.forEach { item ->
                     Text(item.label, style = Boar.type.titleSm, color = c.textHeading,
@@ -128,8 +128,13 @@ private fun usage(used: Long, total: Long): String {
     return "${gb(used)}/${gb(total)}GB"
 }
 
+/**
+ * The memory BOAR itself holds (RssAnon: its heap, the repacked weights, the KV cache). Not VmRSS, which also counts
+ * the model file's mapped pages: Android drops those whenever it needs the room (2.4 GB right after a load, about
+ * 1 GB a minute later on the X6), so they made the bar jump without the app using more.
+ */
 private fun rssBytes(): Long = runCatching {
-    File("/proc/self/status").readLines().first { it.startsWith("VmRSS:") }.split(Regex("\\s+"))[1].toLong() * 1024
+    File("/proc/self/status").readLines().first { it.startsWith("RssAnon:") }.split(Regex("\\s+"))[1].toLong() * 1024
 }.getOrDefault(0L)
 
 /** DrawerFooterStats.tsx: the app's RAM and the models' disk use against BOAR's budgets, and the last answer's speed. */

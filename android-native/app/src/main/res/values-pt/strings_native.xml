@@ -54,4 +54,28 @@
     <string name="native_tweaks_thinkingNote" formatted="false">Deixa um modelo que pensa raciocinar primeiro. Auto: desligado, para o limite de tokens da resposta não ir para o raciocínio.</string>
     <string name="native_tweaks_repack" formatted="false">Pesos reempacotados</string>
     <string name="native_tweaks_repackNote" formatted="false">Auto: ligado (o prompt é lido cerca de 2x mais rápido). Depois de um carregamento sem memória, o próximo mantém os pesos mapeados do armazenamento.</string>
+    <string name="native_pin_enterTitle" formatted="false">Digite seu PIN</string>
+    <string name="native_pin_enterSubtitle" formatted="false">Suas conversas estão protegidas com ele.</string>
+    <string name="native_pin_wrong" formatted="false">PIN errado.</string>
+    <string name="native_pin_wait" formatted="false">Tentativas demais. Espere {{seconds}} s.</string>
+    <string name="native_pin_forgot" formatted="false">Esqueceu o PIN?</string>
+    <string name="native_pin_forgotTitle" formatted="false">Apagar suas conversas?</string>
+    <string name="native_pin_forgotBody" formatted="false">Sem o PIN, suas conversas não podem ser abertas, nem por nós. Apagá-las remove o PIN também. Modelos, pacotes e documentos continuam.</string>
+    <string name="native_pin_forgotConfirm" formatted="false">Apagar conversas</string>
+    <string name="native_pin_currentTitle" formatted="false">PIN atual</string>
+    <string name="native_pin_newTitle" formatted="false">Escolha um PIN</string>
+    <string name="native_pin_newSubtitle" formatted="false">De 4 a 8 dígitos. Você vai digitá-lo sempre que abrir o BOAR.</string>
+    <string name="native_pin_confirmTitle" formatted="false">Digite de novo</string>
+    <string name="native_pin_mismatch" formatted="false">Os PINs não conferem. Escolha de novo.</string>
+    <string name="native_pin_offerTitle" formatted="false">Trancar o BOAR com um PIN?</string>
+    <string name="native_pin_offerBody" formatted="false">Com um PIN, suas conversas ficam guardadas lacradas: quem tiver seu celular ou os arquivos dele via USB não consegue lê-las. Dá para ativar ou remover depois, nas Configurações.</string>
+    <string name="native_pin_offerSet" formatted="false">Definir um PIN</string>
+    <string name="native_pin_offerSkip" formatted="false">Agora não</string>
+    <string name="native_settings_security" formatted="false">Segurança</string>
+    <string name="native_settings_pinOn" formatted="false">PIN ativo. As conversas ficam guardadas lacradas com ele.</string>
+    <string name="native_settings_pinOff" formatted="false">Sem PIN. Quem tiver o celular desbloqueado pode abrir suas conversas.</string>
+    <string name="native_settings_pinSet" formatted="false">Definir um PIN</string>
+    <string name="native_settings_pinChange" formatted="false">Trocar o PIN</string>
+    <string name="native_settings_pinRemove" formatted="false">Remover o PIN</string>
+    <string name="native_settings_clearChatsDone" formatted="false">Histórico de conversas apagado.</string>
 </resources>

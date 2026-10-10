@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,7 +57,7 @@ interface DisplayPrefs {
  * plus Advanced tweaks: every engine knob, Auto by default.
  */
 @Composable
-fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onBack: () -> Unit) {
+fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) -> Unit, onSetup: () -> Unit, onBack: () -> Unit) {
     val c = Boar.colors
     val s = services.settings
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding()) {
@@ -66,6 +67,7 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onBack: () -> Un
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ToneSection(services)
+            SecuritySection(services, onPin)
             Section(t("modelSetupScreen.sections.memory")) {
                 var auto by remember { mutableStateOf(s.autoSummarize) }
                 SwitchRow(t("memorySettings.autoSummarizeLabel"), t("memorySettings.autoSummarizeValue"), auto) { auto = it; s.autoSummarize = it }
@@ -75,6 +77,7 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onBack: () -> Un
                 Choices(t("memorySettings.turnsBeforeSummarizing"), listOf(4, 6, 8, 12).map { it to "$it" }, turns) { turns = it; s.historyTurnThreshold = it }
                 var max by remember { mutableStateOf(s.maxSavedSessions) }
                 Choices(t("memorySettings.maxSavedSessions"), listOf(5, 10, 25, 50).map { it to "$it" }, max) { max = it; s.maxSavedSessions = it }
+                ClearChats(services)
             }
             Section(t("modelSetupScreen.sections.displayTheme")) {
                 var theme by remember { mutableStateOf(ThemeTokens.byId(s.themeId).id) }
@@ -87,8 +90,71 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onBack: () -> Un
                 Choices(null, listOf("system" to "System", "en" to "English", "pt" to "Português"), lang) { lang = it; val id = it.takeIf { v -> v != "system" }; s.languageId = id; prefs.setLanguage(id) }
             }
             TweaksSection(services)
+            RecoverySection(onSetup)
         }
     }
+}
+
+@Composable
+private fun SecuritySection(services: BoarServices, onPin: (String) -> Unit) {
+    val c = Boar.colors
+    val on = services.pinLock.isSet
+    Section(t("native.settings.security")) {
+        Text(t(if (on) "native.settings.pinOn" else "native.settings.pinOff"), style = Boar.type.subtext, color = if (on) c.textAccentEmerald else c.textSecondary)
+        if (on) {
+            LinkButton(t("native.settings.pinChange")) { onPin("CHANGE") }
+            LinkButton(t("native.settings.pinRemove"), danger = true) { onPin("REMOVE") }
+        } else LinkButton(t("native.settings.pinSet")) { onPin("NEW") }
+    }
+}
+
+/** MemorySettings.tsx: Clear All Chat History, after a confirmation. */
+@Composable
+private fun ClearChats(services: BoarServices) {
+    var asking by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf(false) }
+    LinkButton(if (done) t("native.settings.clearChatsDone") else t("memorySettings.clearAllChatHistory"), danger = !done) { if (!done) asking = true }
+    if (asking) androidx.compose.material3.AlertDialog({ asking = false },
+        title = { Text(t("memorySettings.clearAllConfirmTitle")) },
+        confirmButton = { androidx.compose.material3.TextButton({ services.chats.clearAll(); asking = false; done = true }) { Text(t("memorySettings.clearAllButton"), color = Boar.colors.crimson400) } },
+        dismissButton = { androidx.compose.material3.TextButton({ asking = false }) { Text(t("common.cancel")) } })
+}
+
+/** ModelSetupScreen.tsx's System Recovery & Danger Zone: run setup again, or wipe everything and start over. */
+@Composable
+private fun RecoverySection(onSetup: () -> Unit) {
+    val c = Boar.colors
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var purging by remember { mutableStateOf(false) }
+    Section(t("modelSetupScreen.sections.recovery")) {
+        Text(t("modelSetupScreen.recovery.wizardTitle"), style = Boar.type.titleSm, color = c.textHeading)
+        Text(t("modelSetupScreen.recovery.wizardDesc"), style = Boar.type.subtext, color = c.textSecondary)
+        LinkButton(t("modelSetupScreen.recovery.wizardButton"), onClick = onSetup)
+        Text(t("modelSetupScreen.recovery.dangerBadge"), style = Boar.type["mono.xs"], color = c.crimson400, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+        Text(t("modelSetupScreen.recovery.dangerDesc"), style = Boar.type.subtext, color = c.textSecondary)
+        LinkButton(t("modelSetupScreen.recovery.dangerButton"), danger = true) { purging = true }
+    }
+    if (purging) androidx.compose.material3.AlertDialog({ purging = false },
+        title = { Text(t("modelSetupScreen.dangerModal.title")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(t("modelSetupScreen.dangerModal.subtitle"))
+                Text(t("modelSetupScreen.dangerModal.consequencesHeader"), fontWeight = FontWeight.Bold)
+                listOf("consequenceModels", "consequenceEmbeddings", "consequenceHistory").forEach { Text("• " + t("modelSetupScreen.dangerModal.$it")) }
+            }
+        },
+        // Android's own "clear data": every file, setting and key of the app, then it closes; next start is setup.
+        confirmButton = { androidx.compose.material3.TextButton({ ctx.getSystemService(android.app.ActivityManager::class.java).clearApplicationUserData() }) {
+            Text(t("modelSetupScreen.dangerModal.confirmButton"), color = Boar.colors.crimson400) } },
+        dismissButton = { androidx.compose.material3.TextButton({ purging = false }) { Text(t("common.cancel")) } })
+}
+
+@Composable
+private fun LinkButton(label: String, danger: Boolean = false, onClick: () -> Unit) {
+    val c = Boar.colors
+    Text(label, style = Boar.type.body, fontWeight = FontWeight.SemiBold, color = if (danger) c.crimson400 else c.textAccentCyan,
+        modifier = Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .background(if (danger) c.crimsonBgSubtle else c.bgCard).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp))
 }
 
 @Composable

@@ -72,10 +72,26 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(base.createConfigurationContext(config))
     }
 
+    /** With a PIN: locked at start (the chats' key isn't in memory yet) and after a minute in the background. */
+    private val locked = mutableStateOf(false)
+    private var stoppedAt = 0L
+
+    override fun onStop() {
+        super.onStop()
+        stoppedAt = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (stoppedAt > 0 && BoarServices.get(this).pinLock.isSet && System.currentTimeMillis() - stoppedAt > RELOCK_AFTER_MS) locked.value = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val services = BoarServices.get(this)
+        // A new process has no chat key yet; a recreated activity (rotation, font size) in the same process keeps it.
+        if (services.pinLock.isSet && services.chats.cipher == team.sopa.boar.engine.security.PlainCipher) locked.value = true
         setContent {
             var theme by remember { mutableStateOf(services.settings.themeId) }
             var fontScale by remember { mutableStateOf(services.settings.fontScale) }
@@ -85,11 +101,17 @@ class MainActivity : ComponentActivity() {
                 override fun setLanguage(id: String?) { recreate() }
             }
             BoarTheme(theme, fontScale) {
-                App(services, prefs)
+                if (locked.value) team.sopa.boar.ui.security.LockScreen(services.pinLock) { locked.value = false }
+                else App(services, prefs)
             }
         }
     }
+
+    private companion object { const val RELOCK_AFTER_MS = 60_000L }
 }
+
+/** Where setup leads: the PIN offer, unless a PIN is already set (setup run again from Settings → Recovery). */
+internal fun afterSetup(pinSet: Boolean) = if (pinSet) "chat" else "pinOffer"
 
 @Composable
 private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel = viewModel(), setup: SetupViewModel = viewModel()) {
@@ -101,7 +123,19 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
         val view = LocalView.current
         DisposableEffect(Unit) { view.keepScreenOn = true; onDispose { view.keepScreenOn = false } }
         BackHandler(setupState.step == 2) { setup.back() }
-        SetupScreen(setupState, setup) { vm.refreshModel(); screen = "chat" }
+        SetupScreen(setupState, setup) { vm.refreshModel(); screen = afterSetup(services.pinLock.isSet) }
+        return
+    }
+    if (screen == "pinOffer") {
+        team.sopa.boar.ui.security.PinOffer(onSet = { screen = "pin:NEW:chat" }, onSkip = { screen = "chat" })
+        return
+    }
+    if (screen.startsWith("pin:")) {
+        // pin:<flow>:<screen to return to>
+        val (_, flow, back) = screen.split(":")
+        BackHandler { screen = back }
+        team.sopa.boar.ui.security.PinSetup(services.pinLock, team.sopa.boar.ui.security.PinFlow.valueOf(flow),
+            onDone = { vm.refreshSettings(); screen = back }, onCancel = { screen = back })
         return
     }
     if (screen == "models") {
@@ -135,7 +169,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
     }
     if (screen == "settings") {
         BackHandler { vm.refreshSettings(); screen = "chat" }
-        SettingsScreen(services, prefs) { vm.refreshSettings(); screen = "chat" }
+        SettingsScreen(services, prefs, onPin = { flow -> screen = "pin:$flow:settings" }, onSetup = { setup.restart(); screen = "setup" }) { vm.refreshSettings(); screen = "chat" }
         return
     }
     val drawer = rememberDrawerState(DrawerValue.Closed)
