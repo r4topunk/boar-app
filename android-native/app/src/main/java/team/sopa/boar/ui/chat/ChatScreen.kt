@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.graphicsLayer
 import team.sopa.boar.R
 import team.sopa.boar.chat.Activity
 import team.sopa.boar.chat.ChatState
@@ -81,6 +82,8 @@ fun ChatScreen(
     onCycleTone: () -> Unit,
     onRate: (String, String) -> Unit,
     onDismissCrash: () -> Unit = {},
+    onReused: () -> Unit = {},
+    onToastHidden: () -> Unit = {},
 ) {
     val c = Boar.colors
     val list = rememberLazyListState()
@@ -106,12 +109,13 @@ fun ChatScreen(
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.messages, key = { it.id }) { m -> Bubble(m, state, onRate, onReuse = { input = it }) }
+                    items(state.messages, key = { it.id }) { m -> Bubble(m, state, onRate, onReuse = { input = it; onReused() }) }
                 }
             }
             InputBar(input, { input = it }, state.answeringId != null, onSend = { onSend(input); input = "" }, onStop)
         }
     }
+    state.toast?.let { Toast(it, onToastHidden) }
 }
 
 /** components/Ambient.tsx: Campfire's ember glow rising from the bottom, Moonlight's faint moon at the top right. */
@@ -233,6 +237,24 @@ private fun CrashBanner(crash: team.sopa.boar.engine.models.LoadGuard.Crash, onD
         Text("✕", style = Boar.type["mono.sm"], color = c.amber400)
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.amberBorder))
+}
+
+/** Toast.tsx: below the header, fades in, gone after 1.8 s. */
+@Composable
+private fun Toast(message: String, onHide: () -> Unit) {
+    val alpha = remember(message) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(message) {
+        alpha.animateTo(1f, androidx.compose.animation.core.tween(150))
+        kotlinx.coroutines.delay(1800)
+        alpha.animateTo(0f, androidx.compose.animation.core.tween(200))
+        onHide()
+    }
+    Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = 96.dp), contentAlignment = Alignment.TopCenter) {
+        Text(message, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = androidx.compose.ui.graphics.Color(0xFFEEEEEE),
+            modifier = Modifier.graphicsLayer { this.alpha = alpha.value }.clip(RoundedCornerShape(20.dp))
+                .background(androidx.compose.ui.graphics.Color(0xF214141E)).border(1.dp, androidx.compose.ui.graphics.Color(0x1AFFFFFF), RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 10.dp))
+    }
 }
 
 @Composable

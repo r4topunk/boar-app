@@ -95,7 +95,7 @@
     <string name="drawerFooterStats_lastQuery" formatted="false">{{rate}} tok/s last query</string>
     <string name="modelSetupScreen_header_title" formatted="false">Settings</string>
     <string name="modelSetupScreen_header_subtitle" formatted="false">BOAR — Adaptive Local Intelligence</string>
-    <string name="modelSetupScreen_sections_tone" formatted="false">Assistant Tone &amp; Response Style</string>
+    <string name="modelSetupScreen_sections_tone" formatted="false">How BOAR answers</string>
     <string name="modelSetupScreen_sections_models" formatted="false">Reasoning Models</string>
     <string name="modelSetupScreen_sections_knowledgeBase" formatted="false">Offline Knowledge Base (RAG)</string>
     <string name="modelSetupScreen_sections_memory" formatted="false">Memory &amp; Context Settings</string>
@@ -185,7 +185,7 @@
     <string name="setupWizard_phaseStatus_indexing" formatted="false">INDEXING</string>
     <string name="setupWizard_phaseStatus_pending" formatted="false">PENDING</string>
     <string name="setupWizard_phaseStatus_queued" formatted="false">QUEUED</string>
-    <string name="personalitySettings_title" formatted="false">Assistant tone &amp; response style</string>
+    <string name="personalitySettings_title" formatted="false">How BOAR answers</string>
     <string name="personalitySettings_customPromptPlaceholder" formatted="false">Write your own system prompt…</string>
     <string name="personalitySettings_maxOutputTokens" formatted="false">Max output tokens</string>
     <string name="personalitySettings_maxOutputTokensNote" formatted="false">Caps how long a single response can be — lower is faster and more battery-friendly on phone hardware.</string>
@@ -240,7 +240,7 @@
     <string name="chatHeader_openDrawer" formatted="false">Open Navigation Drawer</string>
     <string name="chatHeader_offline" formatted="false">OFFLINE</string>
     <string name="chatHeader_localLlmCore" formatted="false">LOCAL LLM CORE</string>
-    <string name="chatHeader_cycleTone" formatted="false">Cycle Assistant Tone</string>
+    <string name="chatHeader_cycleTone" formatted="false">Change how BOAR answers</string>
     <string name="chatHeader_newChatSession" formatted="false">New Chat Session</string>
     <string name="chatHeader_deepResearch" formatted="false">Deep Research</string>
     <string name="chatHeader_deepResearchActive" formatted="false">Deep Research Active</string>

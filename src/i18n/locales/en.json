@@ -132,7 +132,7 @@
       "subtitle": "BOAR — Adaptive Local Intelligence"
     },
     "sections": {
-      "tone": "Assistant Tone & Response Style",
+      "tone": "How BOAR answers",
       "models": "Reasoning Models",
       "knowledgeBase": "Offline Knowledge Base (RAG)",
       "memory": "Memory & Context Settings",
@@ -247,7 +247,7 @@
     }
   },
   "personalitySettings": {
-    "title": "Assistant tone & response style",
+    "title": "How BOAR answers",
     "customPromptPlaceholder": "Write your own system prompt…",
     "maxOutputTokens": "Max output tokens",
     "maxOutputTokensNote": "Caps how long a single response can be — lower is faster and more battery-friendly on phone hardware.",
@@ -316,7 +316,7 @@
     "openDrawer": "Open Navigation Drawer",
     "offline": "OFFLINE",
     "localLlmCore": "LOCAL LLM CORE",
-    "cycleTone": "Cycle Assistant Tone",
+    "cycleTone": "Change how BOAR answers",
     "newChatSession": "New Chat Session",
     "deepResearch": "Deep Research",
     "deepResearchActive": "Deep Research Active",

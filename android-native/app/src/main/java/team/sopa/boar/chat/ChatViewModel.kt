@@ -77,7 +77,9 @@ data class ChatState(
     val loadCrash: team.sopa.boar.engine.models.LoadGuard.Crash? = null,
     /** While the model loads or the corpus indexes: the line the Expo app shows under the header (chatScreen.*). */
     val loadingKey: String? = null,
-    val personalityId: String = "succinct",
+    val personalityId: String = BoarServices.DEFAULT_PERSONALITY_ID,
+    /** A short message over the chat for about 2 s (Toast.tsx): the new tone, a reused question. */
+    val toast: String? = null,
     val toneIcon: String = "",
     val online: Boolean = false,
     /** Suggested question keys for the empty chat (chat.suggestions.*). */
@@ -138,7 +140,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val next = order[(order.indexOf(_state.value.personalityId) + 1) % order.size]
         services.settings.personalityId = next
         refreshTone()
+        val app = getApplication<Application>()
+        val tone = "${services.personalities.get(next).icon} ${team.sopa.boar.ui.I18n.t(app, "personalities.$next.label")}"
+        _state.update { it.copy(toast = team.sopa.boar.ui.I18n.t(app, "chatScreen.toneChanged", "tone" to tone)) }
     }
+
+    fun showToast(key: String) = _state.update { it.copy(toast = team.sopa.boar.ui.I18n.t(getApplication(), key)) }
+    fun hideToast() = _state.update { it.copy(toast = null) }
 
     /** ONLINE / OFFLINE in the header (connectivity.pure.ts isOnline: connected and the internet not known unreachable). */
     private fun watchConnectivity(app: Application) {

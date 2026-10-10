@@ -38,7 +38,11 @@ class BoarServices private constructor(private val context: Context) {
     private val files = context.filesDir
     val settings = AppSettings(File(files, "settings.json"))
     val catalog: Catalog = Catalog.parse(asset("boar-data/catalog.json"))
-    val personalities: Personalities = Personalities.parse(asset("boar-data/personalities.json"))
+    /**
+     * The answer styles. The native app starts on Detailed (the Expo app on Succinct); a style the user picked is kept.
+     * The evaluation runner keeps the shared default, so its runs compare with the Expo app's.
+     */
+    val personalities: Personalities = Personalities.parse(asset("boar-data/personalities.json")).copy(defaultId = DEFAULT_PERSONALITY_ID)
     val topology: CpuTopology = CpuTopology.read()
     /** Total RAM, for the Auto context size; 0 when Android doesn't say. */
     val totalRamBytes: Long = runCatching {
@@ -201,6 +205,8 @@ class BoarServices private constructor(private val context: Context) {
     }
 
     companion object {
+        const val DEFAULT_PERSONALITY_ID = "detailed"
+
         @Volatile private var instance: BoarServices? = null
 
         fun get(context: Context): BoarServices = instance ?: synchronized(this) {

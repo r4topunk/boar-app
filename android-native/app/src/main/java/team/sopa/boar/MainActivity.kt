@@ -179,6 +179,8 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
             onCycleTone = vm::cycleTone,
             onRate = vm::rate,
             onDismissCrash = vm::dismissLoadCrash,
+            onReused = { vm.showToast("chatScreen.messageReused") },
+            onToastHidden = vm::hideToast,
         )
     }
 }

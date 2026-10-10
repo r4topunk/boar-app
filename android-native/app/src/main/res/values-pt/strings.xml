@@ -94,7 +94,7 @@
     <string name="drawerFooterStats_lastQuery" formatted="false">{{rate}} tok/s na última consulta</string>
     <string name="modelSetupScreen_header_title" formatted="false">Configurações</string>
     <string name="modelSetupScreen_header_subtitle" formatted="false">BOAR — Inteligência Local Adaptativa</string>
-    <string name="modelSetupScreen_sections_tone" formatted="false">Tom do Assistente &amp; Estilo de Resposta</string>
+    <string name="modelSetupScreen_sections_tone" formatted="false">Como o BOAR responde</string>
     <string name="modelSetupScreen_sections_models" formatted="false">Modelos de Raciocínio</string>
     <string name="modelSetupScreen_sections_knowledgeBase" formatted="false">Base de Conhecimento Offline (RAG)</string>
     <string name="modelSetupScreen_sections_memory" formatted="false">Configurações de Memória e Contexto</string>
@@ -184,7 +184,7 @@
     <string name="setupWizard_phaseStatus_indexing" formatted="false">INDEXANDO</string>
     <string name="setupWizard_phaseStatus_pending" formatted="false">PENDENTE</string>
     <string name="setupWizard_phaseStatus_queued" formatted="false">NA FILA</string>
-    <string name="personalitySettings_title" formatted="false">Tom do assistente e estilo de resposta</string>
+    <string name="personalitySettings_title" formatted="false">Como o BOAR responde</string>
     <string name="personalitySettings_customPromptPlaceholder" formatted="false">Escreva seu próprio prompt de sistema…</string>
     <string name="personalitySettings_maxOutputTokens" formatted="false">Máximo de tokens de saída</string>
     <string name="personalitySettings_maxOutputTokensNote" formatted="false">Limita o tamanho de uma única resposta — quanto menor, mais rápido e mais econômico para a bateria do celular.</string>
@@ -239,7 +239,7 @@
     <string name="chatHeader_openDrawer" formatted="false">Abrir menu de navegação</string>
     <string name="chatHeader_offline" formatted="false">OFFLINE</string>
     <string name="chatHeader_localLlmCore" formatted="false">NÚCLEO LLM LOCAL</string>
-    <string name="chatHeader_cycleTone" formatted="false">Alternar tom do assistente</string>
+    <string name="chatHeader_cycleTone" formatted="false">Mudar como o BOAR responde</string>
     <string name="chatHeader_newChatSession" formatted="false">Nova sessão de chat</string>
     <string name="chatHeader_deepResearch" formatted="false">Pesquisa Aprofundada</string>
     <string name="chatHeader_deepResearchActive" formatted="false">Pesquisa Aprofundada Ativa</string>
