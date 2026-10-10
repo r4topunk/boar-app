@@ -37,6 +37,8 @@ class SettingsDeviceTest {
 
     @Test fun securityClearAllChatsAndRecoveryAreThere() {
         val services = BoarServices.get(ctx)
+        // Clear All really clears: only run where the app has no chats of its own (a test install).
+        org.junit.Assume.assumeTrue("the app has chats; not clearing them", services.chats.listSessions().isEmpty())
         val s = services.chats.createSession("Settings test chat")
         services.chats.addMessage(s.id, "user", "hello", services.chats.newId())
         var pinFlow by mutableStateOf<String?>(null)

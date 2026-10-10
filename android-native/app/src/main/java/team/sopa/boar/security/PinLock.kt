@@ -58,8 +58,14 @@ class PinLock(
         require(PinKeys.valid(pin))
         val dek = PinKeys.newDataKey()
         val cipher = AesTextCipher(dek)
-        chats.reseal(PlainCipher, cipher)
+        // The key is saved before any chat is sealed with it, so a failure can't leave chats sealed with a lost key.
         store(pin, dek)
+        try {
+            chats.reseal(PlainCipher, cipher)
+        } catch (e: Exception) {
+            clear() // the reseal is one transaction: the chats are still plain
+            throw e
+        }
         chats.cipher = cipher
     }
 
