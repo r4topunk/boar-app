@@ -94,7 +94,16 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
             for (a in assets) {
                 if (store.status(a).present) continue
                 try {
-                    store.download(a) { p -> update(a) { it.copy(bytesDone = p.bytesDone, bytesTotal = p.bytesTotal, verifying = p.phase == AssetStore.Progress.Phase.VERIFYING) } }
+                    var shownAt = 0L
+                    store.download(a) { p ->
+                        // At most 4 screen updates a second: one per downloaded chunk swamped the UI thread.
+                        val now = System.currentTimeMillis()
+                        val verifying = p.phase == AssetStore.Progress.Phase.VERIFYING
+                        if (now - shownAt >= 250 || verifying || p.bytesDone >= p.bytesTotal) {
+                            shownAt = now
+                            update(a) { it.copy(bytesDone = p.bytesDone, bytesTotal = p.bytesTotal, verifying = verifying) }
+                        }
+                    }
                     update(a) { it.copy(done = true, bytesDone = a.sizeBytes) }
                 } catch (e: Exception) {
                     update(a) { it.copy(error = e.message) }
@@ -131,8 +140,13 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
                     runCatching { SeedCorpus.Collection(p.id, SeedCorpus.docs(p.id, services.fileOf(p).readText())) }
                         .getOrElse { e -> SeedCorpus.Collection(p.id, emptyList(), e.message) }
                 }
+            var shownAt = 0L
             SeedCorpus(services.knowledgeBase) { text -> embedder.embed(text) }.seed(collections, onProgress = { p ->
-                _state.update { it.copy(indexDone = p.done, indexTotal = p.total, indexTitle = p.title) }
+                val now = System.currentTimeMillis()
+                if (now - shownAt >= 250 || p.done >= p.total) {
+                    shownAt = now
+                    _state.update { it.copy(indexDone = p.done, indexTotal = p.total, indexTitle = p.title) }
+                }
             })
             _state.update { it.copy(finished = true) }
         } catch (e: Exception) {

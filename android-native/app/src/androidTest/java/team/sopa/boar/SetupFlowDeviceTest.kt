@@ -3,7 +3,8 @@ package team.sopa.boar
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.test.core.app.ActivityScenario
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
@@ -18,13 +19,13 @@ import team.sopa.boar.app.BoarServices
 import team.sopa.boar.ui.I18n
 
 /**
- * The whole first run on a cleared install (adb shell pm clear team.sopa.aoair.native first): hardware, the 1.5B
+ * The whole first run, on the throwaway devtest install (its files are emptied first): hardware, the 1.5B
  * model, the real download and indexing, launch, then the PIN offer and a PIN set through it. Needs Wi-Fi and about
- * 1 GB; it skips on an install that already has a model.
+ * 1 GB; it only runs on the devtest install.
  */
 @RunWith(AndroidJUnit4::class)
 class SetupFlowDeviceTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val compose = createEmptyComposeRule()
     private val ctx = InstrumentationRegistry.getInstrumentation().targetContext
     private fun t(key: String) = I18n.t(ctx, key)
 
@@ -35,15 +36,21 @@ class SetupFlowDeviceTest {
         compose.waitForIdle()
     }
 
-    private fun shows(text: String) = runCatching { compose.onNodeWithText(text).assertExists() }.isSuccess
+    private fun shows(text: String) = runCatching { compose.onNodeWithText(text).assertExists() }.isSuccess // false until a screen exists
 
     @Test fun firstRunEndsOnThePinOfferAndSetsAPin() {
+        // A first run: this throwaway install's files are emptied before the app starts (nothing else in this process
+        // has opened them yet), so setup begins from step 1.
+        assumeTrue("only on the throwaway devtest install", ctx.packageName.endsWith(".devtest"))
+        ctx.filesDir.listFiles().orEmpty().forEach { it.deleteRecursively() }
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
         val services = BoarServices.get(ctx)
-        assumeTrue("needs a cleared install", services.activeModel() == null && !services.pinLock.isSet)
+        // The engine and the screen take a moment on a first start.
+        compose.waitUntil(60_000) { shows(t("setupWizard.step1.selectTierButton")) }
 
         click(t("setupWizard.step1.selectTierButton"))
         val compact = services.catalog.answerModels.first { it.id == "qwen2.5-1.5b-instruct-q4km" }
-        click(compact.label, substring = true)
+        click(compact.shortName, substring = true) // the name the setup screen shows
         click(t("setupWizard.step2.installButton"))
         // Downloads (verified) and indexing, then the launch button.
         compose.waitUntil(30 * 60_000L) { shows(t("setupWizard.step3.launchButton")) }
@@ -58,5 +65,6 @@ class SetupFlowDeviceTest {
         compose.waitUntil(20_000) { services.pinLock.isSet }
         assertTrue(services.pinLock.isSet)
         assertTrue(services.activeModel()?.id == compact.id)
+        scenario.close()
     }
 }

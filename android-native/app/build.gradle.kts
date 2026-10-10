@@ -43,6 +43,14 @@ android {
             applicationIdSuffix = ".native"
             versionNameSuffix = "-native"
         }
+        // A throwaway install for the on-device tests that wipe data (first-run setup, Purge All Data), so they never
+        // touch the debug app someone is using.
+        create("devtest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".devtest"
+            versionNameSuffix = "-devtest"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
@@ -53,6 +61,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
+    // Instrumented tests run against the throwaway devtest install (./gradlew :app:assembleDevtestAndroidTest).
+    testBuildType = "devtest"
     packaging { jniLibs { useLegacyPackaging = true } }
 }
 
@@ -88,4 +98,5 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     debugImplementation(libs.compose.ui.test.manifest)
+    "devtestImplementation"(libs.compose.ui.test.manifest)
 }
