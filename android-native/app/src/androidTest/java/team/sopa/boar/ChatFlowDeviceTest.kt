@@ -28,6 +28,10 @@ import team.sopa.boar.ui.I18n
 class ChatFlowDeviceTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+    /** Screens launched by a test, closed after it whatever happened. */
+    private val opened = mutableListOf<ActivityScenario<*>>()
+
+    @org.junit.After fun closeScreens() { opened.forEach { runCatching { it.close() } } }
 
     /** Every text on screen, joined (the answer bubble's text among them). */
     private fun screenText(): String = compose.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().joinToString("\n") { root ->
@@ -39,7 +43,7 @@ class ChatFlowDeviceTest {
     @Test fun aSentQuestionShowsItsAnswerOnScreen() {
         val services = BoarServices.get(ctx)
         assumeTrue("needs a model and no PIN", services.activeModel() != null && !services.pinLock.isSet)
-        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val scenario = ActivityScenario.launch(MainActivity::class.java).also { opened += it }
         compose.waitUntil(60_000) { compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty() }
         val before = screenText()
         compose.onNode(hasSetTextAction()).performTextInput("What is a monsoon?")
@@ -50,7 +54,6 @@ class ChatFlowDeviceTest {
         val after = screenText()
         android.util.Log.i("ChatFlowDeviceTest", "screen after answer:\n$after")
         assertTrue("no answer text appeared on screen", after.length > before.length + 80)
-        scenario.close()
     }
 
     /** The same with a PIN: unlock on the lock screen first, then the answer must still show. The PIN is removed after. */
@@ -60,7 +63,7 @@ class ChatFlowDeviceTest {
         services.pinLock.enable("2580")
         try {
             services.chats.cipher = team.sopa.boar.engine.security.PlainCipher // as a fresh process: locked until the PIN
-            val scenario = ActivityScenario.launch(MainActivity::class.java)
+            val scenario = ActivityScenario.launch(MainActivity::class.java).also { opened += it }
             compose.waitUntil(60_000) { compose.onAllNodesWithText(I18n.t(ctx, "native.pin.enterTitle")).fetchSemanticsNodes().isNotEmpty() }
             "2580".forEach { d -> compose.onNode(hasText(d.toString())).performSemanticsAction(SemanticsActions.OnClick) }
             compose.onNode(hasText("✓")).performSemanticsAction(SemanticsActions.OnClick)
@@ -73,8 +76,7 @@ class ChatFlowDeviceTest {
             val after = screenText()
             android.util.Log.i("ChatFlowDeviceTest", "PIN screen after answer:\n$after")
             assertTrue("no answer text appeared on screen with a PIN", after.length > before.length + 80)
-            scenario.close()
-        } finally {
+            } finally {
             runCatching { services.pinLock.disable("2580") }
         }
     }

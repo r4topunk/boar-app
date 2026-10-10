@@ -27,6 +27,10 @@ import team.sopa.boar.ui.I18n
 class SetupFlowDeviceTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+    /** Screens launched by a test, closed after it whatever happened. */
+    private val opened = mutableListOf<ActivityScenario<*>>()
+
+    @org.junit.After fun closeScreens() { opened.forEach { runCatching { it.close() } } }
     private fun t(key: String) = I18n.t(ctx, key)
 
     private fun click(text: String, substring: Boolean = false) {
@@ -43,7 +47,7 @@ class SetupFlowDeviceTest {
         // has opened them yet), so setup begins from step 1.
         assumeTrue("only on the throwaway devtest install", ctx.packageName.endsWith(".devtest"))
         ctx.filesDir.listFiles().orEmpty().forEach { it.deleteRecursively() }
-        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val scenario = ActivityScenario.launch(MainActivity::class.java).also { opened += it }
         val services = BoarServices.get(ctx)
         // The engine and the screen take a moment on a first start.
         compose.waitUntil(60_000) { shows(t("setupWizard.step1.selectTierButton")) }
@@ -65,6 +69,5 @@ class SetupFlowDeviceTest {
         compose.waitUntil(20_000) { services.pinLock.isSet }
         assertTrue(services.pinLock.isSet)
         assertTrue(services.activeModel()?.id == compact.id)
-        scenario.close()
     }
 }
