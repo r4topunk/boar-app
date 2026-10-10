@@ -78,12 +78,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        stoppedAt = System.currentTimeMillis()
+        stoppedAt = android.os.SystemClock.elapsedRealtime() // not the wall clock: changing the time can't skip the lock
     }
 
     override fun onStart() {
         super.onStart()
-        if (stoppedAt > 0 && BoarServices.get(this).pinLock.isSet && System.currentTimeMillis() - stoppedAt > RELOCK_AFTER_MS) locked.value = true
+        if (stoppedAt > 0 && BoarServices.get(this).pinLock.isSet && android.os.SystemClock.elapsedRealtime() - stoppedAt > RELOCK_AFTER_MS) locked.value = true
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -41,33 +41,37 @@ class SettingsDeviceTest {
         org.junit.Assume.assumeTrue("the app has chats; not clearing them", services.chats.listSessions().isEmpty())
         val s = services.chats.createSession("Settings test chat")
         services.chats.addMessage(s.id, "user", "hello", services.chats.newId())
-        var pinFlow by mutableStateOf<String?>(null)
-        var setupAgain = false
-        val prefs = object : DisplayPrefs {
-            override fun setTheme(id: String) {}
-            override fun setFontScale(scale: String) {}
-            override fun setLanguage(id: String?) {}
+        try {
+            var pinFlow by mutableStateOf<String?>(null)
+            var setupAgain = false
+            val prefs = object : DisplayPrefs {
+                override fun setTheme(id: String) {}
+                override fun setFontScale(scale: String) {}
+                override fun setLanguage(id: String?) {}
+            }
+            compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = { pinFlow = it }, onSetup = { setupAgain = true }) {} } }
+    
+            // Security: no PIN on this install, so it offers one.
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("native.settings.security")))
+            compose.onNodeWithText(t("native.settings.pinOff")).assertExists()
+            click(t("native.settings.pinSet"))
+            assertEquals("NEW", pinFlow)
+    
+            // Memory: Clear All Chat History, confirmed, empties the chats.
+            click(t("memorySettings.clearAllChatHistory"))
+            compose.onNodeWithText(t("memorySettings.clearAllButton")).performSemanticsAction(SemanticsActions.OnClick)
+            compose.waitForIdle()
+            assertTrue(services.chats.listSessions().isEmpty())
+            compose.onNodeWithText(t("native.settings.clearChatsDone")).assertExists()
+    
+            // Recovery: setup again, and the purge button opens its confirmation (not confirmed here: it wipes the app).
+            click(t("modelSetupScreen.recovery.wizardButton"))
+            assertTrue(setupAgain)
+            click(t("modelSetupScreen.recovery.dangerButton"))
+            compose.onNodeWithText(t("modelSetupScreen.dangerModal.title")).assertExists()
+            compose.onNodeWithText(t("modelSetupScreen.dangerModal.confirmButton")).assertExists()
+        } finally {
+            runCatching { services.chats.deleteSession(s.id) }
         }
-        compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = { pinFlow = it }, onSetup = { setupAgain = true }) {} } }
-
-        // Security: no PIN on this install, so it offers one.
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("native.settings.security")))
-        compose.onNodeWithText(t("native.settings.pinOff")).assertExists()
-        click(t("native.settings.pinSet"))
-        assertEquals("NEW", pinFlow)
-
-        // Memory: Clear All Chat History, confirmed, empties the chats.
-        click(t("memorySettings.clearAllChatHistory"))
-        compose.onNodeWithText(t("memorySettings.clearAllButton")).performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitForIdle()
-        assertTrue(services.chats.listSessions().isEmpty())
-        compose.onNodeWithText(t("native.settings.clearChatsDone")).assertExists()
-
-        // Recovery: setup again, and the purge button opens its confirmation (not confirmed here: it wipes the app).
-        click(t("modelSetupScreen.recovery.wizardButton"))
-        assertTrue(setupAgain)
-        click(t("modelSetupScreen.recovery.dangerButton"))
-        compose.onNodeWithText(t("modelSetupScreen.dangerModal.title")).assertExists()
-        compose.onNodeWithText(t("modelSetupScreen.dangerModal.confirmButton")).assertExists()
     }
 }
