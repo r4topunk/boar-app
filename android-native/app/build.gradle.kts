@@ -10,7 +10,13 @@ android {
     // The NDK's strip tool for the engine's libraries: without it they ship with their debug symbols (77 MB libllama-common).
     ndkVersion = "27.1.12297006"
 
+    // The Supabase URL and publishable key the Expo app reads (EXPO_PUBLIC_* in the repo's .env, never committed).
+    // Without them the build has no Share button, as the Expo app.
+    val env = rootProject.file("../.env").takeIf { it.isFile }?.readLines().orEmpty()
+        .mapNotNull { l -> l.split("=", limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim().trim('"') } }.toMap()
     defaultConfig {
+        buildConfigField("String", "SUPABASE_URL", "\"${env["EXPO_PUBLIC_SUPABASE_URL"] ?: ""}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${env["EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ?: ""}\"")
         // The release keeps the Expo app's id and key, so it installs over v1.1.x with its models.
         applicationId = "team.sopa.aoair"
         minSdk = 26
@@ -45,7 +51,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     packaging { jniLibs { useLegacyPackaging = true } }
 }
 

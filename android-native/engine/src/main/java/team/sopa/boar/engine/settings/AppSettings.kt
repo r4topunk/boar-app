@@ -93,5 +93,8 @@ class AppSettings(private val file: File) {
     /** The last model that loaded: CR-2's fallback after a crash on a cold start. */
     var lastLoadedModelId: String? get() = str("lastLoadedModelId"); set(v) = set("lastLoadedModelId", v?.let(::JsonPrimitive))
 
+    /** The id submit-results gave this phone's key (settings.ts shareDeviceId). */
+    var shareDeviceId: String? get() = str("shareDeviceId"); set(v) = set("shareDeviceId", v?.let(::JsonPrimitive))
+
     fun raw(): JsonObject = data
 }
