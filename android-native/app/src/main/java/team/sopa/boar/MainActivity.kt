@@ -116,7 +116,7 @@ internal fun afterSetup(pinSet: Boolean) = if (pinSet) "chat" else "pinOffer"
 @Composable
 private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel = viewModel(), setup: SetupViewModel = viewModel()) {
     val state by vm.state.collectAsState()
-    var screen by rememberSaveable { mutableStateOf(if (setup.ready()) "chat" else "setup") }
+    var screen by rememberSaveable { mutableStateOf(if (setup.ready() && !setup.unfinished) "chat" else "setup") }
     if (screen == "setup") {
         val setupState by setup.state.collectAsState()
         // Downloads pause in the background on MIUI: the screen stays on while setup runs.

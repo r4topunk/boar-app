@@ -104,6 +104,9 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
     private var rateStart: Pair<Long, Long>? = null
     private var lastMove = Pair(0L, System.currentTimeMillis())
     private var indexStart: Pair<Int, Long>? = null
+    /** Setup was in its install step when the process ended: the app opens on it, not on the chat. */
+    var unfinished = false
+        private set
 
     init {
         val ram = runCatching { ActivityManager.MemoryInfo().also { app.getSystemService(ActivityManager::class.java).getMemoryInfo(it) }.totalMem }.getOrDefault(0L)
@@ -112,9 +115,10 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(totalRamBytes = ram, models = answer, recommendedId = rec?.id, chosenId = rec?.id) }
         restore()
         refreshPlans()
-        // Process killed mid-download: start what is still missing. Not when the app already works (the
-        // view model also exists behind the chat).
-        if (_state.value.step == 4 && !store.requiredPresent()) install()
+        // Process killed in step 4 (downloading or indexing): pick up there. Files already in are skipped and the
+        // index skips the articles it has, so this ends on the summary.
+        unfinished = _state.value.step == 4
+        if (unfinished) install()
         watchStall()
     }
 
