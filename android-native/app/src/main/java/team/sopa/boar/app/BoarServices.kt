@@ -49,8 +49,12 @@ class BoarServices private constructor(private val context: Context) {
         discoveredJson.decodeFromString(kotlinx.serialization.builtins.ListSerializer(CatalogAsset.serializer()), discoveredFile.readText())
     }.getOrDefault(emptyList())
 
-    private fun writeDiscovered(list: List<CatalogAsset>) =
-        discoveredFile.writeText(discoveredJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(CatalogAsset.serializer()), list))
+    /** Written to a temporary file, then moved over the old one: a failed write never leaves a truncated list. */
+    private fun writeDiscovered(list: List<CatalogAsset>) {
+        val tmp = File(files, "discovered_models.json.tmp")
+        tmp.writeText(discoveredJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(CatalogAsset.serializer()), list))
+        java.nio.file.Files.move(tmp.toPath(), discoveredFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+    }
 
     /** The built-in catalog plus the discovered models (a search result already in the catalog isn't listed twice). */
     @Volatile var catalog: Catalog = withDiscovered()

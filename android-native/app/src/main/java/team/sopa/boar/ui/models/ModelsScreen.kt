@@ -203,10 +203,13 @@ private fun HfSearch(state: ModelsState, vm: ModelsViewModel) {
         state.hfError?.let { Text(it, style = Boar.type.subtext, color = c.crimson400) }
         state.hfAdded?.let { Text(t("modelBrowser.addedMessage", "label" to it), style = Boar.type.subtext, color = c.textAccentEmerald) }
         state.hfResults.forEach { r ->
-            Column(Modifier.fillMaxWidth().background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).clickable { vm.hfOpen(r.id) }.padding(10.dp),
+            Column(Modifier.fillMaxWidth().background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(r.id, style = Boar.type.body, color = c.textHeading, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                Text(t("modelBrowser.downloadsLikes", "downloads" to (r.downloads ?: 0), "likes" to (r.likes ?: 0)), style = Boar.type.micro, color = c.textDim)
+                // Only the header opens and closes the repo; tapping a file below doesn't collapse it.
+                Column(Modifier.fillMaxWidth().clickable { vm.hfOpen(r.id) }) {
+                    Text(r.id, style = Boar.type.body, color = c.textHeading, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    Text(t("modelBrowser.downloadsLikes", "downloads" to (r.downloads ?: 0), "likes" to (r.likes ?: 0)), style = Boar.type.micro, color = c.textDim)
+                }
                 if (state.hfOpenRepo == r.id) {
                     if (!state.hfBusy && state.hfFiles.isEmpty()) Text(t("modelBrowser.noGgufFiles"), style = Boar.type.subtext, color = c.textMuted)
                     state.hfFiles.forEach { f ->

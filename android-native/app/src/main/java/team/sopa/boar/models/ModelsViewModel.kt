@@ -48,7 +48,7 @@ data class ModelsState(
 /** The models and knowledge catalog (port of ModelCatalogScreen.tsx): download, use, remove. */
 class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     private val services = BoarServices.get(app)
-    private var store = AssetStore(app.filesDir, services.catalog)
+    @Volatile private var store = AssetStore(app.filesDir, services.catalog)
     private val _state = MutableStateFlow(ModelsState())
     val state: StateFlow<ModelsState> = _state
 
@@ -76,19 +76,22 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.hfOpenRepo == repo) { _state.update { it.copy(hfOpenRepo = null, hfFiles = emptyList()) }; return }
         _state.update { it.copy(hfBusy = true, hfError = null, hfOpenRepo = repo, hfFiles = emptyList()) }
         viewModelScope.launch(Dispatchers.IO) {
+            // An answer for a repo that's no longer open (another was tapped meanwhile) is dropped.
             runCatching { HfBrowser.files(repo) }
-                .onSuccess { f -> _state.update { it.copy(hfFiles = f, hfBusy = false) } }
-                .onFailure { e -> _state.update { it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
+                .onSuccess { f -> _state.update { if (it.hfOpenRepo != repo) it else it.copy(hfFiles = f, hfBusy = false) } }
+                .onFailure { e -> _state.update { if (it.hfOpenRepo != repo) it else it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
         }
     }
 
     /** Adds the file to the list above as a downloadable model (not downloaded yet). */
     fun hfAdd(repo: String, f: HfBrowser.GgufFile) {
-        val asset = HfBrowser.toAsset(repo, f)
-        services.addDiscovered(asset)
-        store = AssetStore(getApplication<Application>().filesDir, services.catalog)
-        _state.update { it.copy(items = sortedItems(), hfAdded = asset.label) }
-        refresh()
+        viewModelScope.launch(Dispatchers.IO) {
+            val asset = runCatching { HfBrowser.toAsset(repo, f) }.getOrElse { e -> _state.update { it.copy(hfError = e.message) }; return@launch }
+            services.addDiscovered(asset)
+            store = AssetStore(getApplication<Application>().filesDir, services.catalog)
+            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label) }
+            refresh()
+        }
     }
 
     fun refresh() {

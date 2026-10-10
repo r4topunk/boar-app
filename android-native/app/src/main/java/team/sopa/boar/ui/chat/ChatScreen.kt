@@ -250,14 +250,15 @@ private fun MicButton(text: String, onText: (String) -> Unit, enabled: Boolean) 
     val voice = remember { team.sopa.boar.voice.VoiceInput(ctx) }
     var listening by remember { mutableStateOf(false) }
     val before = remember { mutableStateOf("") }
-    DisposableEffect(Unit) { onDispose { voice.stop() } }
+    val disposed = remember { booleanArrayOf(false) }
+    DisposableEffect(Unit) { onDispose { disposed[0] = true; voice.stop() } }
     fun listen() {
         before.value = text.trimEnd()
         listening = true
         val join = { said: String -> listOf(before.value, said).filter { it.isNotBlank() }.joinToString(" ") }
         voice.start(onPartial = { onText(join(it)) }, onResult = { onText(join(it)) }, onEnd = { listening = false })
     }
-    val permission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted -> if (granted) listen() }
+    val permission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted -> if (granted && !disposed[0]) listen() }
     Box(Modifier.size(48.dp).alpha(if (enabled) 1f else 0.35f).clip(CircleShape).background(if (listening) c.crimson600 else c.bgInput)
         .border(1.dp, if (listening) c.crimsonBorder else c.borderDefault, CircleShape)
         .clickable(enabled = enabled) {

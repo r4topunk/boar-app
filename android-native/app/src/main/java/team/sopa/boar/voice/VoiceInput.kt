@@ -28,10 +28,11 @@ class VoiceInput(private val context: Context) {
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onError(error: Int) { onEnd(error); stop() }
+            // Stopped first, and destroyed after this callback returns, so a session onEnd starts isn't the one stopped.
+            override fun onError(error: Int) { finish(r); onEnd(error) }
             override fun onResults(results: Bundle?) {
                 results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let(onResult)
-                onEnd(null); stop()
+                finish(r); onEnd(null)
             }
             override fun onPartialResults(partial: Bundle?) {
                 partial?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let(onPartial)
@@ -44,6 +45,13 @@ class VoiceInput(private val context: Context) {
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         })
+    }
+
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun finish(r: SpeechRecognizer) {
+        if (recognizer === r) recognizer = null
+        main.post { runCatching { r.destroy() } }
     }
 
     fun stop() {
