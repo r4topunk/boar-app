@@ -182,6 +182,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The drawer's 🗑️: the chat and its messages; the open one becomes a new chat. */
     fun deleteSession(id: String) {
+        // Not the chat still being answered: its answer would be saved into a deleted session.
+        if (job?.isActive == true && _state.value.sessionId == id) return
         viewModelScope.launch(Dispatchers.IO) { services.chats.deleteSession(id) }
         if (_state.value.sessionId == id) newChat()
     }
