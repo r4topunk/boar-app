@@ -35,9 +35,18 @@ class SetupFlowDeviceTest {
 
     private fun click(text: String, substring: Boolean = false) {
         val node = compose.onNode(hasText(text, substring = substring) and hasClickAction())
-        node.performScrollTo()
+        runCatching { node.performScrollTo() } // screens that don't scroll (the PIN offer) have nothing to scroll
         node.performSemanticsAction(SemanticsActions.OnClick)
         compose.waitForIdle()
+    }
+
+    /** Checks every 2 s: waitUntil's 10 ms polling keeps the main thread busy for the whole half-hour setup. */
+    private fun waitSlowly(timeoutMs: Long, condition: () -> Boolean) {
+        val end = android.os.SystemClock.uptimeMillis() + timeoutMs
+        while (!condition()) {
+            check(android.os.SystemClock.uptimeMillis() < end) { "condition not met in ${timeoutMs / 1000} s" }
+            Thread.sleep(2_000)
+        }
     }
 
     private fun shows(text: String) = runCatching { compose.onNodeWithText(text).assertExists() }.isSuccess // false until a screen exists
@@ -57,7 +66,7 @@ class SetupFlowDeviceTest {
         click(compact.shortName, substring = true) // the name the setup screen shows
         click(t("setupWizard.step2.installButton"))
         // Downloads (verified) and indexing, then the launch button.
-        compose.waitUntil(30 * 60_000L) { shows(t("setupWizard.step3.launchButton")) }
+        waitSlowly(30 * 60_000L) { shows(t("setupWizard.step3.launchButton")) }
         click(t("setupWizard.step3.launchButton"))
 
         compose.waitUntil(10_000) { shows(t("native.pin.offerTitle")) }
