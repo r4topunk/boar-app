@@ -57,6 +57,9 @@ class BoarServices private constructor(private val context: Context) {
     }
 
     fun fileOf(asset: CatalogAsset) = File(files, asset.filename)
+    /** Bytes of the catalog's models and packs on disk (ModelManager.currentStorageUsageBytes). */
+    fun storageUsedBytes(): Long = (catalog.models + catalog.corpusCatalog).sumOf { fileOf(it).takeIf { f -> f.isFile }?.length() ?: 0L }
+
     fun installed(kind: AssetKind) = catalog.models.filter { it.kind == kind && fileOf(it).isFile }
 
     /** The user's model, else the first installed one (the catalog's order puts the default first). */

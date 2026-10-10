@@ -180,6 +180,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(sessionId = null, messages = emptyList(), error = null) }
     }
 
+    /** The drawer's 🗑️: the chat and its messages; the open one becomes a new chat. */
+    fun deleteSession(id: String) {
+        viewModelScope.launch(Dispatchers.IO) { services.chats.deleteSession(id) }
+        if (_state.value.sessionId == id) newChat()
+    }
+
     fun openSession(id: String) {
         if (job?.isActive == true) return
         viewModelScope.launch {

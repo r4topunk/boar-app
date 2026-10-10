@@ -13,6 +13,8 @@ import team.sopa.boar.models.ModelsViewModel
 import team.sopa.boar.documents.DocumentsViewModel
 import team.sopa.boar.ui.documents.DocumentsScreen
 import team.sopa.boar.ui.about.AboutScreen
+import team.sopa.boar.ui.drawer.BoarDrawer
+import team.sopa.boar.ui.drawer.DrawerItem
 import team.sopa.boar.ui.eval.EvaluationScreen
 import team.sopa.boar.eval.EvaluationViewModel
 import team.sopa.boar.ui.models.ModelsScreen
@@ -143,28 +145,28 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
-            ModalDrawerSheet(drawerContainerColor = Boar.colors.bgSurface, modifier = Modifier.width(300.dp)) {
-                Column(Modifier.fillMaxHeight().statusBarsPadding().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(t("chatHeader.newChatSession"), style = Boar.type.title, color = Boar.colors.textAccentEmerald,
-                        modifier = Modifier.fillMaxWidth().clickable { vm.newChat(); scope.launch { drawer.close() } }.padding(8.dp))
-                    Text("🧠 " + t("modelCatalogScreen.title"), style = Boar.type.body, color = Boar.colors.textSecondary,
-                        modifier = Modifier.fillMaxWidth().clickable { screen = "models"; scope.launch { drawer.close() } }.padding(8.dp))
-                    Text("📄 " + t("modelSetupScreen.sections.knowledgeBase"), style = Boar.type.body, color = Boar.colors.textSecondary,
-                        modifier = Modifier.fillMaxWidth().clickable { screen = "documents"; scope.launch { drawer.close() } }.padding(8.dp))
-                    Text(t("native.drawer.evaluation"), style = Boar.type.body, color = Boar.colors.textSecondary,
-                        modifier = Modifier.fillMaxWidth().clickable { screen = "evaluation"; scope.launch { drawer.close() } }.padding(8.dp))
-                    Text("🐗 " + t("aboutScreen.title"), style = Boar.type.body, color = Boar.colors.textSecondary,
-                        modifier = Modifier.fillMaxWidth().clickable { screen = "about"; scope.launch { drawer.close() } }.padding(8.dp))
-                    Text("⚙ " + t("native.drawer.settings"), style = Boar.type.body, color = Boar.colors.textSecondary,
-                        modifier = Modifier.fillMaxWidth().clickable { screen = "settings"; scope.launch { drawer.close() } }.padding(8.dp))
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        items(sessions, key = { it.id }) { s ->
-                            Text(s.title, style = Boar.type.body, color = if (s.id == state.sessionId) Boar.colors.textHeading else Boar.colors.textSecondary, maxLines = 2,
-                                modifier = Modifier.fillMaxWidth().background(if (s.id == state.sessionId) Boar.colors.bgCard else Boar.colors.bgSurface)
-                                    .clickable { vm.openSession(s.id); scope.launch { drawer.close() } }.padding(8.dp))
-                        }
-                    }
-                }
+            ModalDrawerSheet(drawerContainerColor = Boar.colors.bgCardElevated, modifier = Modifier.width(310.dp)) {
+                fun go(target: () -> Unit) { target(); scope.launch { drawer.close() } }
+                BoarDrawer(
+                    sessions = sessions,
+                    activeSessionId = state.sessionId,
+                    // ChatScreen.tsx's items; Evaluation stands in for Execution Telemetry (not in the native app yet),
+                    // and the model catalog has its own entry (the Expo app reaches it through Settings).
+                    items = listOf(
+                        DrawerItem("knowledge", t("chatScreen.drawerItems.myDocuments")) { go { screen = "documents" } },
+                        DrawerItem("models", t("modelCatalogScreen.title")) { go { screen = "models" } },
+                        DrawerItem("settings", t("chatScreen.drawerItems.settings")) { go { screen = "settings" } },
+                        DrawerItem("evaluation", t("evaluation.title")) { go { screen = "evaluation" } },
+                        DrawerItem("about", t("chatScreen.drawerItems.about")) { go { screen = "about" } },
+                    ),
+                    lastTokPerSec = state.liveTokPerSec.takeIf { state.answeringId == null },
+                    storageUsed = { services.storageUsedBytes() },
+                    ramBudgetBytes = services.catalog.ramBudgetBytes,
+                    storageBudgetBytes = services.catalog.storageBudgetBytes,
+                    onNewChat = { go { vm.newChat() } },
+                    onSelect = { id -> go { vm.openSession(id) } },
+                    onDelete = { id -> vm.deleteSession(id); sessions = sessions.filter { it.id != id } },
+                )
             }
         },
     ) {
