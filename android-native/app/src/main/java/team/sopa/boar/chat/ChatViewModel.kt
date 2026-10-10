@@ -143,13 +143,17 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     /** ONLINE / OFFLINE in the header (connectivity.pure.ts isOnline: connected and the internet not known unreachable). */
     private fun watchConnectivity(app: Application) {
         val cm = app.getSystemService(android.net.ConnectivityManager::class.java) ?: return
-        fun current() = cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-        _state.update { it.copy(online = current()) }
+        // connectivity.pure.ts isOnline: connected and reachable (Android's validated internet), not just a network.
+        fun online(caps: android.net.NetworkCapabilities?) = caps != null &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        _state.update { it.copy(online = online(cm.getNetworkCapabilities(cm.activeNetwork))) }
         runCatching {
+            // The callback's own network and capabilities: re-reading activeNetwork in onLost can still return the
+            // network just lost (airplane mode showed ONLINE).
             cm.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: android.net.Network) { _state.update { it.copy(online = current()) } }
-                override fun onLost(network: android.net.Network) { _state.update { it.copy(online = current()) } }
-                override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) { _state.update { it.copy(online = current()) } }
+                override fun onCapabilitiesChanged(network: android.net.Network, caps: android.net.NetworkCapabilities) { _state.update { it.copy(online = online(caps)) } }
+                override fun onLost(network: android.net.Network) { _state.update { it.copy(online = false) } }
             })
         }
     }
@@ -273,7 +277,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val stopped = stopRequested
             chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
             if (shown.isNotEmpty()) chats.setMessageMeta(answerId, metaOf(shown))
-            afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt)
+            afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
             chats.prune(settings.maxSavedSessions)
             _state.update { s ->
                 s.copy(answeringId = null, activity = null,
@@ -300,7 +304,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
      * As ChatScreen.tsx after an answer: a new chat gets a model-written title (autoGenerateTitles); a long one gets its
      * older turns summarized (autoSummarize, past historyTurnThreshold), in the background.
      */
-    private fun afterAnswer(sessionId: String, isNewSession: Boolean, stopped: Boolean, all: List<UiMessage>, systemPrompt: String?) {
+    private fun afterAnswer(sessionId: String, isNewSession: Boolean, stopped: Boolean, all: List<UiMessage>, systemPrompt: String?, hadSources: Boolean) {
         if (stopped) return
         val s = services.settings
         val session = services.host.current() ?: return
@@ -308,7 +312,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (isNewSession && s.autoGenerateTitles) {
             background = viewModelScope.launch(Dispatchers.Default) {
                 runCatching { services.chats.setTitle(sessionId, Summarize.title(gen, all.first { it.role == "user" }.text)) }
-                runCatching { warmPrefix(session, systemPrompt) }
+                runCatching { warmPrefix(session, systemPrompt, hadSources) }
             }
         } else if (s.autoSummarize && all.size / 2 > s.historyTurnThreshold) {
             val older = all.dropLast(VERBATIM_MESSAGE_COUNT)
@@ -320,7 +324,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     val turns = HistoryBudget.budget(older.map { ConversationTurn(it.role, if (it.role == "assistant") AnswerText.stripThinking(it.text) else it.text) })
                     services.chats.setSummary(sessionId, Summarize.summary(gen, turns, previous))
                 }
-                runCatching { warmPrefix(session, systemPrompt) }
+                runCatching { warmPrefix(session, systemPrompt, hadSources) }
             }
         }
     }
@@ -329,8 +333,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
      * A title or summary left its own prompt in the KV cache, so the next question would read the whole system prompt
      * again (about 230 tokens, 8 s on a 4B). Prefill it back: the next answer reuses it (#72's warm-up).
      */
-    private suspend fun warmPrefix(session: team.sopa.boar.engine.LlamaSession, systemPrompt: String?) {
-        val (head, plain) = team.sopa.boar.engine.rag.RagPure.answerPromptPrefix(systemPrompt)
+    private suspend fun warmPrefix(session: team.sopa.boar.engine.LlamaSession, systemPrompt: String?, withSources: Boolean) {
+        // The variant the last answer used (with or without sources): a follow-up in the same chat most often matches it.
+        val (head, plain) = team.sopa.boar.engine.rag.RagPure.answerPromptPrefix(systemPrompt, withSources)
         val prompt = if (session.info.optBoolean("hasChatTemplate", false))
             session.formatChat(listOf(team.sopa.boar.engine.ChatMessage("system", head)), services.settings.engineTweaks.thinkingEnabled).prompt
         else plain

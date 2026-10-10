@@ -197,8 +197,9 @@ object RagPure {
     }
 
     /** The fixed start of every sourced answer prompt for a tone, kept prefilled in the KV cache. */
-    fun answerPromptPrefix(systemPrompt: String? = null): Pair<String, String> {
-        val head = "${instructionOf(systemPrompt)}$CONTEXT_INSTRUCTION $GROUNDING_INSTRUCTION"
+    fun answerPromptPrefix(systemPrompt: String? = null, withContext: Boolean = true): Pair<String, String> {
+        // Without sources the prompt has no context instruction, so the two start differently right after the tone.
+        val head = "${instructionOf(systemPrompt)}${if (withContext) CONTEXT_INSTRUCTION else ""} $GROUNDING_INSTRUCTION"
         return head to "$head\n\n"
     }
 
