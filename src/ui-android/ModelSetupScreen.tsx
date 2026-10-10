@@ -12,7 +12,7 @@ import {
 import { Text } from "./components/AppText";
 import { impact, notification, ImpactFeedbackStyle, NotificationFeedbackType, setHapticsEnabledCache } from "../services/haptics";
 import { useTranslation } from "react-i18next";
-import { MODEL_CATALOG, CatalogModel, AssetKind, CORPUS_CATALOG, REQUIRED_MODELS } from "../models/manifest";
+import { MODEL_CATALOG, CatalogModel, AssetKind, CORPUS_CATALOG, REQUIRED_MODELS, isListed } from "../models/manifest";
 import { llamaEngine } from "../inference/LlamaEngine";
 import { ModelManager } from "../models/ModelManager";
 import { getActiveModelId, setActiveModelId, getHapticsEnabled, setHapticsEnabled } from "../models/settings";
@@ -244,7 +244,7 @@ export function ModelSetupScreen(props: Props) {
           <Text style={styles.sectionHeading}>{t("modelSetupScreen.installedModels")}</Text>
           <FlatList
             data={[
-              ...MODEL_CATALOG.filter((m) => m.kind === "llm" || m.kind === "embedding"),
+              ...MODEL_CATALOG.filter((m) => (m.kind === "llm" || m.kind === "embedding") && isListed(m, presence[m.id] ?? false)),
               // A search result for a file that's now in the curated catalog would be listed twice.
               ...discoveredModels.filter((d) => !MODEL_CATALOG.some((c) => c.filename === d.filename)),
             ]}

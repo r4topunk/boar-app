@@ -3,7 +3,7 @@ import { View, StyleSheet, FlatList, Pressable, ScrollView } from "react-native"
 import { Text } from "./components/AppText";
 import { impact, ImpactFeedbackStyle } from "../services/haptics";
 import { useTranslation } from "react-i18next";
-import { MODEL_CATALOG, CatalogModel, AssetKind } from "../models/manifest";
+import { MODEL_CATALOG, CatalogModel, AssetKind, isListed } from "../models/manifest";
 import { ModelManager } from "../models/ModelManager";
 import { getActiveModelId, setActiveModelId } from "../models/settings";
 import {
@@ -114,7 +114,7 @@ export function ModelCatalogScreen({ onClose }: Props) {
     [refreshStatus, t]
   );
 
-  const allModels = [...MODEL_CATALOG, ...discoveredModels];
+  const allModels = [...MODEL_CATALOG.filter((m) => isListed(m, presence[m.id] ?? false)), ...discoveredModels];
   const filteredModels = allModels.filter((m) => {
     if (selectedFilter === "all") return true;
     if (selectedFilter === "llm") return m.kind === "llm";

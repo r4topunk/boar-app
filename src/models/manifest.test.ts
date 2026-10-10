@@ -11,6 +11,7 @@ import {
   totalManifestBytes,
   isPinnedSourceUrl,
   displayNameOf,
+  isListed,
 } from "./manifest";
 
 describe("totalManifestBytes", () => {
@@ -68,6 +69,14 @@ describe("MODEL_CATALOG", () => {
       expect(m.sizeBytes).toBeGreaterThan(0);
       expect(m.sourceUrl).toMatch(/^https:\/\//);
     }
+  });
+
+  it("no longer suggests Phi-3.5-mini, but keeps it listed where it's installed", () => {
+    const phi = MODEL_CATALOG.find((m) => m.id === "phi-3.5-mini-instruct-q4km")!;
+    expect(isListed(phi, false)).toBe(false);
+    expect(isListed(phi, true)).toBe(true);
+    // Nothing the setup or the app needs is hidden.
+    for (const m of [...REQUIRED_MODELS, ...ANSWER_MODELS]) expect(m.hidden).toBeFalsy();
   });
 });
 
