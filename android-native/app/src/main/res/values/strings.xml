@@ -167,7 +167,7 @@
     <string name="setupWizard_step3_customizeWhileWaiting" formatted="false">While you wait, make it yours — pick a theme and font below.</string>
     <string name="setupWizard_step3_tipLabel" formatted="false">💡 Field terminal notice</string>
     <string name="setupWizard_step3_tipText" formatted="false">Once initialized, BOAR is completely self-contained. You can toggle airplane mode and use the app in complete isolation without loss of functionality.</string>
-    <string name="setupWizard_step3_launchButton" formatted="false">🐗 Launch BOAR Terminal</string>
+    <string name="setupWizard_step3_launchButton" formatted="false">Launch BOAR Terminal</string>
     <string name="setupWizard_step3_indexingError" formatted="false">Indexing error: {{error}}</string>
     <string name="setupWizard_step3_buildingIndex" formatted="false">Building local knowledge base &amp; vector index…</string>
     <string name="setupWizard_step3_waitingForDownloads" formatted="false">Waiting for downloads…</string>

@@ -222,7 +222,7 @@
       "customizeWhileWaiting": "Enquanto espera, deixe do seu jeito — escolha um tema e fonte abaixo.",
       "tipLabel": "💡 Aviso do terminal de campo",
       "tipText": "Após a inicialização, o BOAR é completamente autônomo. Você pode ativar o modo avião e usar o app em total isolamento, sem perda de funcionalidade.",
-      "launchButton": "🐗 Iniciar Terminal BOAR",
+      "launchButton": "Iniciar Terminal BOAR",
       "indexingError": "Erro de indexação: {{error}}",
       "buildingIndex": "Construindo base de conhecimento local & índice vetorial…",
       "waitingForDownloads": "Aguardando downloads…",

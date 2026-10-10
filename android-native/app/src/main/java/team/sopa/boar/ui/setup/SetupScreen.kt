@@ -1,5 +1,6 @@
 package team.sopa.boar.ui.setup
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -19,8 +21,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import team.sopa.boar.R
 import team.sopa.boar.engine.BoarEngine
 import team.sopa.boar.engine.models.AnswerTier
 import team.sopa.boar.engine.models.Units
@@ -35,7 +40,10 @@ fun SetupScreen(state: SetupState, vm: SetupViewModel, onDone: () -> Unit) {
     val c = Boar.colors
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("🐗 BOAR", style = Boar.type.headline, color = c.textHeading)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Image(painterResource(R.drawable.brand_pfp), null, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)))
+            Text("BOAR", style = Boar.type.headline, color = c.textHeading)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("hardware", "modelTier", "install", "indexing").forEachIndexed { i, k ->
                 val on = state.step == i + 1
