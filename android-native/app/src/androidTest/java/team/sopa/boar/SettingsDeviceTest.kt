@@ -85,4 +85,19 @@ class SettingsDeviceTest {
             runCatching { services.chats.deleteSession(s.id) }
         }
     }
+
+    /** The sections brought back from the Expo app, without touching the app's chats or settings. */
+    @Test fun restoredSectionsAreThere() {
+        val services = BoarServices.get(ctx)
+        var opened by mutableStateOf<String?>(null)
+        val prefs = object : DisplayPrefs { override fun setTheme(id: String) {}; override fun setFontScale(scale: String) {}; override fun setLanguage(id: String?) {} }
+        compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = {}, onSetup = {}, onOpen = { opened = it }) {} } }
+        click(t("native.settings.openCatalog")); assertEquals("models", opened)
+        click(t("native.settings.openDocuments")); assertEquals("documents", opened)
+        for (label in listOf("modelSetupScreen.sections.models", "modelSetupScreen.sections.knowledgeBase", "native.telemetry.chip", "native.telemetry.note",
+            "voiceSettings.enabledLabel", "voiceSettings.speechEngineLabel", "interfaceSettings.hapticFeedbackLabel", "native.settings.security")) {
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText(t(label)))
+            compose.onNodeWithText(t(label)).assertExists()
+        }
+    }
 }
