@@ -72,14 +72,17 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val hfRequest = java.util.concurrent.atomic.AtomicInteger()
+
     fun hfOpen(repo: String) {
-        if (_state.value.hfOpenRepo == repo) { _state.update { it.copy(hfOpenRepo = null, hfFiles = emptyList()) }; return }
+        // Each tap is a new request; an older answer (the repo closed, or opened again since) is dropped.
+        val request = hfRequest.incrementAndGet()
+        if (_state.value.hfOpenRepo == repo) { _state.update { it.copy(hfOpenRepo = null, hfFiles = emptyList(), hfBusy = false) }; return }
         _state.update { it.copy(hfBusy = true, hfError = null, hfOpenRepo = repo, hfFiles = emptyList()) }
         viewModelScope.launch(Dispatchers.IO) {
-            // An answer for a repo that's no longer open (another was tapped meanwhile) is dropped.
             runCatching { HfBrowser.files(repo) }
-                .onSuccess { f -> _state.update { if (it.hfOpenRepo != repo) it else it.copy(hfFiles = f, hfBusy = false) } }
-                .onFailure { e -> _state.update { if (it.hfOpenRepo != repo) it else it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
+                .onSuccess { f -> _state.update { if (hfRequest.get() != request) it else it.copy(hfFiles = f, hfBusy = false) } }
+                .onFailure { e -> _state.update { if (hfRequest.get() != request) it else it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
         }
     }
 
