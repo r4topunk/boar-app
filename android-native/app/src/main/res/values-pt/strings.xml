@@ -449,4 +449,212 @@
     <string name="chat_empty_tagline" formatted="false">Respostas deste celular, com fontes</string>
     <string name="chat_empty_fill" formatted="false">Colocar no campo para editar</string>
     <string name="chat_empty_ask" formatted="false">Perguntar: {{question}}</string>
+    <string name="flows_onboarding_brandSub" formatted="false">Assistente de pesquisa offline</string>
+    <string name="flows_onboarding_introLabel" formatted="false">Como funciona</string>
+    <string name="flows_onboarding_phoneLabel" formatted="false">Este celular</string>
+    <string name="flows_onboarding_phoneMemory" formatted="false">Memória</string>
+    <string name="flows_onboarding_phoneFree" formatted="false">Espaço livre</string>
+    <string name="flows_onboarding_phoneEngine" formatted="false">Roda em</string>
+    <string name="flows_onboarding_phoneEngineValue" formatted="false">No próprio celular</string>
+    <string name="flows_onboarding_introBody" formatted="false">Pesquisa com IA que roda inteira no seu celular. Depois de configurada, funciona sem internet, suas perguntas não saem do celular e cada resposta mostra as fontes que usou.</string>
+    <string name="flows_onboarding_meta_onDisk" formatted="false">{{size}} no disco depois de instalar</string>
+    <string name="flows_onboarding_meta_time" formatted="false">~{{minutes}} min a {{speed}}/s</string>
+    <string name="flows_onboarding_start" formatted="false">Começar</string>
+    <string name="flows_onboarding_backToApp" formatted="false">Voltar ao app</string>
+    <string name="flows_onboarding_step2Title" formatted="false">Escolha o que instalar</string>
+    <string name="flows_onboarding_step2Sub" formatted="false">Tudo é baixado uma vez e depois funciona offline.</string>
+    <string name="flows_onboarding_step2SubOffline" formatted="false">Esta versão não acessa a internet: você importa os arquivos uma vez, e depois tudo funciona offline.</string>
+    <string name="flows_onboarding_step3Title" formatted="false">Instalando</string>
+    <string name="flows_onboarding_step3Sub" formatted="false">Esta é a única vez que o BOAR usa a internet.</string>
+    <string name="flows_onboarding_indexTitle" formatted="false">Criando o índice</string>
+    <string name="flows_onboarding_indexSub" formatted="false">Montando o índice de busca no celular. Não precisa de internet.</string>
+    <string name="flows_onboarding_package_essential_name" formatted="false">Essencial</string>
+    <string name="flows_onboarding_package_essential_body" formatted="false">Modelos de resposta e de busca, mais coleções básicas da Wikipédia.</string>
+    <string name="flows_onboarding_package_encyclopedia_name" formatted="false">Enciclopédia</string>
+    <string name="flows_onboarding_package_encyclopedia_body" formatted="false">O Essencial mais 50 mil artigos da Wikipédia, para perguntas mais amplas.</string>
+    <string name="flows_onboarding_recommended" formatted="false">Recomendado</string>
+    <string name="flows_onboarding_alreadyDownloaded" formatted="false">Já está no celular</string>
+    <string name="flows_onboarding_noSpace" formatted="false">Falta espaço: são necessários mais {{size}}.</string>
+    <string name="flows_onboarding_install" formatted="false">Baixar {{size}}</string>
+    <string name="flows_onboarding_continue" formatted="false">Continuar</string>
+    <string name="flows_onboarding_back" formatted="false">Voltar</string>
+    <string name="flows_onboarding_backTitle" formatted="false">Voltar para os pacotes?</string>
+    <string name="flows_onboarding_backBody" formatted="false">Os downloads em andamento continuam enquanto o BOAR estiver aberto.</string>
+    <string name="flows_onboarding_stay" formatted="false">Ficar aqui</string>
+    <string name="flows_onboarding_goBack" formatted="false">Voltar</string>
+    <string name="flows_onboarding_totalLabel" formatted="false">Download total</string>
+    <string name="flows_onboarding_importedLabel" formatted="false">Importado</string>
+    <string name="flows_onboarding_ofFiles_one" formatted="false">de {{total}} arquivo</string>
+    <string name="flows_onboarding_ofFiles_other" formatted="false">de {{total}} arquivos</string>
+    <string name="flows_onboarding_keepOpenImport" formatted="false">Mantenha o BOAR aberto enquanto ele confere os arquivos. Se sair, a conferência pode parar.</string>
+    <string name="flows_onboarding_totalValue" formatted="false">{{done}} / {{total}}</string>
+    <string name="flows_onboarding_percentAnnounce" formatted="false">{{pct}}% baixado</string>
+    <string name="flows_onboarding_percentImportedAnnounce" formatted="false">{{pct}}% importado</string>
+    <string name="flows_onboarding_queued" formatted="false">Na fila</string>
+    <string name="flows_onboarding_importingLabel" formatted="false">Importando</string>
+    <string name="flows_onboarding_fileOf" formatted="false">Arquivo {{n}} de {{total}} — {{name}}</string>
+    <string name="flows_onboarding_bootChecking" formatted="false">Conferindo os arquivos neste celular…</string>
+    <string name="flows_onboarding_category_answer" formatted="false">Modelo de resposta</string>
+    <string name="flows_onboarding_category_search" formatted="false">Modelo de busca</string>
+    <string name="flows_onboarding_category_knowledge" formatted="false">Conhecimento</string>
+    <string name="flows_onboarding_category_places" formatted="false">Lugares</string>
+    <string name="flows_onboarding_category_extras" formatted="false">Também importado</string>
+    <string name="flows_onboarding_categoryStatus_failed" formatted="false">Falhou</string>
+    <string name="flows_onboarding_categoryStatus_moving" formatted="false">Baixando</string>
+    <string name="flows_onboarding_categoryStatus_importing" formatted="false">Importando</string>
+    <string name="flows_onboarding_categoryStatus_ready" formatted="false">Pronto</string>
+    <string name="flows_onboarding_categoryStatus_queued" formatted="false">Na fila</string>
+    <string name="flows_onboarding_categoryStatus_import" formatted="false">Importar</string>
+    <string name="flows_onboarding_categoryHint" formatted="false">Mostra os arquivos</string>
+    <string name="flows_onboarding_categoryA11y" formatted="false">{{name}}, {{done}} de {{total}} arquivos, {{pct}}%</string>
+    <string name="flows_onboarding_openWhenReady" formatted="false">Disponível quando todos os arquivos estiverem no celular</string>
+    <string name="flows_onboarding_llmLabel" formatted="false">Modelo</string>
+    <string name="flows_onboarding_chooseAnswerTitle" formatted="false">Assistente</string>
+    <string name="flows_onboarding_chooseAnswerHint" formatted="false">Escolher Rápido ou Mais preciso</string>
+    <string name="flows_onboarding_workingMemory" formatted="false">precisa de ~{{size}} de memória</string>
+    <string name="flows_onboarding_currentItem" formatted="false">Item {{n}} de {{total}} — {{name}}</string>
+    <string name="flows_onboarding_keepOpenTitle" formatted="false">Melhor com o BOAR aberto</string>
+    <string name="flows_onboarding_keepOpenIndex" formatted="false">O índice de busca é feito neste celular. Se você sair, ele pausa e continua de onde parou quando você voltar.</string>
+    <string name="flows_onboarding_stage_start" formatted="false">Início</string>
+    <string name="flows_onboarding_stage_choose" formatted="false">Escolha</string>
+    <string name="flows_onboarding_stage_install" formatted="false">Instalar</string>
+    <string name="flows_onboarding_stage_index" formatted="false">Índice</string>
+    <string name="flows_onboarding_stage_model" formatted="false">Modelo</string>
+    <string name="flows_onboarding_stage_knowledge" formatted="false">Conhecimento</string>
+    <string name="flows_onboarding_stage_download" formatted="false">Download</string>
+    <string name="flows_onboarding_stageOf" formatted="false">Passo {{n}} de {{total}}: {{name}}</string>
+    <string name="flows_onboarding_checking" formatted="false">Conferindo</string>
+    <string name="flows_onboarding_failedShort" formatted="false">Falhou</string>
+    <string name="flows_onboarding_downloadingLine" formatted="false">{{pct}}% · {{done}} de {{total}}</string>
+    <string name="flows_onboarding_ready" formatted="false">Pronto</string>
+    <string name="flows_onboarding_indexRow" formatted="false">Índice de busca no celular</string>
+    <string name="flows_onboarding_waitingDownloads" formatted="false">Começa quando todos os arquivos estiverem no celular</string>
+    <string name="flows_onboarding_indexStarting" formatted="false">Começando</string>
+    <string name="flows_onboarding_indexCounter" formatted="false">{{done}} de {{total}} artigos</string>
+    <string name="flows_onboarding_minutesLeft_one" formatted="false">falta cerca de {{count}} min</string>
+    <string name="flows_onboarding_minutesLeft_other" formatted="false">faltam cerca de {{count}} min</string>
+    <string name="flows_onboarding_indexFailed" formatted="false">A criação do índice falhou</string>
+    <string name="flows_onboarding_downloadFailed" formatted="false">Um download falhou</string>
+    <string name="flows_onboarding_restart" formatted="false">Baixar de novo</string>
+    <string name="flows_onboarding_restartHint" formatted="false">Os downloads pararam de avançar?</string>
+    <string name="flows_onboarding_keepOpen" formatted="false">Os downloads vão mais rápido com o BOAR aberto. Se você sair, eles pausam e continuam de onde pararam quando você voltar.</string>
+    <string name="flows_onboarding_doneTitle" formatted="false">Pronto</string>
+    <string name="flows_onboarding_doneBody" formatted="false">Tudo roda offline a partir de agora.</string>
+    <string name="flows_onboarding_doneSummary" formatted="false">Neste celular</string>
+    <string name="flows_onboarding_doneAnswer" formatted="false">Modelo de resposta</string>
+    <string name="flows_onboarding_doneKnowledge" formatted="false">Conhecimento</string>
+    <string name="flows_onboarding_doneCollections_one" formatted="false">{{value}} coleção</string>
+    <string name="flows_onboarding_doneCollections_other" formatted="false">{{value}} coleções</string>
+    <string name="flows_onboarding_donePlaces" formatted="false">Lugares</string>
+    <string name="flows_onboarding_doneIndex" formatted="false">Índice de busca</string>
+    <string name="flows_onboarding_doneArticles_one" formatted="false">{{value}} artigo</string>
+    <string name="flows_onboarding_doneArticles_other" formatted="false">{{value}} artigos</string>
+    <string name="flows_onboarding_doneAnnounce" formatted="false">Configuração concluída. O BOAR está pronto.</string>
+    <string name="flows_onboarding_open" formatted="false">Abrir o BOAR</string>
+    <string name="flows_onboarding_languageAnnounce" formatted="false">Idioma: Português</string>
+    <string name="flows_onboarding_smallerPackage" formatted="false">Pacote menor</string>
+    <string name="flows_onboarding_importTitle" formatted="false">Importe os arquivos</string>
+    <string name="flows_onboarding_importSub" formatted="false">Esta versão não acessa a internet. Copie os arquivos para o celular e escolha-os aqui.</string>
+    <string name="flows_onboarding_importHow" formatted="false">A lista de arquivos e onde baixar cada um estão no guia de instalação offline:</string>
+    <string name="flows_onboarding_copyLink" formatted="false">Copiar link</string>
+    <string name="flows_onboarding_linkCopied" formatted="false">Link copiado</string>
+    <string name="flows_onboarding_toImport" formatted="false">Ainda não importado</string>
+    <string name="flows_onboarding_importPlacesNote" formatted="false">Os pacotes de lugares ainda não estão publicados para download: escolha os arquivos aqui (a região e o arquivo de lugares do mundo).</string>
+    <string name="flows_onboarding_compactWhy" formatted="false">O Mais preciso pode não rodar bem neste celular, por isso o Rápido está selecionado. Você ainda pode escolher o Mais preciso.</string>
+    <string name="flows_onboarding_answerTier_default" formatted="false">Mais preciso</string>
+    <string name="flows_onboarding_answerTier_compact" formatted="false">Rápido</string>
+    <string name="flows_onboarding_compactLowRam" formatted="false">Este celular tem {{ram}} de memória ou menos, por isso o Rápido está selecionado. Você ainda pode escolher o Mais preciso.</string>
+    <string name="flows_onboarding_canLeaveTitle" formatted="false">Pode sair do BOAR</string>
+    <string name="flows_onboarding_indexReading" formatted="false">Lendo: {{title}}</string>
+    <string name="flows_onboarding_loadingLines_l1" formatted="false">Alimentando o javali…</string>
+    <string name="flows_onboarding_loadingLines_l2" formatted="false">O javali parou para farejar uma trufa…</string>
+    <string name="flows_onboarding_loadingLines_l3" formatted="false">Afiando as presas…</string>
+    <string name="flows_onboarding_loadingLines_l4" formatted="false">Separando as bolotas por assunto…</string>
+    <string name="flows_onboarding_loadingLines_l5" formatted="false">Ensinando o javali a ler notas de rodapé…</string>
+    <string name="flows_onboarding_loadingLines_l6" formatted="false">Cavando fatos debaixo do carvalho…</string>
+    <string name="flows_onboarding_loadingLines_l7" formatted="false">O javali está lendo a enciclopédia inteira. Devagar.</string>
+    <string name="flows_onboarding_loadingLines_l8" formatted="false">Arrumando lanches para a viagem sem internet…</string>
+    <string name="flows_onboarding_loadingLines_l9" formatted="false">Conferindo cada fonte duas vezes…</string>
+    <string name="flows_onboarding_loadingLines_l10" formatted="false">Rolando na lama do conhecimento…</string>
+    <string name="flows_onboarding_loadingLines_l11" formatted="false">O javali achou um atalho. Era uma árvore.</string>
+    <string name="flows_onboarding_loadingLines_l12" formatted="false">Contando páginas com os cascos…</string>
+    <string name="flows_onboarding_modelTitle" formatted="false">Escolha o modelo de respostas</string>
+    <string name="flows_onboarding_modelSub" formatted="false">Ele escreve as respostas neste celular. Você pode trocar depois em Modelos.</string>
+    <string name="flows_onboarding_knowledgeTitle" formatted="false">Escolha o conhecimento</string>
+    <string name="flows_row_copying" formatted="false">Copiando</string>
+    <string name="flows_row_downloading" formatted="false">Baixando</string>
+    <string name="flows_row_verifying" formatted="false">Conferindo</string>
+    <string name="flows_row_loading" formatted="false">Carregando</string>
+    <string name="flows_row_failed" formatted="false">Falhou</string>
+    <string name="flows_row_failedAnnounce" formatted="false">{{name}} falhou. Dá para tentar de novo.</string>
+    <string name="flows_row_verified" formatted="false">Conferido</string>
+    <string name="flows_row_importChecking" formatted="false">Conferindo {{name}}</string>
+    <string name="flows_row_importOther" formatted="false">{{name}} é outro item, não este. Escolha o arquivo deste item.</string>
+    <string name="flows_row_unverified" formatted="false">Não conferido</string>
+    <string name="flows_row_active" formatted="false">Em uso</string>
+    <string name="flows_row_usedFor" formatted="false">Usado para: {{roles}}</string>
+    <string name="flows_row_role_answer" formatted="false">Respostas</string>
+    <string name="flows_row_role_deep" formatted="false">Aprofundar</string>
+    <string name="flows_row_role_search" formatted="false">Busca</string>
+    <string name="flows_row_kind_llm" formatted="false">Modelo de IA</string>
+    <string name="flows_row_kind_embedding" formatted="false">Modelo de busca</string>
+    <string name="flows_row_kind_corpus" formatted="false">Conhecimento</string>
+    <string name="flows_row_progressLabel" formatted="false">Progresso de {{name}}</string>
+    <string name="flows_row_fit_streaming" formatted="false">Maior que a memória deste celular, então roda mais devagar.</string>
+    <string name="flows_row_fit_thrashing" formatted="false">Pode ficar lento neste celular: usa quase toda a memória.</string>
+    <string name="flows_row_fit_insufficient" formatted="false">Não cabe: este celular não tem memória livre suficiente para rodá-lo.</string>
+    <string name="flows_row_error_network" formatted="false">Sem conexão. Conecte-se e tente de novo.</string>
+    <string name="flows_row_error_stalled" formatted="false">O download parou de avançar.</string>
+    <string name="flows_row_error_storage" formatted="false">Falta espaço livre no celular.</string>
+    <string name="flows_row_error_hash__mismatch" formatted="false">O arquivo veio diferente do esperado. Pegue uma cópia nova do arquivo e tente de novo.</string>
+    <string name="flows_row_error_empty__file" formatted="false">O arquivo está vazio (0 bytes). Copie-o de novo para o celular.</string>
+    <string name="flows_row_error_unreadable__file" formatted="false">O BOAR não conseguiu ler este arquivo.</string>
+    <string name="flows_row_error_corrupt" formatted="false">O arquivo parece corrompido. Copie de novo ou escolha outro.</string>
+    <string name="flows_row_error_size__mismatch" formatted="false">O arquivo veio incompleto. Pegue uma cópia nova do arquivo e tente de novo.</string>
+    <string name="flows_row_error_offline__variant" formatted="false">Esta versão não acessa a internet. Importe o arquivo.</string>
+    <string name="flows_row_error_load" formatted="false">Não foi possível carregar este modelo.</string>
+    <string name="flows_row_error_unknown" formatted="false">Algo deu errado.</string>
+    <string name="flows_row_error_unknown__file" formatted="false">Este arquivo não é um que o BOAR conhece. Escolha o arquivo indicado para este item.</string>
+    <string name="flows_row_error_too__large" formatted="false">Este arquivo é maior do que o BOAR aceita para este tipo de item.</string>
+    <string name="flows_row_error_no__source" formatted="false">Este item ainda não está publicado para download. Importe o arquivo.</string>
+    <string name="flows_row_errorDetail_interrupted" formatted="false">Parou em {{done}} de {{total}}. Tente de novo para continuar de onde parou.</string>
+    <string name="flows_row_errorDetail_paused" formatted="false">Sem progresso por {{seconds}} s. Toque em Tentar de novo para continuar.</string>
+    <string name="flows_row_download" formatted="false">Baixar {{size}}</string>
+    <string name="flows_row_retry" formatted="false">Tentar de novo</string>
+    <string name="flows_row_use" formatted="false">Usar nas respostas</string>
+    <string name="flows_row_remove" formatted="false">Remover</string>
+    <string name="flows_row_inUseHint" formatted="false">Em uso. Escolha outro modelo antes de remover este.</string>
+    <string name="flows_row_removeTitle" formatted="false">Remover {{name}}?</string>
+    <string name="flows_row_removeBody" formatted="false">Libera {{size}} neste celular. Dá para adicionar de novo depois.</string>
+    <string name="flows_row_removed" formatted="false">{{name}} removido</string>
+    <string name="flows_row_wontFitTitle" formatted="false">{{name}} não cabe neste celular</string>
+    <string name="flows_row_downloadAnyway" formatted="false">Baixar</string>
+    <string name="flows_row_fitDetail" formatted="false">Ele precisa de cerca de {{need}} de memória de trabalho que não dá para ler do armazenamento; há cerca de {{free}} livres de {{total}}. Estimativa.</string>
+    <string name="flows_row_importFile" formatted="false">Importar {{size}}</string>
+    <string name="flows_row_importAnyway" formatted="false">Importar</string>
+    <string name="flows_row_anywayHint" formatted="false">{{size}} · pode não abrir neste celular</string>
+    <string name="flows_row_notOnDisk" formatted="false">Não baixado</string>
+    <string name="flows_row_fitShort_resident" formatted="false">Cabe na memória</string>
+    <string name="flows_row_fitShort_streaming" formatted="false">Mais lento aqui</string>
+    <string name="flows_row_fitShort_thrashing" formatted="false">Pode ficar lento</string>
+    <string name="flows_row_fitShort_insufficient" formatted="false">Não cabe</string>
+    <string name="flows_row_mayClose" formatted="false">Pode fechar o app</string>
+    <string name="flows_row_mayCloseWhy" formatted="false">Grande demais para a memória deste celular</string>
+    <string name="flows_row_didNotOpen" formatted="false">Não abriu aqui</string>
+    <string name="flows_row_wontFitHere" formatted="false">Grande demais</string>
+    <string name="flows_row_wontFitWhy" formatted="false">Precisa de mais memória do que este celular tem</string>
+    <string name="flows_row_wontFitNumbers" formatted="false">Precisa de ~{{need}} de memória · este celular tem {{total}}</string>
+    <string name="flows_row_didNotOpenBefore" formatted="false">O BOAR fechou da última vez que carregou o </string>
+    <string name="flows_row_mayCloseTitle" formatted="false">Usar este modelo?</string>
+    <string name="flows_row_mayCloseBefore" formatted="false">O BOAR pode fechar ao carregar o </string>
+    <string name="flows_row_mayCloseAfter" formatted="false">. O Rápido é o recomendado aqui.</string>
+    <string name="flows_row_showAll" formatted="false">Mostrar tudo</string>
+    <string name="flows_row_showLess" formatted="false">Mostrar menos</string>
+    <string name="flows_row_keepCompact" formatted="false">Manter o Rápido</string>
+    <string name="flows_row_useAnyway" formatted="false">Usar mesmo assim</string>
+    <string name="flows_row_fitWhy_streaming" formatted="false">Maior que a memória deste celular</string>
+    <string name="flows_row_fitWhy_thrashing" formatted="false">Usa quase toda a memória deste celular</string>
+    <string name="flows_row_fitWhy_insufficient" formatted="false">Falta memória livre neste celular</string>
+    <string name="flows_assistant_sub_compact" formatted="false">Respostas mais rápidas, menos memória</string>
+    <string name="flows_assistant_sub_default" formatted="false">Respostas melhores, um pouco mais lento</string>
 </resources>

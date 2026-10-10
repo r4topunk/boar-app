@@ -122,8 +122,18 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
         // Downloads pause in the background on MIUI: the screen stays on while setup runs.
         val view = LocalView.current
         DisposableEffect(Unit) { view.keepScreenOn = true; onDispose { view.keepScreenOn = false } }
-        BackHandler(setupState.step == 2) { setup.back() }
-        SetupScreen(setupState, setup) { vm.refreshModel(); screen = afterSetup(services.pinLock.isSet) }
+        // Reopened from Settings (the app already works): step 1 offers the way back to the chat.
+        val wasReady = remember { setup.ready() }
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+        DisposableEffect(lifecycle) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_START) setup.onForeground() }
+            lifecycle.addObserver(observer)
+            onDispose { lifecycle.removeObserver(observer) }
+        }
+        SetupScreen(setupState, setup, team.sopa.boar.ui.setup.currentLanguage(services.settings.languageId),
+            onLanguage = { id -> services.settings.languageId = id; prefs.setLanguage(id) },
+            onSkip = if (wasReady) ({ setup.forget(); screen = "chat" }) else null,
+        ) { setup.forget(); vm.refreshModel(); screen = afterSetup(services.pinLock.isSet) }
         return
     }
     if (screen == "pinOffer") {

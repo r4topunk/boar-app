@@ -450,4 +450,212 @@
     <string name="chat_empty_tagline" formatted="false">Answers from this phone, with sources</string>
     <string name="chat_empty_fill" formatted="false">Put in the input to edit</string>
     <string name="chat_empty_ask" formatted="false">Ask: {{question}}</string>
+    <string name="flows_onboarding_brandSub" formatted="false">Offline research assistant</string>
+    <string name="flows_onboarding_introLabel" formatted="false">How it works</string>
+    <string name="flows_onboarding_phoneLabel" formatted="false">This phone</string>
+    <string name="flows_onboarding_phoneMemory" formatted="false">Memory</string>
+    <string name="flows_onboarding_phoneFree" formatted="false">Free space</string>
+    <string name="flows_onboarding_phoneEngine" formatted="false">Runs on</string>
+    <string name="flows_onboarding_phoneEngineValue" formatted="false">Right on this phone</string>
+    <string name="flows_onboarding_introBody" formatted="false">AI research that runs entirely on your phone. Once it is set up it works without internet, your questions never leave the phone, and every answer shows the sources behind it.</string>
+    <string name="flows_onboarding_meta_onDisk" formatted="false">{{size}} on disk after install</string>
+    <string name="flows_onboarding_meta_time" formatted="false">~{{minutes}} min at {{speed}}/s</string>
+    <string name="flows_onboarding_start" formatted="false">Get started</string>
+    <string name="flows_onboarding_backToApp" formatted="false">Back to the app</string>
+    <string name="flows_onboarding_step2Title" formatted="false">Choose what to install</string>
+    <string name="flows_onboarding_step2Sub" formatted="false">Everything is downloaded once and then works offline.</string>
+    <string name="flows_onboarding_step2SubOffline" formatted="false">This version has no internet access: you import the files once, and then everything works offline.</string>
+    <string name="flows_onboarding_step3Title" formatted="false">Installing</string>
+    <string name="flows_onboarding_step3Sub" formatted="false">This is the only time BOAR uses the internet.</string>
+    <string name="flows_onboarding_indexTitle" formatted="false">Indexing</string>
+    <string name="flows_onboarding_indexSub" formatted="false">Building the search index on the phone. No internet needed.</string>
+    <string name="flows_onboarding_package_essential_name" formatted="false">Essential</string>
+    <string name="flows_onboarding_package_essential_body" formatted="false">Answer and search models, plus core Wikipedia collections.</string>
+    <string name="flows_onboarding_package_encyclopedia_name" formatted="false">Encyclopedia</string>
+    <string name="flows_onboarding_package_encyclopedia_body" formatted="false">Essential plus 50,000 Wikipedia articles, for broader questions.</string>
+    <string name="flows_onboarding_recommended" formatted="false">Recommended</string>
+    <string name="flows_onboarding_alreadyDownloaded" formatted="false">Already on the phone</string>
+    <string name="flows_onboarding_noSpace" formatted="false">Not enough space: {{size}} more is needed.</string>
+    <string name="flows_onboarding_install" formatted="false">Download {{size}}</string>
+    <string name="flows_onboarding_continue" formatted="false">Continue</string>
+    <string name="flows_onboarding_back" formatted="false">Back</string>
+    <string name="flows_onboarding_backTitle" formatted="false">Go back to the packages?</string>
+    <string name="flows_onboarding_backBody" formatted="false">Downloads already running keep going while BOAR is open.</string>
+    <string name="flows_onboarding_stay" formatted="false">Stay here</string>
+    <string name="flows_onboarding_goBack" formatted="false">Go back</string>
+    <string name="flows_onboarding_totalLabel" formatted="false">Total download</string>
+    <string name="flows_onboarding_importedLabel" formatted="false">Imported</string>
+    <string name="flows_onboarding_ofFiles_one" formatted="false">of {{total}} file</string>
+    <string name="flows_onboarding_ofFiles_other" formatted="false">of {{total}} files</string>
+    <string name="flows_onboarding_keepOpenImport" formatted="false">Keep BOAR open while it checks the files. If you leave, the check may stop.</string>
+    <string name="flows_onboarding_totalValue" formatted="false">{{done}} / {{total}}</string>
+    <string name="flows_onboarding_percentAnnounce" formatted="false">{{pct}}% downloaded</string>
+    <string name="flows_onboarding_percentImportedAnnounce" formatted="false">{{pct}}% imported</string>
+    <string name="flows_onboarding_queued" formatted="false">Waiting</string>
+    <string name="flows_onboarding_importingLabel" formatted="false">Importing</string>
+    <string name="flows_onboarding_fileOf" formatted="false">File {{n}} of {{total}} — {{name}}</string>
+    <string name="flows_onboarding_bootChecking" formatted="false">Checking the files on this phone…</string>
+    <string name="flows_onboarding_category_answer" formatted="false">Answer model</string>
+    <string name="flows_onboarding_category_search" formatted="false">Search model</string>
+    <string name="flows_onboarding_category_knowledge" formatted="false">Knowledge</string>
+    <string name="flows_onboarding_category_places" formatted="false">Places</string>
+    <string name="flows_onboarding_category_extras" formatted="false">Also imported</string>
+    <string name="flows_onboarding_categoryStatus_failed" formatted="false">Failed</string>
+    <string name="flows_onboarding_categoryStatus_moving" formatted="false">Downloading</string>
+    <string name="flows_onboarding_categoryStatus_importing" formatted="false">Importing</string>
+    <string name="flows_onboarding_categoryStatus_ready" formatted="false">Ready</string>
+    <string name="flows_onboarding_categoryStatus_queued" formatted="false">Waiting</string>
+    <string name="flows_onboarding_categoryStatus_import" formatted="false">To import</string>
+    <string name="flows_onboarding_categoryHint" formatted="false">Shows the files</string>
+    <string name="flows_onboarding_categoryA11y" formatted="false">{{name}}, {{done}} of {{total}} files, {{pct}}%</string>
+    <string name="flows_onboarding_openWhenReady" formatted="false">Available when every file is on the phone</string>
+    <string name="flows_onboarding_llmLabel" formatted="false">Model</string>
+    <string name="flows_onboarding_chooseAnswerTitle" formatted="false">Assistant</string>
+    <string name="flows_onboarding_chooseAnswerHint" formatted="false">Choose Fast or More accurate</string>
+    <string name="flows_onboarding_workingMemory" formatted="false">needs ~{{size}} of memory</string>
+    <string name="flows_onboarding_currentItem" formatted="false">Item {{n}} of {{total}} — {{name}}</string>
+    <string name="flows_onboarding_keepOpenTitle" formatted="false">Best with BOAR open</string>
+    <string name="flows_onboarding_keepOpenIndex" formatted="false">The search index is built on this phone. If you leave, it pauses and picks up where it stopped when you come back.</string>
+    <string name="flows_onboarding_stage_start" formatted="false">Start</string>
+    <string name="flows_onboarding_stage_choose" formatted="false">Choose</string>
+    <string name="flows_onboarding_stage_install" formatted="false">Install</string>
+    <string name="flows_onboarding_stage_index" formatted="false">Index</string>
+    <string name="flows_onboarding_stage_model" formatted="false">Model</string>
+    <string name="flows_onboarding_stage_knowledge" formatted="false">Knowledge</string>
+    <string name="flows_onboarding_stage_download" formatted="false">Download</string>
+    <string name="flows_onboarding_stageOf" formatted="false">Step {{n}} of {{total}}: {{name}}</string>
+    <string name="flows_onboarding_checking" formatted="false">Checking</string>
+    <string name="flows_onboarding_failedShort" formatted="false">Failed</string>
+    <string name="flows_onboarding_downloadingLine" formatted="false">{{pct}}% · {{done}} of {{total}}</string>
+    <string name="flows_onboarding_ready" formatted="false">Ready</string>
+    <string name="flows_onboarding_indexRow" formatted="false">Search index on the phone</string>
+    <string name="flows_onboarding_waitingDownloads" formatted="false">Starts when every file is on the phone</string>
+    <string name="flows_onboarding_indexStarting" formatted="false">Starting</string>
+    <string name="flows_onboarding_indexCounter" formatted="false">{{done}} of {{total}} articles</string>
+    <string name="flows_onboarding_minutesLeft_one" formatted="false">about {{count}} min left</string>
+    <string name="flows_onboarding_minutesLeft_other" formatted="false">about {{count}} min left</string>
+    <string name="flows_onboarding_indexFailed" formatted="false">Building the index failed</string>
+    <string name="flows_onboarding_downloadFailed" formatted="false">A download failed</string>
+    <string name="flows_onboarding_restart" formatted="false">Restart downloads</string>
+    <string name="flows_onboarding_restartHint" formatted="false">Downloads not moving?</string>
+    <string name="flows_onboarding_keepOpen" formatted="false">Downloads go fastest with BOAR open. If you leave, they pause, and they continue where they stopped when you come back.</string>
+    <string name="flows_onboarding_doneTitle" formatted="false">Ready</string>
+    <string name="flows_onboarding_doneBody" formatted="false">Everything runs offline from now on.</string>
+    <string name="flows_onboarding_doneSummary" formatted="false">On this phone</string>
+    <string name="flows_onboarding_doneAnswer" formatted="false">Answer model</string>
+    <string name="flows_onboarding_doneKnowledge" formatted="false">Knowledge</string>
+    <string name="flows_onboarding_doneCollections_one" formatted="false">{{value}} collection</string>
+    <string name="flows_onboarding_doneCollections_other" formatted="false">{{value}} collections</string>
+    <string name="flows_onboarding_donePlaces" formatted="false">Places</string>
+    <string name="flows_onboarding_doneIndex" formatted="false">Search index</string>
+    <string name="flows_onboarding_doneArticles_one" formatted="false">{{value}} article</string>
+    <string name="flows_onboarding_doneArticles_other" formatted="false">{{value}} articles</string>
+    <string name="flows_onboarding_doneAnnounce" formatted="false">Setup finished. BOAR is ready.</string>
+    <string name="flows_onboarding_open" formatted="false">Open BOAR</string>
+    <string name="flows_onboarding_languageAnnounce" formatted="false">Language: English</string>
+    <string name="flows_onboarding_smallerPackage" formatted="false">Smaller package</string>
+    <string name="flows_onboarding_importTitle" formatted="false">Import the files</string>
+    <string name="flows_onboarding_importSub" formatted="false">This version has no internet access. Copy the files to the phone, then choose them here.</string>
+    <string name="flows_onboarding_importHow" formatted="false">The file list and where to get each file are in the offline install guide:</string>
+    <string name="flows_onboarding_copyLink" formatted="false">Copy link</string>
+    <string name="flows_onboarding_linkCopied" formatted="false">Link copied</string>
+    <string name="flows_onboarding_toImport" formatted="false">Not imported yet</string>
+    <string name="flows_onboarding_importPlacesNote" formatted="false">Place packs aren\'t published for download yet: choose their files here (the region and the world places file).</string>
+    <string name="flows_onboarding_compactWhy" formatted="false">More accurate may not run well on this phone, so Fast is selected. You can still choose More accurate.</string>
+    <string name="flows_onboarding_answerTier_default" formatted="false">More accurate</string>
+    <string name="flows_onboarding_answerTier_compact" formatted="false">Fast</string>
+    <string name="flows_onboarding_compactLowRam" formatted="false">This phone has {{ram}} of memory or less, so Fast is selected. You can still choose More accurate.</string>
+    <string name="flows_onboarding_canLeaveTitle" formatted="false">You can leave BOAR</string>
+    <string name="flows_onboarding_indexReading" formatted="false">Reading: {{title}}</string>
+    <string name="flows_onboarding_loadingLines_l1" formatted="false">Feeding the boar…</string>
+    <string name="flows_onboarding_loadingLines_l2" formatted="false">The boar stopped to sniff a truffle…</string>
+    <string name="flows_onboarding_loadingLines_l3" formatted="false">Sharpening the tusks…</string>
+    <string name="flows_onboarding_loadingLines_l4" formatted="false">Sorting acorns by subject…</string>
+    <string name="flows_onboarding_loadingLines_l5" formatted="false">Teaching the boar to read footnotes…</string>
+    <string name="flows_onboarding_loadingLines_l6" formatted="false">Digging for facts under the oak tree…</string>
+    <string name="flows_onboarding_loadingLines_l7" formatted="false">The boar is reading the whole encyclopedia. Slowly.</string>
+    <string name="flows_onboarding_loadingLines_l8" formatted="false">Packing snacks for the trip offline…</string>
+    <string name="flows_onboarding_loadingLines_l9" formatted="false">Checking every source twice…</string>
+    <string name="flows_onboarding_loadingLines_l10" formatted="false">Rolling in the mud of knowledge…</string>
+    <string name="flows_onboarding_loadingLines_l11" formatted="false">The boar found a shortcut. It was a tree.</string>
+    <string name="flows_onboarding_loadingLines_l12" formatted="false">Counting pages with hooves…</string>
+    <string name="flows_onboarding_modelTitle" formatted="false">Choose the answer model</string>
+    <string name="flows_onboarding_modelSub" formatted="false">It writes the answers on this phone. You can change it later in Models.</string>
+    <string name="flows_onboarding_knowledgeTitle" formatted="false">Choose your knowledge</string>
+    <string name="flows_row_copying" formatted="false">Copying</string>
+    <string name="flows_row_downloading" formatted="false">Downloading</string>
+    <string name="flows_row_verifying" formatted="false">Checking</string>
+    <string name="flows_row_loading" formatted="false">Loading</string>
+    <string name="flows_row_failed" formatted="false">Failed</string>
+    <string name="flows_row_failedAnnounce" formatted="false">{{name}} failed. Retry is available.</string>
+    <string name="flows_row_verified" formatted="false">Checked</string>
+    <string name="flows_row_importChecking" formatted="false">Checking {{name}}</string>
+    <string name="flows_row_importOther" formatted="false">{{name}} is a different item, not this one. Choose this item\'s file.</string>
+    <string name="flows_row_unverified" formatted="false">Not checked</string>
+    <string name="flows_row_active" formatted="false">In use</string>
+    <string name="flows_row_usedFor" formatted="false">Used for: {{roles}}</string>
+    <string name="flows_row_role_answer" formatted="false">Answers</string>
+    <string name="flows_row_role_deep" formatted="false">Deep answers</string>
+    <string name="flows_row_role_search" formatted="false">Search</string>
+    <string name="flows_row_kind_llm" formatted="false">AI model</string>
+    <string name="flows_row_kind_embedding" formatted="false">Search model</string>
+    <string name="flows_row_kind_corpus" formatted="false">Knowledge</string>
+    <string name="flows_row_progressLabel" formatted="false">{{name}} progress</string>
+    <string name="flows_row_fit_streaming" formatted="false">Bigger than this phone\'s memory, so it runs slower.</string>
+    <string name="flows_row_fit_thrashing" formatted="false">May be slow on this phone: it needs most of its memory.</string>
+    <string name="flows_row_fit_insufficient" formatted="false">Won\'t fit: this phone doesn\'t have enough free memory to run it.</string>
+    <string name="flows_row_error_network" formatted="false">No connection. Connect and try again.</string>
+    <string name="flows_row_error_stalled" formatted="false">The download stopped making progress.</string>
+    <string name="flows_row_error_storage" formatted="false">Not enough free space on the phone.</string>
+    <string name="flows_row_error_hash__mismatch" formatted="false">The file doesn\'t match the expected one. Get a fresh copy of the file and try again.</string>
+    <string name="flows_row_error_empty__file" formatted="false">The file is empty (0 bytes). Copy it to the phone again.</string>
+    <string name="flows_row_error_unreadable__file" formatted="false">BOAR couldn\'t read this file.</string>
+    <string name="flows_row_error_corrupt" formatted="false">The file looks damaged. Copy it again or choose another.</string>
+    <string name="flows_row_error_size__mismatch" formatted="false">The file is incomplete. Get a fresh copy of the file and try again.</string>
+    <string name="flows_row_error_offline__variant" formatted="false">This version has no internet access. Import the file instead.</string>
+    <string name="flows_row_error_load" formatted="false">Couldn\'t load this model.</string>
+    <string name="flows_row_error_unknown" formatted="false">Something went wrong.</string>
+    <string name="flows_row_error_unknown__file" formatted="false">This file isn\'t one BOAR knows. Choose the file listed for this item.</string>
+    <string name="flows_row_error_too__large" formatted="false">This file is larger than BOAR accepts for this kind of item.</string>
+    <string name="flows_row_error_no__source" formatted="false">This item isn\'t published for download yet. Import its file instead.</string>
+    <string name="flows_row_errorDetail_interrupted" formatted="false">Stopped at {{done}} of {{total}}. Try again to continue from there.</string>
+    <string name="flows_row_errorDetail_paused" formatted="false">No progress for {{seconds}} s. Tap Try again to continue.</string>
+    <string name="flows_row_download" formatted="false">Download {{size}}</string>
+    <string name="flows_row_retry" formatted="false">Try again</string>
+    <string name="flows_row_use" formatted="false">Use for answers</string>
+    <string name="flows_row_remove" formatted="false">Remove</string>
+    <string name="flows_row_inUseHint" formatted="false">In use. Choose another model before removing this one.</string>
+    <string name="flows_row_removeTitle" formatted="false">Remove {{name}}?</string>
+    <string name="flows_row_removeBody" formatted="false">Frees {{size}} on this phone. You can add it again later.</string>
+    <string name="flows_row_removed" formatted="false">{{name}} removed</string>
+    <string name="flows_row_wontFitTitle" formatted="false">{{name}} won\'t fit on this phone</string>
+    <string name="flows_row_downloadAnyway" formatted="false">Download</string>
+    <string name="flows_row_fitDetail" formatted="false">It needs about {{need}} of working memory that can\'t be read from storage; about {{free}} is free of {{total}}. Estimate.</string>
+    <string name="flows_row_importFile" formatted="false">Import {{size}}</string>
+    <string name="flows_row_importAnyway" formatted="false">Import</string>
+    <string name="flows_row_anywayHint" formatted="false">{{size}} · may not open on this phone</string>
+    <string name="flows_row_notOnDisk" formatted="false">Not on disk</string>
+    <string name="flows_row_fitShort_resident" formatted="false">Fits in memory</string>
+    <string name="flows_row_fitShort_streaming" formatted="false">Slower here</string>
+    <string name="flows_row_fitShort_thrashing" formatted="false">May be slow</string>
+    <string name="flows_row_fitShort_insufficient" formatted="false">Won\'t fit</string>
+    <string name="flows_row_mayClose" formatted="false">May close the app</string>
+    <string name="flows_row_mayCloseWhy" formatted="false">Too big for this phone\'s memory</string>
+    <string name="flows_row_didNotOpen" formatted="false">Didn\'t open here</string>
+    <string name="flows_row_wontFitHere" formatted="false">Too big</string>
+    <string name="flows_row_wontFitWhy" formatted="false">Needs more memory than this phone has</string>
+    <string name="flows_row_wontFitNumbers" formatted="false">Needs ~{{need}} of memory · this phone has {{total}}</string>
+    <string name="flows_row_didNotOpenBefore" formatted="false">BOAR closed the last time it loaded </string>
+    <string name="flows_row_mayCloseTitle" formatted="false">Use this model?</string>
+    <string name="flows_row_mayCloseBefore" formatted="false">BOAR may close when it loads </string>
+    <string name="flows_row_mayCloseAfter" formatted="false">. Fast is the recommended one here.</string>
+    <string name="flows_row_showAll" formatted="false">Show all</string>
+    <string name="flows_row_showLess" formatted="false">Show less</string>
+    <string name="flows_row_keepCompact" formatted="false">Keep Fast</string>
+    <string name="flows_row_useAnyway" formatted="false">Use anyway</string>
+    <string name="flows_row_fitWhy_streaming" formatted="false">Larger than this phone\'s memory</string>
+    <string name="flows_row_fitWhy_thrashing" formatted="false">Needs most of this phone\'s memory</string>
+    <string name="flows_row_fitWhy_insufficient" formatted="false">Not enough free memory on this phone</string>
+    <string name="flows_assistant_sub_compact" formatted="false">Quicker answers, less memory</string>
+    <string name="flows_assistant_sub_default" formatted="false">Better answers, a bit slower</string>
 </resources>

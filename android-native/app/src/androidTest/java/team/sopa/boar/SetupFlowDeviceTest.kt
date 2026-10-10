@@ -20,7 +20,7 @@ import team.sopa.boar.ui.I18n
 
 /**
  * The whole first run, on the throwaway devtest install (its files are emptied first): hardware, the 1.5B
- * model, the real download and indexing, launch, then the PIN offer and a PIN set through it. Needs Wi-Fi and about
+ * model, the Essential package, the real download and indexing, the summary, then the PIN offer and a PIN set through it. Needs Wi-Fi and about
  * 1 GB; it only runs on the devtest install.
  */
 @RunWith(AndroidJUnit4::class)
@@ -49,7 +49,7 @@ class SetupFlowDeviceTest {
         }
     }
 
-    private fun shows(text: String) = runCatching { compose.onNodeWithText(text).assertExists() }.isSuccess // false until a screen exists
+    private fun shows(text: String, substring: Boolean = false) = runCatching { compose.onNodeWithText(text, substring = substring).assertExists() }.isSuccess // false until a screen exists
 
     @Test fun firstRunEndsOnThePinOfferAndSetsAPin() {
         // A first run: this throwaway install's files are emptied before the app starts (nothing else in this process
@@ -59,15 +59,17 @@ class SetupFlowDeviceTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java).also { opened += it }
         val services = BoarServices.get(ctx)
         // The engine and the screen take a moment on a first start.
-        compose.waitUntil(60_000) { shows(t("setupWizard.step1.selectTierButton")) }
+        compose.waitUntil(60_000) { shows(t("flows.onboarding.start"), substring = true) }
 
-        click(t("setupWizard.step1.selectTierButton"))
+        click(t("flows.onboarding.start"), substring = true)
         val compact = services.catalog.answerModels.first { it.id == "qwen2.5-1.5b-instruct-q4km" }
-        click(compact.shortName, substring = true) // the name the setup screen shows
-        click(t("setupWizard.step2.installButton"))
-        // Downloads (verified) and indexing, then the launch button.
-        waitSlowly(30 * 60_000L) { shows(t("setupWizard.step3.launchButton")) }
-        click(t("setupWizard.step3.launchButton"))
+        click(compact.shortName, substring = true) // the name the model step shows
+        click(t("flows.onboarding.continue"), substring = true)
+        click(t("flows.onboarding.package.essential.name"))
+        click(t("flows.onboarding.install").substringBefore("{{"), substring = true) // "Download 1.0 GB  →"
+        // Downloads (verified) and indexing, then the summary and its Open button.
+        waitSlowly(30 * 60_000L) { shows(t("flows.onboarding.doneBody")) }
+        click(t("flows.onboarding.open"))
 
         compose.waitUntil(10_000) { shows(t("native.pin.offerTitle")) }
         click(t("native.pin.offerSet"))
