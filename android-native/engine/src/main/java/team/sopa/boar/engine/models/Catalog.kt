@@ -62,6 +62,8 @@ data class CatalogAsset(
     val description: String,
     val required: Boolean,
     val answerTier: AnswerTier? = null,
+    /** No longer suggested (manifest.ts `hidden`): listed only where it's already on the phone, and it keeps working there. */
+    val hidden: Boolean = false,
     val bundled: Boolean = false,
     val format: String? = null,
     val requires: List<String> = emptyList(),

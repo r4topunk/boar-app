@@ -14,6 +14,7 @@
       "license": "MIT",
       "description": "3.8B dense. Most complete comparisons and syntheses in our device benchmark, but slow (~4 tok/s). ~2.4GB.",
       "required": false,
+      "hidden": true,
       "capabilities": {
         "roles": [
           "general",

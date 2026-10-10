@@ -30,4 +30,9 @@ class CatalogTest {
         val corpus = catalog.corpusCatalog.map { it.id }.toSet()
         catalog.tiers.forEach { t -> t.corpusPackIds.forEach { assertTrue("${t.id}: $it", it in corpus) } }
     }
+
+    @Test fun `Phi-3_5-mini is no longer suggested, and nothing setup needs is hidden`() {
+        assertEquals(listOf("phi-3.5-mini-instruct-q4km"), catalog.models.filter { it.hidden }.map { it.id })
+        (catalog.requiredModels + catalog.answerModels).forEach { assertTrue(it.id, !it.hidden) }
+    }
 }
