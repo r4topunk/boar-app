@@ -100,8 +100,10 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() {
+        // The list itself too: a hidden model drops out once it's removed.
+        val items = sortedItems()
         _state.update { s ->
-            s.copy(activeLlm = services.activeModel()?.id, rows = s.items.associate { a ->
+            s.copy(items = items, activeLlm = services.activeModel()?.id, rows = items.associate { a ->
                 val prev = s.rows[a.id] ?: Row()
                 a.id to prev.copy(present = store.status(a).present)
             })
