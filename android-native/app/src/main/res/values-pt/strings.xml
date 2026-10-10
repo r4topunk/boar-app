@@ -466,8 +466,8 @@
     <string name="flows_onboarding_step2SubOffline" formatted="false">Esta versão não acessa a internet: você importa os arquivos uma vez, e depois tudo funciona offline.</string>
     <string name="flows_onboarding_step3Title" formatted="false">Instalando</string>
     <string name="flows_onboarding_step3Sub" formatted="false">Esta é a única vez que o BOAR usa a internet.</string>
-    <string name="flows_onboarding_indexTitle" formatted="false">Criando o índice</string>
-    <string name="flows_onboarding_indexSub" formatted="false">Montando o índice de busca no celular. Não precisa de internet.</string>
+    <string name="flows_onboarding_indexTitle" formatted="false">Organizando a biblioteca do BOAR</string>
+    <string name="flows_onboarding_indexSub" formatted="false">O BOAR está organizando os artigos dos pacotes de conhecimento para achar tudo rápido. Ele só lê o que acabou de baixar, nunca suas fotos ou arquivos. Não precisa de internet.</string>
     <string name="flows_onboarding_package_essential_name" formatted="false">Essencial</string>
     <string name="flows_onboarding_package_essential_body" formatted="false">Modelos de resposta e de busca, mais coleções básicas da Wikipédia.</string>
     <string name="flows_onboarding_package_encyclopedia_name" formatted="false">Enciclopédia</string>
@@ -514,11 +514,11 @@
     <string name="flows_onboarding_workingMemory" formatted="false">precisa de ~{{size}} de memória</string>
     <string name="flows_onboarding_currentItem" formatted="false">Item {{n}} de {{total}} — {{name}}</string>
     <string name="flows_onboarding_keepOpenTitle" formatted="false">Melhor com o BOAR aberto</string>
-    <string name="flows_onboarding_keepOpenIndex" formatted="false">O índice de busca é feito neste celular. Se você sair, ele pausa e continua de onde parou quando você voltar.</string>
+    <string name="flows_onboarding_keepOpenIndex" formatted="false">O BOAR está organizando os próprios artigos. Se você sair, ele pausa e continua de onde parou quando você voltar.</string>
     <string name="flows_onboarding_stage_start" formatted="false">Início</string>
     <string name="flows_onboarding_stage_choose" formatted="false">Escolha</string>
     <string name="flows_onboarding_stage_install" formatted="false">Instalar</string>
-    <string name="flows_onboarding_stage_index" formatted="false">Índice</string>
+    <string name="flows_onboarding_stage_index" formatted="false">Biblioteca</string>
     <string name="flows_onboarding_stage_model" formatted="false">Modelo</string>
     <string name="flows_onboarding_stage_knowledge" formatted="false">Conhecimento</string>
     <string name="flows_onboarding_stage_download" formatted="false">Download</string>
@@ -527,13 +527,13 @@
     <string name="flows_onboarding_failedShort" formatted="false">Falhou</string>
     <string name="flows_onboarding_downloadingLine" formatted="false">{{pct}}% · {{done}} de {{total}}</string>
     <string name="flows_onboarding_ready" formatted="false">Pronto</string>
-    <string name="flows_onboarding_indexRow" formatted="false">Índice de busca no celular</string>
+    <string name="flows_onboarding_indexRow" formatted="false">Organizando os pacotes de conhecimento</string>
     <string name="flows_onboarding_waitingDownloads" formatted="false">Começa quando todos os arquivos estiverem no celular</string>
     <string name="flows_onboarding_indexStarting" formatted="false">Começando</string>
-    <string name="flows_onboarding_indexCounter" formatted="false">{{done}} de {{total}} artigos</string>
+    <string name="flows_onboarding_indexCounter" formatted="false">{{done}} de {{total}} artigos do BOAR</string>
     <string name="flows_onboarding_minutesLeft_one" formatted="false">falta cerca de {{count}} min</string>
     <string name="flows_onboarding_minutesLeft_other" formatted="false">faltam cerca de {{count}} min</string>
-    <string name="flows_onboarding_indexFailed" formatted="false">A criação do índice falhou</string>
+    <string name="flows_onboarding_indexFailed" formatted="false">A organização da biblioteca falhou</string>
     <string name="flows_onboarding_downloadFailed" formatted="false">Um download falhou</string>
     <string name="flows_onboarding_restart" formatted="false">Baixar de novo</string>
     <string name="flows_onboarding_restartHint" formatted="false">Os downloads pararam de avançar?</string>
@@ -546,9 +546,9 @@
     <string name="flows_onboarding_doneCollections_one" formatted="false">{{value}} coleção</string>
     <string name="flows_onboarding_doneCollections_other" formatted="false">{{value}} coleções</string>
     <string name="flows_onboarding_donePlaces" formatted="false">Lugares</string>
-    <string name="flows_onboarding_doneIndex" formatted="false">Índice de busca</string>
-    <string name="flows_onboarding_doneArticles_one" formatted="false">{{value}} artigo</string>
-    <string name="flows_onboarding_doneArticles_other" formatted="false">{{value}} artigos</string>
+    <string name="flows_onboarding_doneIndex" formatted="false">Biblioteca</string>
+    <string name="flows_onboarding_doneArticles_one" formatted="false">{{value}} artigo pronto para busca</string>
+    <string name="flows_onboarding_doneArticles_other" formatted="false">{{value}} artigos prontos para busca</string>
     <string name="flows_onboarding_doneAnnounce" formatted="false">Configuração concluída. O BOAR está pronto.</string>
     <string name="flows_onboarding_open" formatted="false">Abrir o BOAR</string>
     <string name="flows_onboarding_languageAnnounce" formatted="false">Idioma: Português</string>
@@ -565,7 +565,7 @@
     <string name="flows_onboarding_answerTier_compact" formatted="false">Rápido</string>
     <string name="flows_onboarding_compactLowRam" formatted="false">Este celular tem {{ram}} de memória ou menos, por isso o Rápido está selecionado. Você ainda pode escolher o Mais preciso.</string>
     <string name="flows_onboarding_canLeaveTitle" formatted="false">Pode sair do BOAR</string>
-    <string name="flows_onboarding_indexReading" formatted="false">Lendo: {{title}}</string>
+    <string name="flows_onboarding_indexReading" formatted="false">Arquivando: {{title}}</string>
     <string name="flows_onboarding_loadingLines_l1" formatted="false">Alimentando o javali…</string>
     <string name="flows_onboarding_loadingLines_l2" formatted="false">O javali parou para farejar uma trufa…</string>
     <string name="flows_onboarding_loadingLines_l3" formatted="false">Afiando as presas…</string>

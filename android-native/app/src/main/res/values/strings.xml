@@ -467,8 +467,8 @@
     <string name="flows_onboarding_step2SubOffline" formatted="false">This version has no internet access: you import the files once, and then everything works offline.</string>
     <string name="flows_onboarding_step3Title" formatted="false">Installing</string>
     <string name="flows_onboarding_step3Sub" formatted="false">This is the only time BOAR uses the internet.</string>
-    <string name="flows_onboarding_indexTitle" formatted="false">Indexing</string>
-    <string name="flows_onboarding_indexSub" formatted="false">Building the search index on the phone. No internet needed.</string>
+    <string name="flows_onboarding_indexTitle" formatted="false">Organizing BOAR’s library</string>
+    <string name="flows_onboarding_indexSub" formatted="false">BOAR is sorting the articles in its knowledge packs so it can find them fast. It only reads what it just downloaded, never your photos or files. No internet needed.</string>
     <string name="flows_onboarding_package_essential_name" formatted="false">Essential</string>
     <string name="flows_onboarding_package_essential_body" formatted="false">Answer and search models, plus core Wikipedia collections.</string>
     <string name="flows_onboarding_package_encyclopedia_name" formatted="false">Encyclopedia</string>
@@ -515,11 +515,11 @@
     <string name="flows_onboarding_workingMemory" formatted="false">needs ~{{size}} of memory</string>
     <string name="flows_onboarding_currentItem" formatted="false">Item {{n}} of {{total}} — {{name}}</string>
     <string name="flows_onboarding_keepOpenTitle" formatted="false">Best with BOAR open</string>
-    <string name="flows_onboarding_keepOpenIndex" formatted="false">The search index is built on this phone. If you leave, it pauses and picks up where it stopped when you come back.</string>
+    <string name="flows_onboarding_keepOpenIndex" formatted="false">BOAR is organizing its own articles. If you leave, it pauses and picks up where it stopped when you come back.</string>
     <string name="flows_onboarding_stage_start" formatted="false">Start</string>
     <string name="flows_onboarding_stage_choose" formatted="false">Choose</string>
     <string name="flows_onboarding_stage_install" formatted="false">Install</string>
-    <string name="flows_onboarding_stage_index" formatted="false">Index</string>
+    <string name="flows_onboarding_stage_index" formatted="false">Library</string>
     <string name="flows_onboarding_stage_model" formatted="false">Model</string>
     <string name="flows_onboarding_stage_knowledge" formatted="false">Knowledge</string>
     <string name="flows_onboarding_stage_download" formatted="false">Download</string>
@@ -528,13 +528,13 @@
     <string name="flows_onboarding_failedShort" formatted="false">Failed</string>
     <string name="flows_onboarding_downloadingLine" formatted="false">{{pct}}% · {{done}} of {{total}}</string>
     <string name="flows_onboarding_ready" formatted="false">Ready</string>
-    <string name="flows_onboarding_indexRow" formatted="false">Search index on the phone</string>
+    <string name="flows_onboarding_indexRow" formatted="false">Organizing the knowledge packs</string>
     <string name="flows_onboarding_waitingDownloads" formatted="false">Starts when every file is on the phone</string>
     <string name="flows_onboarding_indexStarting" formatted="false">Starting</string>
-    <string name="flows_onboarding_indexCounter" formatted="false">{{done}} of {{total}} articles</string>
+    <string name="flows_onboarding_indexCounter" formatted="false">{{done}} of {{total}} BOAR articles</string>
     <string name="flows_onboarding_minutesLeft_one" formatted="false">about {{count}} min left</string>
     <string name="flows_onboarding_minutesLeft_other" formatted="false">about {{count}} min left</string>
-    <string name="flows_onboarding_indexFailed" formatted="false">Building the index failed</string>
+    <string name="flows_onboarding_indexFailed" formatted="false">Organizing the library failed</string>
     <string name="flows_onboarding_downloadFailed" formatted="false">A download failed</string>
     <string name="flows_onboarding_restart" formatted="false">Restart downloads</string>
     <string name="flows_onboarding_restartHint" formatted="false">Downloads not moving?</string>
@@ -547,9 +547,9 @@
     <string name="flows_onboarding_doneCollections_one" formatted="false">{{value}} collection</string>
     <string name="flows_onboarding_doneCollections_other" formatted="false">{{value}} collections</string>
     <string name="flows_onboarding_donePlaces" formatted="false">Places</string>
-    <string name="flows_onboarding_doneIndex" formatted="false">Search index</string>
-    <string name="flows_onboarding_doneArticles_one" formatted="false">{{value}} article</string>
-    <string name="flows_onboarding_doneArticles_other" formatted="false">{{value}} articles</string>
+    <string name="flows_onboarding_doneIndex" formatted="false">Library</string>
+    <string name="flows_onboarding_doneArticles_one" formatted="false">{{value}} article ready to search</string>
+    <string name="flows_onboarding_doneArticles_other" formatted="false">{{value}} articles ready to search</string>
     <string name="flows_onboarding_doneAnnounce" formatted="false">Setup finished. BOAR is ready.</string>
     <string name="flows_onboarding_open" formatted="false">Open BOAR</string>
     <string name="flows_onboarding_languageAnnounce" formatted="false">Language: English</string>
@@ -566,7 +566,7 @@
     <string name="flows_onboarding_answerTier_compact" formatted="false">Fast</string>
     <string name="flows_onboarding_compactLowRam" formatted="false">This phone has {{ram}} of memory or less, so Fast is selected. You can still choose More accurate.</string>
     <string name="flows_onboarding_canLeaveTitle" formatted="false">You can leave BOAR</string>
-    <string name="flows_onboarding_indexReading" formatted="false">Reading: {{title}}</string>
+    <string name="flows_onboarding_indexReading" formatted="false">Filing: {{title}}</string>
     <string name="flows_onboarding_loadingLines_l1" formatted="false">Feeding the boar…</string>
     <string name="flows_onboarding_loadingLines_l2" formatted="false">The boar stopped to sniff a truffle…</string>
     <string name="flows_onboarding_loadingLines_l3" formatted="false">Sharpening the tusks…</string>
