@@ -7,6 +7,8 @@ plugins {
 android {
     namespace = "team.sopa.boar"
     compileSdk = 36
+    // The NDK's strip tool for the engine's libraries: without it they ship with their debug symbols (77 MB libllama-common).
+    ndkVersion = "27.1.12297006"
 
     defaultConfig {
         // The release keeps the Expo app's id and key, so it installs over v1.1.x with its models.
@@ -17,6 +19,17 @@ android {
         versionName = "2.0.0-dev"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
+    // The Expo app's upload key, named in ~/.gradle/gradle.properties (never in the repo), as plugins/withReleaseSigning.js
+    // reads it. Without it the release is debug-signed, which can't install over a store or release build of BOAR.
+    val storeFile = providers.gradleProperty("BOAR_UPLOAD_STORE_FILE").orNull
+    signingConfigs {
+        if (storeFile != null) create("release") {
+            this.storeFile = file(storeFile)
+            storePassword = providers.gradleProperty("BOAR_UPLOAD_STORE_PASSWORD").get()
+            keyAlias = providers.gradleProperty("BOAR_UPLOAD_KEY_ALIAS").get()
+            keyPassword = providers.gradleProperty("BOAR_UPLOAD_KEY_PASSWORD").get()
+        }
+    }
     buildTypes {
         debug {
             // Development builds install beside the current BOAR, never over it.
@@ -25,6 +38,7 @@ android {
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
