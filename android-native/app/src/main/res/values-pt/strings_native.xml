@@ -78,4 +78,26 @@
     <string name="native_settings_pinChange" formatted="false">Trocar o PIN</string>
     <string name="native_settings_pinRemove" formatted="false">Remover o PIN</string>
     <string name="native_settings_clearChatsDone" formatted="false">Histórico de conversas apagado.</string>
+    <string name="native_settings_openCatalog" formatted="false">Abrir o catálogo de modelos</string>
+    <string name="native_settings_openDocuments" formatted="false">Abrir Meus documentos</string>
+    <string name="native_settings_activeModel" formatted="false">Respondendo com: {{model}}</string>
+    <string name="native_settings_installedCount" formatted="false">{{count}} instalados</string>
+    <string name="native_settings_packsInstalled" formatted="false">Pacotes de conhecimento no celular: {{packs}}</string>
+    <string name="native_settings_noPacks" formatted="false">Nenhum pacote ainda: só a biblioteca embutida.</string>
+    <string name="native_settings_documents" formatted="false">Seus documentos: {{count}} coleções</string>
+    <string name="native_telemetry_device" formatted="false">Aparelho</string>
+    <string name="native_telemetry_chip" formatted="false">Chip</string>
+    <string name="native_telemetry_cores" formatted="false">Núcleos</string>
+    <string name="native_telemetry_ram" formatted="false">RAM</string>
+    <string name="native_telemetry_features" formatted="false">Recursos de CPU para o llama.cpp</string>
+    <string name="native_telemetry_build" formatted="false">Build de CPU do motor</string>
+    <string name="native_telemetry_appMemory" formatted="false">Memória do app agora</string>
+    <string name="native_telemetry_storage" formatted="false">Armazenamento do BOAR</string>
+    <string name="native_telemetry_chats" formatted="false">Conversas salvas</string>
+    <string name="native_telemetry_evals" formatted="false">Avaliações neste celular</string>
+    <string name="native_telemetry_lastEval" formatted="false">Última avaliação</string>
+    <string name="native_telemetry_lastEvalValue" formatted="false">{{ok}}/{{n}} respondidas · mediana {{tps}} tok/s · {{date}}</string>
+    <string name="native_telemetry_none" formatted="false">nenhuma ainda</string>
+    <string name="native_telemetry_note" formatted="false">Nada daqui sai do celular. Resultados só são compartilhados pela tela de Avaliação, depois de você ver o que vai.</string>
+    <string name="native_voice_onDevice" formatted="false">Reconhecimento de fala no aparelho (o áudio fica no celular)</string>
 </resources>

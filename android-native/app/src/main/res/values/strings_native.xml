@@ -78,4 +78,26 @@
     <string name="native_settings_pinChange" formatted="false">Change PIN</string>
     <string name="native_settings_pinRemove" formatted="false">Remove PIN</string>
     <string name="native_settings_clearChatsDone" formatted="false">Chat history cleared.</string>
+    <string name="native_settings_openCatalog" formatted="false">Open the model catalog</string>
+    <string name="native_settings_openDocuments" formatted="false">Open My Documents</string>
+    <string name="native_settings_activeModel" formatted="false">Answering with: {{model}}</string>
+    <string name="native_settings_installedCount" formatted="false">{{count}} installed</string>
+    <string name="native_settings_packsInstalled" formatted="false">Knowledge packs on this phone: {{packs}}</string>
+    <string name="native_settings_noPacks" formatted="false">No knowledge packs yet: the built-in library only.</string>
+    <string name="native_settings_documents" formatted="false">Your documents: {{count}} collections</string>
+    <string name="native_telemetry_device" formatted="false">Device</string>
+    <string name="native_telemetry_chip" formatted="false">Chip</string>
+    <string name="native_telemetry_cores" formatted="false">Cores</string>
+    <string name="native_telemetry_ram" formatted="false">RAM</string>
+    <string name="native_telemetry_features" formatted="false">CPU features for llama.cpp</string>
+    <string name="native_telemetry_build" formatted="false">Engine CPU build</string>
+    <string name="native_telemetry_appMemory" formatted="false">App memory now</string>
+    <string name="native_telemetry_storage" formatted="false">BOAR\'s storage</string>
+    <string name="native_telemetry_chats" formatted="false">Chats saved</string>
+    <string name="native_telemetry_evals" formatted="false">Evaluation runs on this phone</string>
+    <string name="native_telemetry_lastEval" formatted="false">Last evaluation</string>
+    <string name="native_telemetry_lastEvalValue" formatted="false">{{ok}}/{{n}} answered · median {{tps}} tok/s · {{date}}</string>
+    <string name="native_telemetry_none" formatted="false">none yet</string>
+    <string name="native_telemetry_note" formatted="false">Nothing here leaves the phone. Results are shared only from the Evaluation screen, after you see what\'s sent.</string>
+    <string name="native_voice_onDevice" formatted="false">On-device speech recognizer (audio stays on the phone)</string>
 </resources>

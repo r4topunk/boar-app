@@ -66,6 +66,7 @@ fun ModelsScreen(state: ModelsState, vm: ModelsViewModel, onBack: () -> Unit) {
                 val active = if (a.kind == AssetKind.LLM) a.id == state.activeLlm else state.rows[a.id]?.present == true
                 CatalogCard(a, state.rows[a.id], active, state.totalRamBytes, state.activating == a.id, state.activating != null, vm)
             }
+            item { HfSearch(state, vm) }
         }
     }
 }
@@ -179,6 +180,48 @@ private fun CatalogCard(item: CatalogAsset, row: AssetRow?, active: Boolean, ram
         dismissButton = { TextButton({ confirm = false }) { Text(t("common.cancel")) } },
         containerColor = c.bgCard, titleContentColor = c.textHeading, textContentColor = c.textSecondary,
     )
+}
+
+/** ModelBrowser.tsx: search Hugging Face for GGUF repos, list a repo's files, add one to the list above. */
+@Composable
+private fun HfSearch(state: ModelsState, vm: ModelsViewModel) {
+    val c = Boar.colors
+    var query by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(t("modelSetupScreen.discoverHfModels"), style = Boar.type.titleSm, color = c.textHeading)
+        Text(t("modelBrowser.hint"), style = Boar.type.subtext, color = c.textSecondary)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            androidx.compose.foundation.text.BasicTextField(query, { query = it }, singleLine = true,
+                textStyle = Boar.type.body.copy(color = c.textPrimary), cursorBrush = androidx.compose.ui.graphics.SolidColor(c.textAccentEmerald),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { vm.hfSearch(query) }),
+                modifier = Modifier.weight(1f).background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(12.dp),
+                decorationBox = { inner -> if (query.isEmpty()) Text(t("modelBrowser.searchPlaceholder"), style = Boar.type.body, color = c.textDim); inner() })
+            SmallButton("🔍", enabled = !state.hfBusy && query.isNotBlank()) { vm.hfSearch(query) }
+        }
+        if (state.hfBusy) Busy("…")
+        state.hfError?.let { Text(it, style = Boar.type.subtext, color = c.crimson400) }
+        state.hfAdded?.let { Text(t("modelBrowser.addedMessage", "label" to it), style = Boar.type.subtext, color = c.textAccentEmerald) }
+        state.hfResults.forEach { r ->
+            Column(Modifier.fillMaxWidth().background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).clickable { vm.hfOpen(r.id) }.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(r.id, style = Boar.type.body, color = c.textHeading, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Text(t("modelBrowser.downloadsLikes", "downloads" to (r.downloads ?: 0), "likes" to (r.likes ?: 0)), style = Boar.type.micro, color = c.textDim)
+                if (state.hfOpenRepo == r.id) {
+                    if (!state.hfBusy && state.hfFiles.isEmpty()) Text(t("modelBrowser.noGgufFiles"), style = Boar.type.subtext, color = c.textMuted)
+                    state.hfFiles.forEach { f ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text(f.filename, style = Boar.type.subtext, color = c.textPrimary)
+                                Text(formatMB(f.sizeBytes) + if (f.sha256 == null) " · " + t("modelBrowser.noChecksum") else "", style = Boar.type.micro, color = c.textDim)
+                            }
+                            SmallButton(t("modelBrowser.addButton")) { vm.hfAdd(r.id, f) }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

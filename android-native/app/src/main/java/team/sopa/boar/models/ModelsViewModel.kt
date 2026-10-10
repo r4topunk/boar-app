@@ -36,20 +36,58 @@ data class ModelsState(
     val activating: String? = null,
     val totalRamBytes: Long = 0,
     val toast: String? = null,
+    /** The Hugging Face search (ModelBrowser.tsx). */
+    val hfResults: List<HfBrowser.Repo> = emptyList(),
+    val hfOpenRepo: String? = null,
+    val hfFiles: List<HfBrowser.GgufFile> = emptyList(),
+    val hfBusy: Boolean = false,
+    val hfError: String? = null,
+    val hfAdded: String? = null,
 )
 
 /** The models and knowledge catalog (port of ModelCatalogScreen.tsx): download, use, remove. */
 class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     private val services = BoarServices.get(app)
-    private val store = AssetStore(app.filesDir, services.catalog)
+    private var store = AssetStore(app.filesDir, services.catalog)
     private val _state = MutableStateFlow(ModelsState())
     val state: StateFlow<ModelsState> = _state
 
     init {
         val ram = runCatching { ActivityManager.MemoryInfo().also { app.getSystemService(ActivityManager::class.java).getMemoryInfo(it) }.totalMem }.getOrDefault(0L)
         // Answer models first, then the embedding model, then knowledge, as the catalog lists them.
-        val items = services.catalog.models.sortedBy { when (it.kind) { AssetKind.LLM -> 0; AssetKind.EMBEDDING -> 1; AssetKind.CORPUS -> 2 } }
-        _state.update { it.copy(items = items, totalRamBytes = ram) }
+        _state.update { it.copy(items = sortedItems(), totalRamBytes = ram) }
+        refresh()
+    }
+
+    // Answer models first (curated, then discovered), then the embedding model, then knowledge, as the catalog lists them.
+    private fun sortedItems() = services.catalog.models.sortedBy { when (it.kind) { AssetKind.LLM -> 0; AssetKind.EMBEDDING -> 1; AssetKind.CORPUS -> 2 } }
+
+    fun hfSearch(query: String) {
+        if (query.isBlank() || _state.value.hfBusy) return
+        _state.update { it.copy(hfBusy = true, hfError = null, hfOpenRepo = null, hfFiles = emptyList(), hfAdded = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { HfBrowser.search(query.trim()) }
+                .onSuccess { r -> _state.update { it.copy(hfResults = r, hfBusy = false) } }
+                .onFailure { e -> _state.update { it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
+        }
+    }
+
+    fun hfOpen(repo: String) {
+        if (_state.value.hfOpenRepo == repo) { _state.update { it.copy(hfOpenRepo = null, hfFiles = emptyList()) }; return }
+        _state.update { it.copy(hfBusy = true, hfError = null, hfOpenRepo = repo, hfFiles = emptyList()) }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { HfBrowser.files(repo) }
+                .onSuccess { f -> _state.update { it.copy(hfFiles = f, hfBusy = false) } }
+                .onFailure { e -> _state.update { it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
+        }
+    }
+
+    /** Adds the file to the list above as a downloadable model (not downloaded yet). */
+    fun hfAdd(repo: String, f: HfBrowser.GgufFile) {
+        val asset = HfBrowser.toAsset(repo, f)
+        services.addDiscovered(asset)
+        store = AssetStore(getApplication<Application>().filesDir, services.catalog)
+        _state.update { it.copy(items = sortedItems(), hfAdded = asset.label) }
         refresh()
     }
 

@@ -49,7 +49,18 @@ class SettingsDeviceTest {
                 override fun setFontScale(scale: String) {}
                 override fun setLanguage(id: String?) {}
             }
-            compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = { pinFlow = it }, onSetup = { setupAgain = true }) {} } }
+            var opened by mutableStateOf<String?>(null)
+        compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = { pinFlow = it }, onSetup = { setupAgain = true }, onOpen = { opened = it }) {} } }
+
+        // The sections brought back from the Expo app.
+        click(t("native.settings.openCatalog")); assertEquals("models", opened)
+        click(t("native.settings.openDocuments")); assertEquals("documents", opened)
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("native.telemetry.chip")))
+        compose.onNodeWithText(t("native.telemetry.chip")).assertExists()
+        compose.onNodeWithText(t("native.telemetry.note")).assertExists()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("voiceSettings.enabledLabel")))
+        compose.onNodeWithText(t("voiceSettings.speechEngineLabel")).assertExists()
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("interfaceSettings.hapticFeedbackLabel")))
     
             // Security: no PIN on this install, so it offers one.
             compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("native.settings.security")))

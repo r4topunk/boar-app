@@ -169,7 +169,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
     }
     if (screen == "settings") {
         BackHandler { vm.refreshSettings(); screen = "chat" }
-        SettingsScreen(services, prefs, onPin = { flow -> screen = "pin:$flow:settings" }, onSetup = { setup.restart(); screen = "setup" }) { vm.refreshSettings(); screen = "chat" }
+        SettingsScreen(services, prefs, onPin = { flow -> screen = "pin:$flow:settings" }, onSetup = { setup.restart(); screen = "setup" }, onOpen = { screen = it }) { vm.refreshSettings(); screen = "chat" }
         return
     }
     val drawer = rememberDrawerState(DrawerValue.Closed)
@@ -215,6 +215,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
             onDismissCrash = vm::dismissLoadCrash,
             onReused = { vm.showToast("chatScreen.messageReused") },
             onToastHidden = vm::hideToast,
+            voiceEnabled = services.settings.voiceInputEnabled,
         )
     }
 }

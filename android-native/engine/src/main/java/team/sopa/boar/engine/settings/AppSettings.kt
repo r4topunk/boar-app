@@ -62,6 +62,7 @@ class AppSettings(private val file: File) {
     var themeId: String? get() = str("themeId"); set(v) = set("themeId", v?.let(::JsonPrimitive))
     var fontScale: String get() = str("fontScale") ?: "standard"; set(v) = set("fontScale", JsonPrimitive(v))
     var languageId: String? get() = str("languageId"); set(v) = set("languageId", v?.let(::JsonPrimitive))
+    var voiceInputEnabled: Boolean get() = bool("voiceInputEnabled") ?: true; set(v) = set("voiceInputEnabled", JsonPrimitive(v))
     var hapticsEnabled: Boolean get() = bool("hapticsEnabled") ?: true; set(v) = set("hapticsEnabled", JsonPrimitive(v))
     var hidePromptIdeas: Boolean get() = bool("hidePromptIdeas") ?: false; set(v) = set("hidePromptIdeas", JsonPrimitive(v))
     var showLiveStats: Boolean get() = bool("showLiveStats") ?: false; set(v) = set("showLiveStats", JsonPrimitive(v))

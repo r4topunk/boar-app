@@ -37,7 +37,40 @@ import java.io.File
 class BoarServices private constructor(private val context: Context) {
     private val files = context.filesDir
     val settings = AppSettings(File(files, "settings.json"))
-    val catalog: Catalog = Catalog.parse(asset("boar-data/catalog.json"))
+    private val baseCatalog: Catalog = Catalog.parse(asset("boar-data/catalog.json"))
+    private val discoveredFile = File(files, "discovered_models.json")
+    private val discoveredJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    /**
+     * Models added from the Hugging Face search (discoveredModels.ts, same file as the Expo app): not vetted, so kept
+     * apart from the built-in catalog and listed after it.
+     */
+    fun discovered(): List<CatalogAsset> = runCatching {
+        discoveredJson.decodeFromString(kotlinx.serialization.builtins.ListSerializer(CatalogAsset.serializer()), discoveredFile.readText())
+    }.getOrDefault(emptyList())
+
+    private fun writeDiscovered(list: List<CatalogAsset>) =
+        discoveredFile.writeText(discoveredJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(CatalogAsset.serializer()), list))
+
+    /** The built-in catalog plus the discovered models (a search result already in the catalog isn't listed twice). */
+    @Volatile var catalog: Catalog = withDiscovered()
+        private set
+
+    private fun withDiscovered(): Catalog {
+        val extra = discovered().filter { d -> baseCatalog.models.none { it.filename == d.filename } }
+        return baseCatalog.copy(models = baseCatalog.models + extra)
+    }
+
+    fun addDiscovered(asset: CatalogAsset) = synchronized(this) {
+        val all = discovered()
+        if (all.none { it.id == asset.id }) writeDiscovered(all + asset)
+        catalog = withDiscovered()
+    }
+
+    fun removeDiscovered(id: String) = synchronized(this) {
+        writeDiscovered(discovered().filter { it.id != id })
+        catalog = withDiscovered()
+    }
     /**
      * The answer styles. The native app starts on Detailed (the Expo app on Succinct); a style the user picked is kept.
      * The evaluation runner keeps the shared default, so its runs compare with the Expo app's.

@@ -57,7 +57,7 @@ interface DisplayPrefs {
  * plus Advanced tweaks: every engine knob, Auto by default.
  */
 @Composable
-fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) -> Unit, onSetup: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) -> Unit, onSetup: () -> Unit, onOpen: (String) -> Unit = {}, onBack: () -> Unit) {
     val c = Boar.colors
     val s = services.settings
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding()) {
@@ -67,6 +67,8 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) 
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ToneSection(services)
+            ModelsSection(services, onOpen)
+            KnowledgeSection(services, onOpen)
             SecuritySection(services, onPin)
             Section(t("modelSetupScreen.sections.memory")) {
                 var auto by remember { mutableStateOf(s.autoSummarize) }
@@ -84,14 +86,105 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) 
                 Choices(null, ThemeTokens.all.map { it.id to "${it.icon} ${it.name}" }, theme) { theme = it; s.themeId = it; prefs.setTheme(it) }
                 var scale by remember { mutableStateOf(s.fontScale) }
                 Choices(t("native.settings.textSize"), listOf("compact", "standard", "large").map { it to t("native.settings.$it") }, scale) { scale = it; s.fontScale = it; prefs.setFontScale(it) }
+                var haptics by remember { mutableStateOf(s.hapticsEnabled) }
+                SwitchRow(t("interfaceSettings.hapticFeedbackLabel"), t("interfaceSettings.hapticFeedbackValue"), haptics) { haptics = it; s.hapticsEnabled = it }
             }
             Section(t("modelSetupScreen.sections.language")) {
                 var lang by remember { mutableStateOf(s.languageId ?: "system") }
                 Choices(null, listOf("system" to "System", "en" to "English", "pt" to "Português"), lang) { lang = it; val id = it.takeIf { v -> v != "system" }; s.languageId = id; prefs.setLanguage(id) }
             }
+            TelemetrySection(services)
+            VoiceSection(services)
             TweaksSection(services)
             RecoverySection(onSetup)
         }
+    }
+}
+
+/** ModelSetupScreen.tsx's Reasoning Models: what answers now, and the catalog (download, use, remove, Hugging Face search). */
+@Composable
+private fun ModelsSection(services: BoarServices, onOpen: (String) -> Unit) {
+    val c = Boar.colors
+    Section(t("modelSetupScreen.sections.models")) {
+        val llms = services.installed(team.sopa.boar.engine.models.AssetKind.LLM)
+        Text(t("native.settings.activeModel", "model" to (services.answerModel()?.shortName ?: "—")), style = Boar.type.body, color = c.textPrimary)
+        Text(t("modelSetupScreen.installedModels") + ": " + llms.joinToString(", ") { it.shortName }.ifEmpty { "—" }, style = Boar.type.subtext, color = c.textSecondary)
+        LinkButton(t("native.settings.openCatalog")) { onOpen("models") }
+    }
+}
+
+/** CorpusSettingsTab.tsx: the knowledge packs on the phone and your documents. */
+@Composable
+private fun KnowledgeSection(services: BoarServices, onOpen: (String) -> Unit) {
+    val c = Boar.colors
+    Section(t("modelSetupScreen.sections.knowledgeBase")) {
+        val packs = services.catalog.corpusCatalog.filter { services.fileOf(it).isFile }
+        Text(if (packs.isEmpty()) t("native.settings.noPacks") else t("native.settings.packsInstalled", "packs" to packs.joinToString(", ") { it.shortName }),
+            style = Boar.type.subtext, color = c.textSecondary)
+        LinkButton(t("corpusSettingsTab.downloadablePacks")) { onOpen("models") }
+        Text(t("native.settings.documents", "count" to services.knowledgeBase.collections().size), style = Boar.type.subtext, color = c.textSecondary)
+        LinkButton(t("native.settings.openDocuments")) { onOpen("documents") }
+    }
+}
+
+/** UsageStatsContent / SystemMonitor: this phone's hardware, what BOAR uses now, and the evaluations it ran. Read only. */
+@Composable
+private fun TelemetrySection(services: BoarServices) {
+    val c = Boar.colors
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val sharing = remember { team.sopa.boar.share.ResultsSharing(ctx, services.settings) }
+    val d = remember { sharing.device() }
+    val rssAnon = remember { runCatching { java.io.File("/proc/self/status").readLines().first { it.startsWith("RssAnon:") }.split(Regex("\\s+"))[1].toLong() * 1024 }.getOrDefault(0L) }
+    val storage = remember { services.storageUsedBytes() }
+    val evals = remember {
+        java.io.File(ctx.filesDir, "eval").listFiles { f -> f.name.endsWith(".jsonl") }.orEmpty().sortedBy { it.lastModified() }
+    }
+    val last = remember(evals) {
+        evals.lastOrNull()?.let { f ->
+            val rows = f.readLines().filter { it.isNotBlank() }.mapNotNull { runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) as kotlinx.serialization.json.JsonObject }.getOrNull() }
+            val tps = rows.mapNotNull { (it["tokPerSec"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() }.sorted()
+            val ok = rows.count { (it["outcome"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "success" }
+            team.sopa.boar.ui.I18n.t(ctx, "native.telemetry.lastEvalValue", "ok" to ok, "n" to rows.size, "tps" to (if (tps.isEmpty()) "—" else String.format(java.util.Locale.US, "%.1f", tps[tps.size / 2])),
+                "date" to java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(f.lastModified())))
+        } ?: team.sopa.boar.ui.I18n.t(ctx, "native.telemetry.none")
+    }
+    fun gb(b: Long) = String.format(java.util.Locale.US, "%.1f GB", b / 1073741824.0)
+    Section(t("modelSetupScreen.sections.telemetry")) {
+        val inf = d.cpuFeatures.orEmpty()
+        listOf(
+            t("native.telemetry.device") to listOfNotNull(d.brand, d.model).joinToString(" ") + " · Android ${d.osVersion}",
+            t("native.telemetry.chip") to (team.sopa.boar.engine.eval.ShareResults.describeChipset(d) ?: "—"),
+            t("native.telemetry.cores") to (team.sopa.boar.engine.eval.ShareResults.describeCores(d.coreMaxFreqKHz) ?: "${d.cpuCores ?: "—"}"),
+            t("native.telemetry.ram") to (d.ramBytes?.let(::gb) ?: "—"),
+            t("native.telemetry.features") to listOf("dotprod" to "asimddp", "i8mm" to "i8mm", "SVE" to "sve", "SME" to "sme").joinToString(" · ") { (n, f) -> (if (f in inf) "✓ " else "✗ ") + n },
+            t("native.telemetry.build") to (team.sopa.boar.engine.BoarEngine.loadedVariant ?: "—"),
+            t("native.telemetry.appMemory") to gb(rssAnon),
+            t("native.telemetry.storage") to gb(storage),
+            t("native.telemetry.chats") to "${services.chats.listSessions().size}",
+            t("native.telemetry.evals") to "${evals.size}",
+            t("native.telemetry.lastEval") to last,
+        ).forEach { (k, v) ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(k, style = Boar.type.subtext, color = c.textMuted, modifier = Modifier.weight(0.45f))
+                Text(v, style = Boar.type["mono.xs"], color = c.textPrimary, modifier = Modifier.weight(0.55f))
+            }
+        }
+        Text(t("native.telemetry.note"), style = Boar.type.micro, color = c.textDim)
+    }
+}
+
+/** VoiceSettings.tsx: the mic in the chat, and whether this phone has an on-device recognizer. */
+@Composable
+private fun VoiceSection(services: BoarServices) {
+    val c = Boar.colors
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val available = remember { team.sopa.boar.voice.VoiceInput.available(ctx) }
+    Section(t("modelSetupScreen.sections.voice")) {
+        var on by remember { mutableStateOf(services.settings.voiceInputEnabled) }
+        SwitchRow(t("voiceSettings.enabledLabel"), t("voiceSettings.enabledValue"), on) { on = it; services.settings.voiceInputEnabled = it }
+        Text(t("voiceSettings.speechEngineLabel"), style = Boar.type.subtext, color = c.textMuted)
+        Text(if (available) t("native.voice.onDevice") else t("voiceSettings.unavailable"), style = Boar.type.body, color = if (available) c.textAccentEmerald else c.textSecondary)
+        if (!available) Text(t("voiceSettings.unavailableNote"), style = Boar.type.micro, color = c.textDim)
     }
 }
 

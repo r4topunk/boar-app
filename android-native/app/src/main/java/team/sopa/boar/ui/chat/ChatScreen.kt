@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,6 +85,7 @@ fun ChatScreen(
     onDismissCrash: () -> Unit = {},
     onReused: () -> Unit = {},
     onToastHidden: () -> Unit = {},
+    voiceEnabled: Boolean = false,
 ) {
     val c = Boar.colors
     val list = rememberLazyListState()
@@ -112,7 +114,7 @@ fun ChatScreen(
                     items(state.messages, key = { it.id }) { m -> Bubble(m, state, onRate, onReuse = { input = it; onReused() }) }
                 }
             }
-            InputBar(input, { input = it }, state.answeringId != null, onSend = { onSend(input); input = "" }, onStop)
+            InputBar(input, { input = it }, state.answeringId != null, onSend = { onSend(input); input = "" }, onStop, voiceEnabled)
         }
     }
     state.toast?.let { Toast(it, onToastHidden) }
@@ -237,6 +239,36 @@ private fun CrashBanner(crash: team.sopa.boar.engine.models.LoadGuard.Crash, onD
         Text("✕", style = Boar.type["mono.sm"], color = c.amber400)
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.amberBorder))
+}
+
+/** Dictation: tap to listen (asks for the microphone the first time), tap again to stop; the words go into the input. */
+@Composable
+private fun MicButton(text: String, onText: (String) -> Unit, enabled: Boolean) {
+    val c = Boar.colors
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    if (!team.sopa.boar.voice.VoiceInput.available(ctx)) return
+    val voice = remember { team.sopa.boar.voice.VoiceInput(ctx) }
+    var listening by remember { mutableStateOf(false) }
+    val before = remember { mutableStateOf("") }
+    DisposableEffect(Unit) { onDispose { voice.stop() } }
+    fun listen() {
+        before.value = text.trimEnd()
+        listening = true
+        val join = { said: String -> listOf(before.value, said).filter { it.isNotBlank() }.joinToString(" ") }
+        voice.start(onPartial = { onText(join(it)) }, onResult = { onText(join(it)) }, onEnd = { listening = false })
+    }
+    val permission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted -> if (granted) listen() }
+    Box(Modifier.size(48.dp).alpha(if (enabled) 1f else 0.35f).clip(CircleShape).background(if (listening) c.crimson600 else c.bgInput)
+        .border(1.dp, if (listening) c.crimsonBorder else c.borderDefault, CircleShape)
+        .clickable(enabled = enabled) {
+            when {
+                listening -> { voice.stop(); listening = false }
+                androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED -> listen()
+                else -> permission.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        }, contentAlignment = Alignment.Center) {
+        Text(if (listening) "■" else "🎤", fontSize = if (listening) 14.sp else 18.sp, color = Color.White)
+    }
 }
 
 /** Toast.tsx: below the header, fades in, gone after 1.8 s. */
@@ -399,12 +431,13 @@ private fun Badge(text: String) {
         modifier = Modifier.padding(top = 4.dp).background(c.amberBgSubtle, RoundedCornerShape(4.dp)).border(1.dp, c.amberBorder, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
 }
 
-/** The input bar (styles.inputContainer / input / sendBtn / stopBtn). Voice input isn't ported yet. */
+/** The input bar (styles.inputContainer / input / sendBtn / stopBtn), with the mic on the left (VoiceInputButton.tsx). */
 @Composable
-private fun InputBar(text: String, onText: (String) -> Unit, answering: Boolean, onSend: () -> Unit, onStop: () -> Unit) {
+private fun InputBar(text: String, onText: (String) -> Unit, answering: Boolean, onSend: () -> Unit, onStop: () -> Unit, voiceEnabled: Boolean) {
     val c = Boar.colors
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderDefault))
     Row(Modifier.fillMaxWidth().background(c.bgCardElevated).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (voiceEnabled) MicButton(text, onText, enabled = !answering)
         Box(Modifier.weight(1f).clip(RoundedCornerShape(50)).background(c.bgInput).border(1.dp, c.borderDefault, RoundedCornerShape(50)).padding(horizontal = 18.dp, vertical = 12.dp)) {
             val style = Boar.type.body.copy(fontSize = 14.sp, color = c.textPrimary)
             if (text.isEmpty()) Text(t("chatScreen.inputPlaceholder"), style = style, color = c.textDim)
