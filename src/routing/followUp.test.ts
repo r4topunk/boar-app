@@ -102,4 +102,14 @@ describe("searchWithFollowUp", () => {
     expect(seen).toEqual(["Who proposed evolution? What did he publish?", "Who proposed evolution?"]);
     expect(r).toEqual({ chunks: ["Evolution article"], searchedFor: "Who proposed evolution? What did he publish?" });
   });
+
+  it("a fallback keeps only passages about the question: a typo gets no sources, not the previous topic's", async () => {
+    const history = { turns: [{ role: "user" as const, text: "What causes the greenhouse effect?" }, { role: "assistant" as const, text: "Gases trap heat." }] };
+    const search = async (t: string) => (t.includes("greenhouse") ? ["Greenhouse effect: gases trap heat"] : []);
+    const typo = await searchWithFollowUp("what is a moonsoon", history, search, (c) => c);
+    expect(typo).toEqual({ chunks: [], searchedFor: "what is a moonsoon" });
+    const vaccines = { turns: [{ role: "user" as const, text: "How do vaccines work?" }, { role: "assistant" as const, text: "They train immunity." }] };
+    const side = await searchWithFollowUp("What are the side effects?", vaccines, async (t) => (t.includes("vaccines") ? ["Vaccine side effects are usually mild", "Vaccines train the immune system"] : []), (c) => c);
+    expect(side.chunks).toEqual(["Vaccine side effects are usually mild"]);
+  });
 });

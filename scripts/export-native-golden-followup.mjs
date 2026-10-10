@@ -73,6 +73,14 @@ for (const [i, q] of all.entries()) {
         return finds.includes(text) ? [`hit:${text}`] : [];
       });
       runs.push({ query: q, history: history ?? null, finds, calls, chunks: r.chunks, searchedFor: r.searchedFor });
+      // The same with the relevance filter: each hit comes with an unrelated passage, which the fallback drops
+      // (and a fallback hit that only carries the previous question's words is dropped too).
+      const fcalls = [];
+      const f = await searchWithFollowUp(q, history, async (text) => {
+        fcalls.push(text);
+        return finds.includes(text) ? [`hit:${text}`, "Volcanoes erupt molten rock"] : [];
+      }, (c) => c);
+      runs.push({ query: q, history: history ?? null, finds, filtered: true, calls: fcalls, chunks: f.chunks, searchedFor: f.searchedFor });
     }
   }
 }

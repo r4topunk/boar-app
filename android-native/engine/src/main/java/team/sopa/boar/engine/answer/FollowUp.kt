@@ -107,7 +107,19 @@ object FollowUp {
     }
 
     /** Runs [find] (the text to search → its chunks) with the follow-up rule. */
-    fun <T> search(query: String, history: ConversationHistory?, find: (String) -> List<T>): Found<T> {
+    /**
+     * The passages the fallback found that share at least one of the question's own content words (stemmed, as
+     * retrieval does): a question that found nothing because of a typo ("what is a moonsoon", after a greenhouse-effect
+     * question) got the earlier topic's passages as its sources (X6, 2026-10-10). No content words of its own: all kept.
+     */
+    fun <T> aboutTheQuestion(query: String, chunks: List<T>, textOf: (T) -> String): List<T> {
+        val own = Compress.tokenizeTerms(query).toSet()
+        if (own.isEmpty()) return chunks
+        return chunks.filter { c -> Compress.tokenizeTerms(textOf(c)).any { it in own } }
+    }
+
+    /** With [textOf], the fallback keeps only the passages about the question ([aboutTheQuestion]). */
+    fun <T> search(query: String, history: ConversationHistory?, textOf: ((T) -> String)? = null, find: (String) -> List<T>): Found<T> {
         val p = plan(query, history)
         if (p.direct != null) {
             val chunks = find(p.direct)
@@ -118,6 +130,8 @@ object FollowUp {
         }
         val chunks = find(query)
         if (chunks.isNotEmpty() || p.fallback == null) return Found(chunks, query)
-        return Found(find(p.fallback), p.fallback)
+        val found = find(p.fallback)
+        val kept = if (textOf != null) aboutTheQuestion(query, found, textOf) else found
+        return Found(kept, if (kept.isNotEmpty()) p.fallback else query)
     }
 }

@@ -39,7 +39,9 @@ class FollowUpGoldenTest {
             val q = c["query"]!!.str!!
             val finds = c["finds"]!!.jsonArray.map { it.str!! }.toSet()
             val calls = ArrayList<String>()
-            val r = FollowUp.search(q, history(c["history"])) { text -> calls += text; if (text in finds) listOf("hit:$text") else emptyList() }
+            val filtered = c["filtered"]?.jsonPrimitive?.content == "true"
+            val r = if (filtered) FollowUp.search(q, history(c["history"]), { s: String -> s }) { text -> calls += text; if (text in finds) listOf("hit:$text", "Volcanoes erupt molten rock") else emptyList() }
+            else FollowUp.search(q, history(c["history"])) { text -> calls += text; if (text in finds) listOf("hit:$text") else emptyList() }
             val where = "\"$q\" finds $finds"
             assertEquals(where, c["calls"]!!.jsonArray.map { it.str }, calls)
             assertEquals(where, c["chunks"]!!.jsonArray.map { it.str }, r.chunks)

@@ -106,14 +106,28 @@ export function followUpSearch(query: string, history?: ConversationHistory): Fo
 }
 
 /**
+ * Passages the fallback found that are about the question: they share at least one of its own content words
+ * (stemmed, as retrieval does). The fallback adds the previous question's words, so a question that found nothing
+ * because of a typo ("what is a moonsoon", after a greenhouse-effect question) got the earlier topic's passages
+ * as its sources (X6, 2026-10-10). A question with no content words of its own keeps them all.
+ */
+export function aboutTheQuestion<T>(query: string, chunks: T[], textOf: (chunk: T) => string): T[] {
+  const own = new Set(tokenizeTerms(query));
+  if (!own.size) return chunks;
+  return chunks.filter((c) => tokenizeTerms(textOf(c)).some((t) => own.has(t)));
+}
+
+/**
  * Runs the search with the follow-up rule. `search` gets the text to search and
  * returns its chunks; the result says which text found them, so the caller
- * compresses against the same words.
+ * compresses against the same words. With `textOf`, the fallback keeps only the
+ * passages about the question (aboutTheQuestion).
  */
 export async function searchWithFollowUp<T>(
   query: string,
   history: ConversationHistory | undefined,
-  search: (text: string) => Promise<T[]>
+  search: (text: string) => Promise<T[]>,
+  textOf?: (chunk: T) => string
 ): Promise<{ chunks: T[]; searchedFor: string }> {
   const plan = followUpSearch(query, history);
   if (plan.direct) {
@@ -125,5 +139,7 @@ export async function searchWithFollowUp<T>(
   }
   const chunks = await search(query);
   if (chunks.length || !plan.fallback) return { chunks, searchedFor: query };
-  return { chunks: await search(plan.fallback), searchedFor: plan.fallback };
+  const found = await search(plan.fallback);
+  const kept = textOf ? aboutTheQuestion(query, found, textOf) : found;
+  return { chunks: kept, searchedFor: kept.length ? plan.fallback : query };
 }
