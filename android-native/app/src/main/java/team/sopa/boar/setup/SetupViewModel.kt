@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -122,7 +123,8 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         watchStall()
     }
 
-    private fun freeBytes() = runCatching { StatFs(getApplication<Application>().filesDir.path).availableBytes }.getOrDefault(0L)
+    /** Free space on the phone; -1 when Android doesn't say (a real 0 means the disk is full). */
+    private fun freeBytes() = runCatching { StatFs(getApplication<Application>().filesDir.path).availableBytes }.getOrDefault(-1L)
 
     private fun restore() {
         val saved = runCatching {
@@ -200,7 +202,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
             val assets = assetsOf(p)
             val pending = assets.filter { !store.status(it).present }
             val download = pending.sumOf { it.sizeBytes }
-            PackagePlan(p, assets, download, assets.sumOf { it.sizeBytes }, if (free > 0) maxOf(0, download - free) else 0)
+            PackagePlan(p, assets, download, assets.sumOf { it.sizeBytes }, if (free >= 0) maxOf(0, download - free) else 0)
         }
         val rec = (plans.lastOrNull { it.shortfallBytes == 0L } ?: plans.first()).pkg
         _state.update { s -> s.copy(freeDiskBytes = free, plans = plans, recommendedPackage = rec, packageId = if (packageChosen) s.packageId else rec) }
@@ -339,7 +341,8 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             indexFailed(e.message ?: e.toString())
         } finally {
-            withContext(Dispatchers.IO) { embedder.close() }
+            // Also after a cancel (Restart, Recovery): the native session must not leak.
+            withContext(NonCancellable + Dispatchers.IO) { embedder.close() }
         }
     }
 
