@@ -142,7 +142,10 @@ private fun ForgetDialog(onErase: () -> Unit, onClose: () -> Unit) {
                 Text(t("native.pin.forgotCountdown", "seconds" to seconds), style = Boar.type.caption, color = Boar.colors.textSecondary)
             }
         },
-        confirmButton = { TextButton(onErase) { Text("${t("native.pin.forgotConfirm")} ($seconds)", color = Boar.colors.crimson400) } },
+        confirmButton = {
+            // A tap that lands after the deadline (between two countdown ticks) closes instead of erasing.
+            TextButton({ if (android.os.SystemClock.elapsedRealtime() - openedAt < FORGET_WINDOW_MS) onErase() else onClose() }) { Text("${t("native.pin.forgotConfirm")} ($seconds)", color = Boar.colors.crimson400) }
+        },
         dismissButton = { TextButton(onClose) { Text(t("common.cancel")) } })
 }
 
