@@ -55,6 +55,8 @@ class DeviceEvalRunner(
     private val evalDir = File(files, "eval")
     private val requestsDir = File(evalDir, "requests")
     private val json = Json { prettyPrint = false }
+    /** The app version on every row, so a saved or exported run says which build answered. */
+    private val appVersion: String = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?" 
 
     private fun asset(name: String) = context.assets.open("boar-data/$name").bufferedReader().readText()
 
@@ -301,7 +303,7 @@ class DeviceEvalRunner(
             "configId" to config.id, "configLabel" to config.label, "personalityId" to personalityId, "maxTokens" to maxTokens,
             "queryId" to q.id, "category" to q.category, "query" to q.query, "answer" to answer, "promptFormat" to d?.promptFormat,
             "retrievedTitles" to titles, "expectedKbTitles" to q.expectedKbTitles, "expectedKbHit" to DeviceEval.expectedKbHit(q.expectedKbTitles, titles),
-            "timedOut" to false, "createdAt" to System.currentTimeMillis(), "engine" to "native",
+            "timedOut" to false, "createdAt" to System.currentTimeMillis(), "engine" to "native", "appVersion" to appVersion,
         )
     }
 
@@ -311,7 +313,7 @@ class DeviceEvalRunner(
         "configId" to config.id, "configLabel" to config.label, "personalityId" to personalityId, "maxTokens" to maxTokens,
         "queryId" to q.id, "category" to q.category, "query" to q.query, "answer" to "", "retrievedTitles" to emptyList<String>(),
         "expectedKbTitles" to q.expectedKbTitles, "expectedKbHit" to DeviceEval.expectedKbHit(q.expectedKbTitles, emptyList()),
-        "timedOut" to false, "createdAt" to System.currentTimeMillis(), "engine" to "native",
+        "timedOut" to false, "createdAt" to System.currentTimeMillis(), "engine" to "native", "appVersion" to appVersion,
     )
 
     companion object {
@@ -323,7 +325,7 @@ class DeviceEvalRunner(
             "retrievedTitles", "expectedKbTitles", "expectedKbHit", "reasonCodes", "modelSwitches", "crossMessageModelSwitch",
             "modelResidency", "modelLoadMs", "ttftMs", "retrievalMs", "contextTokensBefore", "contextTokensAfter",
             "generationLatencyMs", "promptTokens", "promptMs", "cachedTokens", "predictedTokens", "predictedMs", "totalLatencyMs",
-            "tokensGenerated", "tokPerSec", "peakRssBytes", "outcome", "errorMessage", "timedOut", "answer", "createdAt")
+            "tokensGenerated", "tokPerSec", "peakRssBytes", "outcome", "errorMessage", "timedOut", "answer", "createdAt", "appVersion")
 
         fun toCsv(rows: List<JsonObject>): String =
             (listOf(CSV_COLUMNS.joinToString(",")) + rows.map { r -> CSV_COLUMNS.joinToString(",") { csvCell(r[it]) } }).joinToString("\n")

@@ -63,6 +63,8 @@ export interface EvalResultRow extends Omit<ExecutionTelemetryRecord, "id" | "cr
   expectedKbHit: boolean | null;
   timedOut: boolean;
   createdAt: number;
+  /** The app build that answered (app.json version), so a saved or exported run says which one. */
+  appVersion?: string;
 }
 
 export function newEvalRunId(now = Date.now()): string {
@@ -151,6 +153,7 @@ export const EVAL_CSV_COLUMNS: Array<keyof EvalResultRow> = [
   "timedOut",
   "answer",
   "createdAt",
+  "appVersion",
 ];
 
 export function evalRowsToCsv(rows: EvalResultRow[]): string {

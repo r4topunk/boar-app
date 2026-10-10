@@ -9,6 +9,7 @@
  * written to the persisted execution telemetry (recordExecution), so eval
  * runs show up in the Execution Telemetry screen like any other message.
  */
+import appConfig from "../../app.json";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { getMemoryInfo } from "ram-monitor";
@@ -200,6 +201,7 @@ async function runOne(
     expectedKbHit: expectedKbHit(q.expectedKbTitles, retrievedTitles),
     timedOut: result?.timedOut ?? false,
     createdAt: Date.now(),
+    appVersion: appConfig.expo.version,
   };
 }
 
