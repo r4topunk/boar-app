@@ -48,7 +48,7 @@ import team.sopa.boar.ui.theme.Boar
 
 /** My Documents (PersonalDocumentsManager.tsx). */
 @Composable
-fun DocumentsScreen(state: DocumentsState, vm: DocumentsViewModel, onBack: () -> Unit) {
+fun DocumentsScreen(state: DocumentsState, vm: DocumentsViewModel, packs: @Composable () -> Unit = {}, onBack: () -> Unit) {
     val c = Boar.colors
     var name by remember { mutableStateOf("") }
     var nameMissing by remember { mutableStateOf(false) }
@@ -61,7 +61,7 @@ fun DocumentsScreen(state: DocumentsState, vm: DocumentsViewModel, onBack: () ->
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().background(c.bgSurface).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("‹ " + t("common.back"), style = Boar.type.body, color = c.textAccentEmerald, modifier = Modifier.clickable(onClick = onBack).padding(4.dp))
-            Text(t("modelSetupScreen.sections.knowledgeBase"), style = Boar.type.titleLg, color = c.textHeading)
+            Text(t("nav.knowledge"), style = Boar.type.titleLg, color = c.textHeading)
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderDefault))
         Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -114,6 +114,8 @@ fun DocumentsScreen(state: DocumentsState, vm: DocumentsViewModel, onBack: () ->
                     Text("🗑️ " + t("common.remove"), style = Boar.type.caption, color = c.crimson400, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { removing = col }.padding(vertical = 4.dp))
                 }
             }
+            // Your documents first, then the knowledge packs (KnowledgeScreen.tsx's order).
+            packs()
         }
     }
     exportError?.let { msg -> AlertDialog({ exportError = null }, confirmButton = { TextButton({ exportError = null }) { Text("OK") } },

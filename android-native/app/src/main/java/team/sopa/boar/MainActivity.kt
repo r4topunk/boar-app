@@ -17,6 +17,7 @@ import team.sopa.boar.ui.drawer.BoarDrawer
 import team.sopa.boar.ui.drawer.DrawerItem
 import team.sopa.boar.ui.eval.EvaluationScreen
 import team.sopa.boar.eval.EvaluationViewModel
+import team.sopa.boar.ui.models.KnowledgePacks
 import team.sopa.boar.ui.models.ModelsScreen
 import team.sopa.boar.ui.setup.SetupScreen
 import androidx.compose.runtime.DisposableEffect
@@ -158,8 +159,10 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
     if (screen == "documents") {
         val docs: DocumentsViewModel = viewModel()
         val docsState by docs.state.collectAsState()
+        val models: ModelsViewModel = viewModel()
+        val modelsState by models.state.collectAsState()
         BackHandler { screen = "chat" }
-        DocumentsScreen(docsState, docs) { screen = "chat" }
+        DocumentsScreen(docsState, docs, packs = { KnowledgePacks(modelsState, models) }) { screen = "chat" }
         return
     }
     if (screen == "evaluation") {
@@ -197,7 +200,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
                     // ChatScreen.tsx's items; Evaluation stands in for Execution Telemetry (not in the native app yet),
                     // and the model catalog has its own entry (the Expo app reaches it through Settings).
                     items = listOf(
-                        DrawerItem("knowledge", t("chatScreen.drawerItems.myDocuments")) { go { screen = "documents" } },
+                        DrawerItem("knowledge", t("nav.knowledge")) { go { screen = "documents" } },
                         DrawerItem("models", t("modelCatalogScreen.title")) { go { screen = "models" } },
                         DrawerItem("settings", t("chatScreen.drawerItems.settings")) { go { screen = "settings" } },
                         DrawerItem("evaluation", t("evaluation.title")) { go { screen = "evaluation" } },

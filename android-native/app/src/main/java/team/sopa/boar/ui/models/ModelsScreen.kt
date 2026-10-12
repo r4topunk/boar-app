@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,6 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -52,7 +56,7 @@ import kotlin.math.floor
 @Composable
 fun ModelsScreen(state: ModelsState, vm: ModelsViewModel, onBack: () -> Unit) {
     val c = Boar.colors
-    Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().background(c.bgSurface).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("‹ " + t("common.back"), style = Boar.type.body, color = c.textAccentEmerald, modifier = Modifier.clickable(onClick = onBack).padding(4.dp))
             Column {
@@ -62,12 +66,26 @@ fun ModelsScreen(state: ModelsState, vm: ModelsViewModel, onBack: () -> Unit) {
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderDefault))
         LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(state.items, key = { it.id }) { a ->
+            // Knowledge packs are on the Knowledge screen, as in the Expo app (KnowledgePacks below).
+            items(state.items.filter { it.kind != AssetKind.CORPUS }, key = { it.id }) { a ->
                 val active = if (a.kind == AssetKind.LLM) a.id == state.activeLlm else state.rows[a.id]?.present == true
                 CatalogCard(a, state.rows[a.id], active, state.totalRamBytes, state.activating == a.id, state.activating != null, vm)
             }
             item { HfSearch(state, vm) }
         }
+    }
+}
+
+/** The knowledge packs (KnowledgeScreen.tsx "Topic packs"): download, verify and remove, on the Knowledge screen. */
+@Composable
+fun KnowledgePacks(state: ModelsState, vm: ModelsViewModel) {
+    val c = Boar.colors
+    val packs = state.items.filter { it.kind == AssetKind.CORPUS }
+    if (packs.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(t("flows.knowledge.topicPacksTitle"), style = Boar.type.title, color = c.textHeading, modifier = Modifier.padding(top = 8.dp))
+        Text(t("flows.knowledge.topicPacksFooter"), style = Boar.type.subtext, color = c.textMuted)
+        for (a in packs) CatalogCard(a, state.rows[a.id], state.rows[a.id]?.present == true, state.totalRamBytes, state.activating == a.id, state.activating != null, vm)
     }
 }
 
@@ -183,9 +201,13 @@ private fun CatalogCard(item: CatalogAsset, row: AssetRow?, active: Boolean, ram
 }
 
 /** ModelBrowser.tsx: search Hugging Face for GGUF repos, list a repo's files, add one to the list above. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun HfSearch(state: ModelsState, vm: ModelsViewModel) {
     val c = Boar.colors
+    // The field is the list's last item: once the keyboard is up, scroll it into view instead of leaving it behind.
+    val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var query by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
     Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(t("modelSetupScreen.discoverHfModels"), style = Boar.type.titleSm, color = c.textHeading)
@@ -195,7 +217,9 @@ private fun HfSearch(state: ModelsState, vm: ModelsViewModel) {
                 textStyle = Boar.type.body.copy(color = c.textPrimary), cursorBrush = androidx.compose.ui.graphics.SolidColor(c.textAccentEmerald),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { vm.hfSearch(query) }),
-                modifier = Modifier.weight(1f).background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(12.dp),
+                modifier = Modifier.weight(1f).background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(12.dp)
+                    .bringIntoViewRequester(bring)
+                    .onFocusEvent { if (it.isFocused) scope.launch { kotlinx.coroutines.delay(350); bring.bringIntoView() } },
                 decorationBox = { inner -> if (query.isEmpty()) Text(t("modelBrowser.searchPlaceholder"), style = Boar.type.body, color = c.textDim); inner() })
             SmallButton("🔍", enabled = !state.hfBusy && query.isNotBlank()) { vm.hfSearch(query) }
         }
