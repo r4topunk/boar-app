@@ -77,8 +77,9 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     /** A new search with these filters (the browse page): replaces the results; an older answer still running is dropped. */
     fun hfBrowse(query: String = _state.value.hfQuery, size: HfQuery.Size = _state.value.hfSize, sort: HfQuery.Sort = _state.value.hfSort) {
         val request = hfSearch.incrementAndGet()
+        hfRequest.incrementAndGet() // a repo's files still loading belong to the old results
         _state.update { it.copy(hfQuery = query, hfSize = size, hfSort = sort, hfSearching = true, hfSearched = true, hfError = null,
-            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfAdded = null) }
+            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfBusy = false, hfAdded = null) }
         fetchPage(request, HfQuery.searchUrl(query, size, sort), append = false)
     }
 
@@ -94,7 +95,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     private fun fetchPage(request: Int, url: String, append: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { HfBrowser.browse(url) }
-                .onSuccess { p -> _state.update { if (hfSearch.get() != request) it else it.copy(hfResults = (if (append) it.hfResults else emptyList()) + p.repos, hfNext = p.next, hfSearching = false) } }
+                .onSuccess { p -> _state.update { if (hfSearch.get() != request) it else it.copy(hfResults = ((if (append) it.hfResults else emptyList()) + p.repos).distinctBy { r -> r.id }, hfNext = p.next, hfSearching = false) } }
                 .onFailure { e -> _state.update { if (hfSearch.get() != request) it else it.copy(hfError = e.message ?: e.toString(), hfSearching = false) } }
         }
     }
