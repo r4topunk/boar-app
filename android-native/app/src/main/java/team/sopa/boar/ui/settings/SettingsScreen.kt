@@ -135,7 +135,7 @@ private fun TelemetrySection(services: BoarServices) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val sharing = remember { team.sopa.boar.share.ResultsSharing(ctx, services.settings) }
     val d = remember { sharing.device() }
-    val rssAnon = remember { runCatching { java.io.File("/proc/self/status").readLines().first { it.startsWith("RssAnon:") }.split(Regex("\\s+"))[1].toLong() * 1024 }.getOrDefault(0L) }
+    val resident = remember { team.sopa.boar.app.AppMemory.residentBytes() }
     val storage = remember { services.storageUsedBytes() }
     val evals = remember {
         java.io.File(ctx.filesDir, "eval").listFiles { f -> f.name.endsWith(".jsonl") }.orEmpty().sortedBy { it.lastModified() }
@@ -159,7 +159,7 @@ private fun TelemetrySection(services: BoarServices) {
             t("native.telemetry.ram") to (d.ramBytes?.let(::gb) ?: "—"),
             t("native.telemetry.features") to listOf("dotprod" to "asimddp", "i8mm" to "i8mm", "SVE" to "sve", "SME" to "sme").joinToString(" · ") { (n, f) -> (if (f in inf) "✓ " else "✗ ") + n },
             t("native.telemetry.build") to (team.sopa.boar.engine.BoarEngine.loadedVariant ?: "—"),
-            t("native.telemetry.appMemory") to gb(rssAnon),
+            t("native.telemetry.appMemory") to gb(resident),
             t("native.telemetry.storage") to gb(storage),
             t("native.telemetry.chats") to "${services.chats.listSessions().size}",
             t("native.telemetry.evals") to "${evals.size}",
@@ -293,7 +293,7 @@ private fun TweaksSection(services: BoarServices) {
     }
     val autoLabel = t("native.tweaks.auto")
     @Composable fun autoOf(value: Any) = t("native.tweaks.autoValue", "value" to value)
-    Section(t("native.tweaks.title")) {
+    Section(t("native.tweaks.title"), collapsible = true) {
         Note(t("native.tweaks.intro"))
         val cpuAuto = CpuVariants.auto(features)?.let { n -> CpuVariants.ALL.first { it.name == n }.label } ?: t("native.tweaks.cpuBest")
         Choices(
@@ -341,14 +341,19 @@ private fun TweaksSection(services: BoarServices) {
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+private fun Section(title: String, collapsible: Boolean = false, content: @Composable () -> Unit) {
     val c = Boar.colors
+    // A collapsible section starts closed: Advanced tweaks are for people who go looking for them.
+    var open by remember { mutableStateOf(!collapsible) }
     Column(
         Modifier.fillMaxWidth().background(c.bgCard, RoundedCornerShape(12.dp)).border(1.dp, c.borderSubtle, RoundedCornerShape(12.dp)).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(title, style = Boar.type.title, color = c.textHeading)
-        content()
+        if (collapsible) Row(Modifier.fillMaxWidth().clickable(onClickLabel = title) { open = !open }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = Boar.type.title, color = c.textHeading, modifier = Modifier.weight(1f))
+            Text(if (open) "▴" else "▾", style = Boar.type.title, color = c.textMuted)
+        } else Text(title, style = Boar.type.title, color = c.textHeading)
+        if (open) content()
     }
 }
 

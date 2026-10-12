@@ -46,7 +46,6 @@ import team.sopa.boar.R
 import team.sopa.boar.engine.chat.ChatSession
 import team.sopa.boar.ui.t
 import team.sopa.boar.ui.theme.Boar
-import java.io.File
 import java.util.Locale
 
 class DrawerItem(val key: String, val label: String, val onClick: () -> Unit)
@@ -128,14 +127,7 @@ private fun usage(used: Long, total: Long): String {
     return "${gb(used)}/${gb(total)}GB"
 }
 
-/**
- * The memory BOAR itself holds (RssAnon: its heap, the repacked weights, the KV cache). Not VmRSS, which also counts
- * the model file's mapped pages: Android drops those whenever it needs the room (2.4 GB right after a load, about
- * 1 GB a minute later on the X6), so they made the bar jump without the app using more.
- */
-private fun rssBytes(): Long = runCatching {
-    File("/proc/self/status").readLines().first { it.startsWith("RssAnon:") }.split(Regex("\\s+"))[1].toLong() * 1024
-}.getOrDefault(0L)
+private fun rssBytes(): Long = team.sopa.boar.app.AppMemory.residentBytes()
 
 /** DrawerFooterStats.tsx: the app's RAM and the models' disk use against BOAR's budgets, and the last answer's speed. */
 @Composable
