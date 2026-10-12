@@ -54,6 +54,11 @@ export interface CatalogModel {
    */
   answerTier?: "default" | "compact";
   /**
+   * No longer suggested: the catalog lists it only on a phone that already has it, where it keeps working
+   * (Phi-3.5-mini: ~4 tok/s on the X6 and it invented citations in our device benchmark).
+   */
+  hidden?: boolean;
+  /**
    * Ships inside the app build itself (see plugins/withBundledModels.js).
    * Not used by default — see module doc comment — but kept available.
    */
@@ -96,6 +101,11 @@ export const RAM_BUDGET_BYTES = 12 * 1024 * 1024 * 1024; // 12GB
  * on the phone after every download and import (ModelManager). Run
  * `npm run manifest:verify` to re-check sizes and hashes against the hosts.
  */
+/** Whether a catalog entry is offered: everything but a `hidden` one, which shows only once it's on the phone. */
+export function isListed(m: Pick<CatalogModel, "hidden">, present: boolean): boolean {
+  return !m.hidden || present;
+}
+
 export const MODEL_CATALOG: CatalogModel[] = [
   {
     id: "phi-3.5-mini-instruct-q4km",
@@ -110,6 +120,7 @@ export const MODEL_CATALOG: CatalogModel[] = [
     license: "MIT",
     description: "3.8B dense. Most complete comparisons and syntheses in our device benchmark, but slow (~4 tok/s). ~2.4GB.",
     required: false,
+    hidden: true,
     capabilities: { roles: ["general", "reasoning"] },
   },
   {
