@@ -295,7 +295,7 @@
     <string name="aboutScreen_benchmarkBody" formatted="false">O BOAR mede cada resposta no seu próprio celular: tempo de carregamento do modelo, tempo até o primeiro token, tokens/s, pico de memória e quais fontes foram usadas. Rode a avaliação embutida em Telemetria de Execução → 🧪 Avaliar para comparar qualquer modelo instalado nas mesmas perguntas, ou comande pelo computador com npm run eval:device.</string>
     <string name="aboutScreen_repoTitle" formatted="false">Repositório de código aberto</string>
     <string name="aboutScreen_repoBody" formatted="false">O código-fonte, os manifestos de modelos quantizados e os scripts de indexação offline estão disponíveis em:</string>
-    <string name="sourceFootnotes_title" formatted="false">Fontes verificadas offline</string>
+    <string name="sourceFootnotes_title" formatted="false">Fontes consultadas</string>
     <string name="sourceFootnotes_localIndex" formatted="false">ÍNDICE LOCAL</string>
     <string name="promptIdeasCarousel_title" formatted="false">Prompts de pesquisa de referência</string>
     <string name="promptIdeasCarousel_prev" formatted="false">Anterior</string>

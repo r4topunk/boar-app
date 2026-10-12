@@ -296,7 +296,7 @@
     <string name="aboutScreen_benchmarkBody" formatted="false">BOAR measures every answer on your own phone: model load time, time to first token, tokens/sec, peak memory and which sources were used. Run the built-in evaluation from Execution Telemetry → 🧪 Evaluate to compare any installed model on the same questions, or drive it from a computer with npm run eval:device.</string>
     <string name="aboutScreen_repoTitle" formatted="false">Open source repository</string>
     <string name="aboutScreen_repoBody" formatted="false">Source code, quantized model manifests, and offline indexing scripts are available at:</string>
-    <string name="sourceFootnotes_title" formatted="false">Offline verified sources</string>
+    <string name="sourceFootnotes_title" formatted="false">Retrieved sources</string>
     <string name="sourceFootnotes_localIndex" formatted="false">LOCAL INDEX</string>
     <string name="promptIdeasCarousel_title" formatted="false">Research prompt benchmarks</string>
     <string name="promptIdeasCarousel_prev" formatted="false">Prev</string>
