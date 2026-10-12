@@ -403,17 +403,21 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
             if (m.sources.isNotEmpty()) SourceFootnotes(m.sources)
             if (m.stopped) Badge("⏹ " + t("chatScreen.stoppedByUser"))
             if (m.timedOut) Badge("⏱ " + t("chatScreen.stageTimedOut"))
-            if (!streaming) m.receipt?.let { ReceiptLine(it) }
+            var receiptOpen by remember { mutableStateOf(false) }
             if (m.text.isNotEmpty() && !streaming) {
                 Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(0.5.dp).background(c.borderSubtle))
-                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(top = 6.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     FooterButton("▲", if (m.feedback == "up") t("chatScreen.rateHelpful") else null, m.feedback == "up", c.textAccentEmerald, c.emeraldBgSubtle, c.emeraldBorder) { onRate(m.id, "up") }
                     FooterButton("▼", if (m.feedback == "down") t("chatScreen.rateUnhelpful") else null, m.feedback == "down", c.crimson400, c.crimsonBgSubtle, c.crimsonBorder) { onRate(m.id, "down") }
-                    Spacer(Modifier.weight(1f))
+                    // The receipt fills the gap between rating and copy (main's ReceiptToggle), tapped open below.
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        m.receipt?.let { r -> ReceiptToggle(r, receiptOpen) { receiptOpen = !receiptOpen } }
+                    }
                     if (split.thinking != null) FooterButton("💭", null, reasoningShown, c.textAccentEmerald, c.emeraldBgSubtle, c.emeraldBorder) { reasoningShown = !reasoningShown }
                     var copied by remember { mutableStateOf(false) }
                     FooterButton("⧉", null, copied, c.textAccentEmerald, c.emeraldBgSubtle, c.emeraldBorder) { clipboard.setText(AnnotatedString(shown)); copied = true }
                 }
+                if (receiptOpen) m.receipt?.let { r -> ReceiptDetails(r) }
             }
         }
     }
@@ -421,14 +425,16 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
 
 /** The answer's receipt (main's ReceiptToggle): time and speed, tapped open for the measured details. */
 @Composable
-private fun ReceiptLine(r: Receipt) {
-    val c = Boar.colors
-    var open by remember { mutableStateOf(false) }
+private fun ReceiptToggle(r: Receipt, open: Boolean, onToggle: () -> Unit) {
     val short = listOf(ReceiptFormat.seconds(r.totalMs), t("chat.receipt.speed", "rate" to ReceiptFormat.rate(r.tokPerSec))).joinToString(" · ")
-    Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text("$short  " + if (open) "▴" else "▾", style = Boar.type["mono.xs"], color = c.textMuted,
-            modifier = Modifier.clickable(onClickLabel = t("chat.receipt.details")) { open = !open }.padding(vertical = 4.dp))
-        if (open) receiptRows(r).forEach { (label, value) -> Text("$label: $value", style = Boar.type["mono.xs"], color = c.textSecondary) }
+    Text("$short " + if (open) "▴" else "▾", style = Boar.type["mono.xs"], color = Boar.colors.textMuted, maxLines = 1,
+        modifier = Modifier.clickable(onClickLabel = t("chat.receipt.details"), onClick = onToggle).padding(vertical = 8.dp, horizontal = 4.dp))
+}
+
+@Composable
+private fun ReceiptDetails(r: Receipt) {
+    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        receiptRows(r).forEach { (label, value) -> Text("$label: $value", style = Boar.type["mono.xs"], color = Boar.colors.textSecondary) }
     }
 }
 
