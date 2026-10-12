@@ -31,7 +31,7 @@ class AppSettingsTest {
     @Test fun `keeps keys it doesn't know when it writes`() {
         val f = file(expo)
         val s = AppSettings(f)
-        s.maxTokens = 2048
+        s.maxTokensChoice = 2048
         s.engineTweaks = EngineTweaks(threads = 6, kvCache = KvType.Q8_0, stageTimeoutSeconds = 0)
         s.setActiveModelId("llm", "qwen2.5-1.5b-instruct-q4km")
         val again = AppSettings(f)
@@ -48,9 +48,21 @@ class AppSettingsTest {
     @Test fun `missing or broken file means defaults`() {
         for (s in listOf(AppSettings(file(null)), AppSettings(file("{not json")))) {
             assertNull(s.activeModelId("llm"))
-            assertEquals(512, s.maxTokens)
+            assertEquals(AppSettings.AUTO_MAX_TOKENS_DETAILED, s.maxTokens)
             assertEquals("standard", s.fontScale)
             assertTrue(s.autoSummarize)
         }
+    }
+
+    @Test fun `Auto answer length is 1024 for Detailed, 512 for the other styles, a pick wins`() {
+        val s = AppSettings(file(null))
+        assertNull(s.maxTokensChoice)
+        assertEquals(1024, s.maxTokens)
+        s.personalityId = "succinct"
+        assertEquals(512, s.maxTokens)
+        s.maxTokensChoice = 2048
+        assertEquals(2048, s.maxTokens)
+        s.maxTokensChoice = null
+        assertEquals(512, s.maxTokens)
     }
 }

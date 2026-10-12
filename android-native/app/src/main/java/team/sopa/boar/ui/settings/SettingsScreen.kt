@@ -41,6 +41,7 @@ import team.sopa.boar.engine.FlashAttn
 import team.sopa.boar.engine.KvType
 import team.sopa.boar.engine.LazyMode
 import team.sopa.boar.engine.LoadMode
+import team.sopa.boar.engine.settings.AppSettings
 import team.sopa.boar.ui.t
 import team.sopa.boar.ui.theme.Boar
 import team.sopa.boar.ui.theme.ThemeTokens
@@ -262,8 +263,11 @@ private fun ToneSection(services: BoarServices) {
             var prompt by remember { mutableStateOf(s.customSystemPrompt ?: "") }
             Field(prompt, t("personalitySettings.customPromptPlaceholder")) { prompt = it; s.customSystemPrompt = it }
         }
-        var tokens by remember { mutableStateOf(s.maxTokens) }
-        Choices(t("personalitySettings.maxOutputTokens"), personalities.maxTokensOptions.map { it to "$it" }, tokens) { tokens = it; s.maxTokens = it }
+        var tokens by remember { mutableStateOf(s.maxTokensChoice) }
+        val auto = AppSettings.autoMaxTokens(id)
+        Choices(t("personalitySettings.maxOutputTokens"),
+            listOf<Pair<Int?, String>>(null to "${t("native.tweaks.auto")} ($auto)") + personalities.maxTokensOptions.map { it to "$it" },
+            tokens) { tokens = it; s.maxTokensChoice = it }
         Note(t("personalitySettings.maxOutputTokensNote"))
         var deep by remember { mutableStateOf(s.deepResearchMode) }
         SwitchRow(t("personalitySettings.deepResearchTitle"), t("personalitySettings.deepResearchNote"), deep) { deep = it; s.deepResearchMode = it }

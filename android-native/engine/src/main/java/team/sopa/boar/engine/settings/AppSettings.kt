@@ -53,8 +53,20 @@ class AppSettings(private val file: File) {
 
     var personalityId: String? get() = str("personalityId"); set(v) = set("personalityId", v?.let(::JsonPrimitive))
     var customSystemPrompt: String? get() = str("customSystemPrompt"); set(v) = set("customSystemPrompt", v?.let(::JsonPrimitive))
-    /** DEFAULT_MAX_TOKENS when unset. */
-    var maxTokens: Int get() = int("maxTokens") ?: 512; set(v) = set("maxTokens", JsonPrimitive(v))
+    /** The answer length the user picked in Settings; null is Auto. */
+    var maxTokensChoice: Int? get() = int("maxTokens"); set(v) = set("maxTokens", v?.let(::JsonPrimitive))
+    /** The answer's token limit: the user's pick, else Auto by style. */
+    val maxTokens: Int get() = maxTokensChoice ?: autoMaxTokens(personalityId)
+
+    companion object {
+        const val AUTO_MAX_TOKENS = 512
+        /** Detailed answers ran past 512 tokens and stopped mid-sentence (X6, Oct 11). */
+        const val AUTO_MAX_TOKENS_DETAILED = 1024
+
+        /** No style set means Detailed, the native app's default (BoarServices.DEFAULT_PERSONALITY_ID). */
+        fun autoMaxTokens(personalityId: String?): Int =
+            if ((personalityId ?: "detailed") == "detailed") AUTO_MAX_TOKENS_DETAILED else AUTO_MAX_TOKENS
+    }
     var deepResearchMode: Boolean get() = bool("deepResearchMode") ?: false; set(v) = set("deepResearchMode", JsonPrimitive(v))
     var adaptiveRoutingEnabled: Boolean get() = bool("adaptiveRoutingEnabled") ?: false; set(v) = set("adaptiveRoutingEnabled", JsonPrimitive(v))
     var routingPreset: String? get() = str("routingPreset"); set(v) = set("routingPreset", v?.let(::JsonPrimitive))
