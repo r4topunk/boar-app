@@ -99,7 +99,7 @@ fun ChatScreen(
         snapshotFlow { list.isScrollInProgress }.collect { moving -> if (!moving) follow = !list.canScrollForward }
     }
     LaunchedEffect(state.messages.size) { follow = true }
-    LaunchedEffect(state.messages.size, last?.text?.length) {
+    LaunchedEffect(state.messages.size, last?.text?.length, list.isScrollInProgress) {
         // Jump to the end of the last message (the offset is clamped to the list's end); not animated, since this
         // runs on every streamed token.
         if (follow && !list.isScrollInProgress && state.messages.isNotEmpty()) list.scrollToItem(state.messages.size - 1, Int.MAX_VALUE / 2)
