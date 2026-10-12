@@ -88,7 +88,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         val s = _state.value
         val next = s.hfNext ?: return
         if (s.hfSearching) return
-        _state.update { it.copy(hfSearching = true) }
+        _state.update { it.copy(hfSearching = true, hfError = null) }
         fetchPage(hfSearch.get(), next, append = true)
     }
 
