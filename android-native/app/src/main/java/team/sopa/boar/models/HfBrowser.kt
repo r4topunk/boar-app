@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
 import team.sopa.boar.engine.models.AssetKind
 import team.sopa.boar.engine.models.CatalogAsset
+import team.sopa.boar.engine.models.HfQuery
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -20,28 +21,38 @@ import java.net.URLEncoder
  * download is pinned to the commit that was listed, and checked against the LFS sha256 when Hugging Face gives one.
  */
 object HfBrowser {
-    private const val API = "https://huggingface.co/api"
+    private const val API = HfQuery.API
 
-    data class Repo(val id: String, val downloads: Long?, val likes: Long?)
+    /** A repo as listed, with the facts from its GGUF header: parameter count, architecture, context length. */
+    data class Repo(val id: String, val downloads: Long?, val likes: Long?, val params: Long? = null, val architecture: String? = null, val contextLength: Long? = null)
     data class GgufFile(val filename: String, val sizeBytes: Long, val sha256: String?, val revision: String?)
+    data class Page(val repos: List<Repo>, val next: String?)
 
-    private fun get(url: String): String {
+    private fun get(url: String): Pair<String, String?> {
         val c = (URL(url).openConnection() as HttpURLConnection).apply { connectTimeout = 20_000; readTimeout = 30_000 }
         try {
             if (c.responseCode !in 200..299) error("Hugging Face answered ${c.responseCode}")
-            return c.inputStream.bufferedReader().readText()
+            return c.inputStream.bufferedReader().readText() to c.getHeaderField("Link")
         } finally {
             c.disconnect()
         }
     }
 
-    fun search(query: String, limit: Int = 15): List<Repo> {
-        val q = URLEncoder.encode(query, "UTF-8")
-        return Json.parseToJsonElement(get("$API/models?search=$q&filter=gguf&limit=$limit&sort=downloads&direction=-1")).jsonArray.map {
-            val o = it.jsonObject
-            Repo(o.str("id") ?: "", o.num("downloads"), o.num("likes"))
-        }.filter { it.id.isNotEmpty() }
+    /**
+     * One page of the search ([HfQuery.searchUrl], or the `next` of the previous page): text-generation GGUF repos
+     * whose architecture BOAR can chat with. A page can come back shorter than asked, or empty with a next page.
+     */
+    fun browse(url: String): Page {
+        require(url.startsWith("$API/models?")) { "Not a Hugging Face model listing: $url" }
+        val (body, link) = get(url)
+        val repos = Json.parseToJsonElement(body).jsonArray.map { it.jsonObject }.map { o ->
+            val g = o["gguf"] as? JsonObject
+            Repo(o.str("id") ?: "", o.num("downloads"), o.num("likes"), g?.num("total"), g?.str("architecture"), g?.num("context_length"))
+        }.filter { it.id.isNotEmpty() && HfQuery.chatArchitecture(it.architecture) }
+        return Page(repos, HfQuery.nextUrl(link))
     }
+
+    fun search(query: String): List<Repo> = browse(HfQuery.searchUrl(query, HfQuery.Size.ANY, HfQuery.Sort.DOWNLOADS)).repos
 
     private val REPO = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -52,11 +63,11 @@ object HfBrowser {
     private fun repoPath(repoId: String) = checkRepo(repoId).split("/").joinToString("/") { enc(it) }
 
     fun files(repoId: String): List<GgufFile> {
-        val o = Json.parseToJsonElement(get("$API/models/${repoPath(repoId)}?blobs=true")).jsonObject
+        val o = Json.parseToJsonElement(get("$API/models/${repoPath(repoId)}?blobs=true").first).jsonObject
         val revision = o.str("sha")?.takeIf { Regex("^[0-9a-f]{40}$").matches(it) }
         return (o["siblings"] as? JsonArray).orEmpty().map { it.jsonObject }
-            .filter { it.str("rfilename")?.lowercase()?.endsWith(".gguf") == true }
-            .map { GgufFile(it.str("rfilename")!!, it.num("size") ?: 0, (it["lfs"] as? JsonObject)?.str("oid"), revision) }
+            .map { GgufFile(it.str("rfilename") ?: "", it.num("size") ?: 0, (it["lfs"] as? JsonObject)?.str("oid"), revision) }
+            .filter { HfQuery.addableFile(it.filename, it.sizeBytes) }
             .sortedBy { it.sizeBytes }
     }
 

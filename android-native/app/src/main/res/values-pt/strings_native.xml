@@ -101,4 +101,18 @@
     <string name="native_telemetry_none" formatted="false">nenhuma ainda</string>
     <string name="native_telemetry_note" formatted="false">Nada daqui sai do celular. Resultados só são compartilhados pela tela de Avaliação, depois de você ver o que vai.</string>
     <string name="native_voice_onDevice" formatted="false">Reconhecimento de fala no aparelho (o áudio fica no celular)</string>
+    <string name="native_browse_title" formatted="false">Explorar modelos</string>
+    <string name="native_browse_cta" formatted="false">Explorar modelos do Hugging Face</string>
+    <string name="native_browse_ctaNote" formatted="false">Modelos de texto em GGUF, um arquivo abaixo de 12 GB, que este app consegue rodar. Não verificados pelo BOAR.</string>
+    <string name="native_browse_size" formatted="false">Tamanho</string>
+    <string name="native_browse_sizeAny" formatted="false">Qualquer</string>
+    <string name="native_browse_sort" formatted="false">Ordenar</string>
+    <string name="native_browse_sortTrending" formatted="false">Em alta</string>
+    <string name="native_browse_sortDownloads" formatted="false">Mais baixados</string>
+    <string name="native_browse_sortLikes" formatted="false">Mais curtidos</string>
+    <string name="native_browse_sortNewest" formatted="false">Mais recentes</string>
+    <string name="native_browse_empty" formatted="false">Nenhum modelo de texto GGUF encontrado.</string>
+    <string name="native_browse_unvetted" formatted="false">Não verificado pelo BOAR</string>
+    <string name="native_browse_more" formatted="false">Carregando mais…</string>
+    <string name="native_browse_files" formatted="false">Arquivos</string>
 </resources>

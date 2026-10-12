@@ -14,6 +14,7 @@ import team.sopa.boar.engine.EngineParams
 import team.sopa.boar.engine.LlamaSession
 import team.sopa.boar.engine.models.AssetKind
 import team.sopa.boar.engine.models.AssetStore
+import team.sopa.boar.engine.models.HfQuery
 import team.sopa.boar.engine.models.CatalogAsset
 import team.sopa.boar.engine.rag.SeedCorpus
 
@@ -43,6 +44,13 @@ data class ModelsState(
     val hfBusy: Boolean = false,
     val hfError: String? = null,
     val hfAdded: String? = null,
+    /** The browse page's filters and paging: no request until the page is opened. */
+    val hfQuery: String = "",
+    val hfSize: HfQuery.Size = HfQuery.Size.ANY,
+    val hfSort: HfQuery.Sort = HfQuery.Sort.TRENDING,
+    val hfSearching: Boolean = false,
+    val hfNext: String? = null,
+    val hfSearched: Boolean = false,
 )
 
 /** The models and knowledge catalog (port of ModelCatalogScreen.tsx): download, use, remove. */
@@ -64,13 +72,30 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     private fun sortedItems() = services.catalog.models.filter { !it.hidden || services.fileOf(it).isFile }
         .sortedBy { when (it.kind) { AssetKind.LLM -> 0; AssetKind.EMBEDDING -> 1; AssetKind.CORPUS -> 2 } }
 
-    fun hfSearch(query: String) {
-        if (query.isBlank() || _state.value.hfBusy) return
-        _state.update { it.copy(hfBusy = true, hfError = null, hfOpenRepo = null, hfFiles = emptyList(), hfAdded = null) }
+    private val hfSearch = java.util.concurrent.atomic.AtomicInteger()
+
+    /** A new search with these filters (the browse page): replaces the results; an older answer still running is dropped. */
+    fun hfBrowse(query: String = _state.value.hfQuery, size: HfQuery.Size = _state.value.hfSize, sort: HfQuery.Sort = _state.value.hfSort) {
+        val request = hfSearch.incrementAndGet()
+        _state.update { it.copy(hfQuery = query, hfSize = size, hfSort = sort, hfSearching = true, hfSearched = true, hfError = null,
+            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfAdded = null) }
+        fetchPage(request, HfQuery.searchUrl(query, size, sort), append = false)
+    }
+
+    /** The next page of the same search, at the end of the list. */
+    fun hfMore() {
+        val s = _state.value
+        val next = s.hfNext ?: return
+        if (s.hfSearching) return
+        _state.update { it.copy(hfSearching = true) }
+        fetchPage(hfSearch.get(), next, append = true)
+    }
+
+    private fun fetchPage(request: Int, url: String, append: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { HfBrowser.search(query.trim()) }
-                .onSuccess { r -> _state.update { it.copy(hfResults = r, hfBusy = false) } }
-                .onFailure { e -> _state.update { it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
+            runCatching { HfBrowser.browse(url) }
+                .onSuccess { p -> _state.update { if (hfSearch.get() != request) it else it.copy(hfResults = (if (append) it.hfResults else emptyList()) + p.repos, hfNext = p.next, hfSearching = false) } }
+                .onFailure { e -> _state.update { if (hfSearch.get() != request) it else it.copy(hfError = e.message ?: e.toString(), hfSearching = false) } }
         }
     }
 

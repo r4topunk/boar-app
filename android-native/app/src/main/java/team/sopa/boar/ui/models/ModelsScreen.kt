@@ -34,8 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusEvent
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +52,7 @@ import kotlin.math.floor
 
 /** The models and knowledge catalog (ModelCatalogScreen.tsx with CatalogItemCard.tsx's layout and styles). */
 @Composable
-fun ModelsScreen(state: ModelsState, vm: ModelsViewModel, onBack: () -> Unit) {
+fun ModelsScreen(state: ModelsState, vm: ModelsViewModel, onBrowse: () -> Unit = {}, onBack: () -> Unit) {
     val c = Boar.colors
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding().imePadding()) {
         Row(Modifier.fillMaxWidth().background(c.bgSurface).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -71,7 +69,7 @@ fun ModelsScreen(state: ModelsState, vm: ModelsViewModel, onBack: () -> Unit) {
                 val active = if (a.kind == AssetKind.LLM) a.id == state.activeLlm else state.rows[a.id]?.present == true
                 CatalogCard(a, state.rows[a.id], active, state.totalRamBytes, state.activating == a.id, state.activating != null, vm)
             }
-            item { HfSearch(state, vm) }
+            item { HfCta(onBrowse) }
         }
     }
 }
@@ -89,7 +87,7 @@ fun KnowledgePacks(state: ModelsState, vm: ModelsViewModel) {
     }
 }
 
-private fun formatMB(bytes: Long): String = when {
+internal fun formatMB(bytes: Long): String = when {
     bytes <= 0 -> "0 MB"
     bytes >= 1024L * 1024 * 1024 -> "%.1f GB".format(bytes / (1024.0 * 1024 * 1024))
     else -> "%.0f MB".format(bytes / (1024.0 * 1024))
@@ -200,54 +198,15 @@ private fun CatalogCard(item: CatalogAsset, row: AssetRow?, active: Boolean, ram
     )
 }
 
-/** ModelBrowser.tsx: search Hugging Face for GGUF repos, list a repo's files, add one to the list above. */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+/** Where more models come from: Hugging Face, searched on its own page (BrowseScreen). */
 @Composable
-private fun HfSearch(state: ModelsState, vm: ModelsViewModel) {
+private fun HfCta(onBrowse: () -> Unit) {
     val c = Boar.colors
-    // The field is the list's last item: once the keyboard is up, scroll it into view instead of leaving it behind.
-    val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var query by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp).background(c.bgCard, RoundedCornerShape(12.dp)).border(1.dp, c.borderDefault, RoundedCornerShape(12.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(t("modelSetupScreen.discoverHfModels"), style = Boar.type.titleSm, color = c.textHeading)
-        Text(t("modelBrowser.hint"), style = Boar.type.subtext, color = c.textSecondary)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            androidx.compose.foundation.text.BasicTextField(query, { query = it }, singleLine = true,
-                textStyle = Boar.type.body.copy(color = c.textPrimary), cursorBrush = androidx.compose.ui.graphics.SolidColor(c.textAccentEmerald),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { vm.hfSearch(query) }),
-                modifier = Modifier.weight(1f).background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(12.dp)
-                    .bringIntoViewRequester(bring)
-                    .onFocusEvent { if (it.isFocused) scope.launch { kotlinx.coroutines.delay(350); bring.bringIntoView() } },
-                decorationBox = { inner -> if (query.isEmpty()) Text(t("modelBrowser.searchPlaceholder"), style = Boar.type.body, color = c.textDim); inner() })
-            SmallButton("🔍", enabled = !state.hfBusy && query.isNotBlank()) { vm.hfSearch(query) }
-        }
-        if (state.hfBusy) Busy("…")
-        state.hfError?.let { Text(it, style = Boar.type.subtext, color = c.crimson400) }
-        state.hfAdded?.let { Text(t("modelBrowser.addedMessage", "label" to it), style = Boar.type.subtext, color = c.textAccentEmerald) }
-        state.hfResults.forEach { r ->
-            Column(Modifier.fillMaxWidth().background(c.bgCard, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                // Only the header opens and closes the repo; tapping a file below doesn't collapse it.
-                Column(Modifier.fillMaxWidth().clickable { vm.hfOpen(r.id) }) {
-                    Text(r.id, style = Boar.type.body, color = c.textHeading, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                    Text(t("modelBrowser.downloadsLikes", "downloads" to (r.downloads ?: 0), "likes" to (r.likes ?: 0)), style = Boar.type.micro, color = c.textDim)
-                }
-                if (state.hfOpenRepo == r.id) {
-                    if (!state.hfBusy && state.hfFiles.isEmpty()) Text(t("modelBrowser.noGgufFiles"), style = Boar.type.subtext, color = c.textMuted)
-                    state.hfFiles.forEach { f ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Column(Modifier.weight(1f)) {
-                                Text(f.filename, style = Boar.type.subtext, color = c.textPrimary)
-                                Text(formatMB(f.sizeBytes) + if (f.sha256 == null) " · " + t("modelBrowser.noChecksum") else "", style = Boar.type.micro, color = c.textDim)
-                            }
-                            SmallButton(t("modelBrowser.addButton")) { vm.hfAdd(r.id, f) }
-                        }
-                    }
-                }
-            }
-        }
+        Text(t("native.browse.ctaNote"), style = Boar.type.subtext, color = c.textSecondary)
+        SmallButton("🔍 " + t("native.browse.cta"), onClick = onBrowse)
     }
 }
 
@@ -271,7 +230,7 @@ private fun StatusBadge(present: Boolean, active: Boolean, downloading: Boolean)
 }
 
 @Composable
-private fun SmallButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun SmallButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     val c = Boar.colors
     Text(label, style = Boar.type.titleSm.copy(fontSize = 12.sp), color = c.textAccentEmerald,
         modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(c.emeraldBgSubtle).border(1.dp, c.emeraldBorder, RoundedCornerShape(6.dp))
@@ -285,7 +244,7 @@ private fun Check(label: String) = Row(verticalAlignment = Alignment.CenterVerti
 }
 
 @Composable
-private fun Busy(label: String) = Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+internal fun Busy(label: String) = Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
     CircularProgressIndicator(Modifier.size(14.dp), color = Boar.colors.emerald400, strokeWidth = 1.5.dp)
     Text(label, style = Boar.type.caption, color = Boar.colors.textAccentEmerald)
 }

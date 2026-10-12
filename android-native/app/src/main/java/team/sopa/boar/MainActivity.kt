@@ -17,6 +17,7 @@ import team.sopa.boar.ui.drawer.BoarDrawer
 import team.sopa.boar.ui.drawer.DrawerItem
 import team.sopa.boar.ui.eval.EvaluationScreen
 import team.sopa.boar.eval.EvaluationViewModel
+import team.sopa.boar.ui.models.BrowseScreen
 import team.sopa.boar.ui.models.KnowledgePacks
 import team.sopa.boar.ui.models.ModelsScreen
 import team.sopa.boar.ui.setup.SetupScreen
@@ -153,7 +154,14 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
         val models: ModelsViewModel = viewModel()
         val modelsState by models.state.collectAsState()
         BackHandler { vm.refreshModel(); screen = "chat" }
-        ModelsScreen(modelsState, models) { vm.refreshModel(); screen = "chat" }
+        ModelsScreen(modelsState, models, onBrowse = { screen = "browse" }) { vm.refreshModel(); screen = "chat" }
+        return
+    }
+    if (screen == "browse") {
+        val models: ModelsViewModel = viewModel()
+        val modelsState by models.state.collectAsState()
+        BackHandler { screen = "models" }
+        BrowseScreen(modelsState, models) { screen = "models" }
         return
     }
     if (screen == "documents") {
