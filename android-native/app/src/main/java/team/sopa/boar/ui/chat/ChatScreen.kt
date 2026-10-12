@@ -61,6 +61,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import team.sopa.boar.R
 import team.sopa.boar.chat.Activity
 import team.sopa.boar.chat.ChatState
+import androidx.compose.ui.platform.LocalContext
+import team.sopa.boar.ui.I18n
+import team.sopa.boar.chat.Receipt
+import team.sopa.boar.chat.ReceiptFormat
 import team.sopa.boar.chat.Source
 import team.sopa.boar.chat.UiMessage
 import team.sopa.boar.engine.answer.AnswerText
@@ -399,6 +403,7 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
             if (m.sources.isNotEmpty()) SourceFootnotes(m.sources)
             if (m.stopped) Badge("⏹ " + t("chatScreen.stoppedByUser"))
             if (m.timedOut) Badge("⏱ " + t("chatScreen.stageTimedOut"))
+            if (!streaming) m.receipt?.let { ReceiptLine(it) }
             if (m.text.isNotEmpty() && !streaming) {
                 Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(0.5.dp).background(c.borderSubtle))
                 Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -412,6 +417,36 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
             }
         }
     }
+}
+
+/** The answer's receipt (main's ReceiptToggle): time and speed, tapped open for the measured details. */
+@Composable
+private fun ReceiptLine(r: Receipt) {
+    val c = Boar.colors
+    var open by remember { mutableStateOf(false) }
+    val short = listOf(ReceiptFormat.seconds(r.totalMs), t("chat.receipt.speed", "rate" to ReceiptFormat.rate(r.tokPerSec))).joinToString(" · ")
+    Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text("$short  " + if (open) "▴" else "▾", style = Boar.type["mono.xs"], color = c.textMuted,
+            modifier = Modifier.clickable(onClickLabel = t("chat.receipt.details")) { open = !open }.padding(vertical = 4.dp))
+        if (open) receiptRows(r).forEach { (label, value) -> Text("$label: $value", style = Boar.type["mono.xs"], color = c.textSecondary) }
+    }
+}
+
+/** main's receiptDetails: what the answer took, step by step. */
+@Composable
+private fun receiptRows(r: Receipt): List<Pair<String, String>> {
+    val ctx = LocalContext.current
+    fun count(tokens: Int) = I18n.t(ctx, "chat.receipt.tokenCount", "tokens" to "$tokens", "words" to "${ReceiptFormat.words(tokens.toDouble())}")
+    return listOfNotNull(
+        r.retrievalMs?.let { t("chat.receipt.search") to ReceiptFormat.seconds(it) },
+        r.prefillMs?.let { t("chat.receipt.prefill") to ReceiptFormat.seconds(it) },
+        r.contextTokens?.let { t("chat.receipt.context") to count(it) },
+        t("chat.receipt.start") to ReceiptFormat.seconds(r.ttftMs),
+        r.model?.let { t("chat.receipt.model") to it },
+        t("chat.receipt.speedLabel") to t("chat.receipt.speedBoth", "rate" to ReceiptFormat.rate(r.tokPerSec), "words" to "${ReceiptFormat.words(r.tokPerSec)}"),
+        t("chat.receipt.words") to count(r.tokens),
+        t("chat.receipt.total") to ReceiptFormat.seconds(r.totalMs),
+    )
 }
 
 /** ProcessingIndicator.tsx: the stage line while nothing has streamed yet. */

@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import team.sopa.boar.app.BoarServices
+import team.sopa.boar.engine.GenerationMetrics
 import team.sopa.boar.engine.answer.AnswerEvent
 import team.sopa.boar.engine.answer.AnswerPipeline
 import team.sopa.boar.engine.answer.AnswerRequest
@@ -52,6 +53,7 @@ data class UiMessage(
     val feedback: String? = null,
     val stopped: Boolean = false,
     val timedOut: Boolean = false,
+    val receipt: Receipt? = null,
 )
 
 /** What the assistant is doing for the message being answered. */
@@ -203,7 +205,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (job?.isActive == true) return
         viewModelScope.launch {
             val msgs = withContext(Dispatchers.IO) { services.chats.messages(id) }.map { r ->
-                UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback)
+                UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback, receipt = receiptFromMeta(r.meta))
             }
             _state.update { it.copy(sessionId = id, messages = msgs, error = null) }
         }
@@ -246,6 +248,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 // Within a token budget: earlier answers cut to their opening sentences (HistoryBudget).
                 turns = HistoryBudget.budget(prior.takeLast(VERBATIM_MESSAGE_COUNT).map { ConversationTurn(it.role, if (it.role == "assistant") AnswerText.stripThinking(it.text) else it.text) }),
             )
+            val startAt = System.nanoTime()
+            var metrics: GenerationMetrics? = null
+            var retrievalMs: Double? = null
             val text = StringBuilder()
             var sources: List<Chunk> = emptyList()
             var timedOut = false
@@ -285,7 +290,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                             is AnswerEvent.Stage -> _state.update { it.copy(activity = when (e.stage) { AnswerStage.RETRIEVING -> Activity.Retrieving; AnswerStage.THINKING -> Activity.Thinking; AnswerStage.GENERATING -> Activity.Generating }) }
                             is AnswerEvent.Sources -> sources = e.chunks
                             is AnswerEvent.Piece -> onPiece(e.text)
-                            is AnswerEvent.Done -> {}
+                            is AnswerEvent.Done -> { metrics = e.metrics; retrievalMs = e.retrievalMs }
                         }
                     }
                 }
@@ -294,13 +299,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             }
             val shown = sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
             val stopped = stopRequested
+            val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)
             chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
-            if (shown.isNotEmpty()) chats.setMessageMeta(answerId, metaOf(shown))
+            if (shown.isNotEmpty() || receipt != null) chats.setMessageMeta(answerId, metaOf(shown, receipt))
             afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
             chats.prune(settings.maxSavedSessions)
             _state.update { s ->
                 s.copy(answeringId = null, activity = null,
-                    messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut) else it })
+                    messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt) else it })
             }
         }
     }
@@ -382,12 +388,31 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         android.app.ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }.totalMem
     }.getOrDefault(0L)
 
-    private fun metaOf(sources: List<Source>): String = JsonObject(mapOf("sources" to JsonArray(sources.map { s ->
+    /**
+     * The answer's receipt, from the engine's own numbers where the pipeline reports them (Deep Research and adaptive
+     * routing don't), else from the tokens as they streamed. None when nothing was generated.
+     */
+    private fun receiptOf(startAt: Long, firstAt: Long, streamed: Int, m: GenerationMetrics?, retrievalMs: Double?): Receipt? {
+        if (firstAt == 0L || streamed == 0) return null
+        val end = System.nanoTime()
+        val wallRate = streamed / ((end - firstAt) / 1e9).coerceAtLeast(1e-3)
+        return Receipt(
+            totalMs = (end - startAt) / 1e6, ttftMs = (firstAt - startAt) / 1e6,
+            tokPerSec = m?.decodeTokPerSec?.takeIf { it > 0 } ?: wallRate, tokens = m?.generatedTokens?.takeIf { it > 0 } ?: streamed,
+            model = services.activeModel()?.shortName, retrievalMs = retrievalMs, prefillMs = m?.prefillMs, contextTokens = m?.promptTokens,
+        )
+    }
+
+    private fun receiptFromMeta(meta: String?): Receipt? = runCatching {
+        Json.parseToJsonElement(meta ?: return null).jsonObject["receipt"]?.jsonObject?.let(Receipt::fromJson)
+    }.getOrNull()
+
+    private fun metaOf(sources: List<Source>, receipt: Receipt?): String = JsonObject(listOfNotNull("sources" to JsonArray(sources.map { s ->
         JsonObject(listOfNotNull(
             "title" to JsonPrimitive(s.title), s.source?.let { "source" to JsonPrimitive(it) }, s.relevance?.let { "relevance" to JsonPrimitive(it) },
             s.similarity?.let { "similarity" to JsonPrimitive(it) }, s.docId?.let { "docId" to JsonPrimitive(it) }, "body" to JsonPrimitive(s.body),
         ).toMap())
-    }))).toString()
+    }), receipt?.let { "receipt" to it.toJson() }).toMap()).toString()
 
     private fun sourcesFromMeta(meta: String?): List<Source> = runCatching {
         Json.parseToJsonElement(meta ?: return emptyList()).jsonObject["sources"]!!.jsonArray.map { e ->
