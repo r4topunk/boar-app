@@ -575,6 +575,38 @@
       "tagline": "Answers from this phone, with sources",
       "fill": "Put in the input to edit",
       "ask": "Ask: {{question}}"
+    },
+    "receipt": {
+      "sourcePassage": "Source passage",
+      "localModel": "Local model",
+      "noOfflineSource": "No offline source",
+      "calculator": "Calculation",
+      "started": "started in {{time}}",
+      "offline": "offline",
+      "speed": "{{rate}} tok/s",
+      "details": "Performance details",
+      "load": "Model load",
+      "search": "Search",
+      "prefill": "Reading sources",
+      "context": "Context",
+      "start": "Start",
+      "words": "Generated",
+      "wordCount": "~{{words}} words",
+      "total": "Total",
+      "verification": "Verification",
+      "copy": "Copy receipt",
+      "copied": "Receipt copied",
+      "verified": {
+        "passed": "passed",
+        "failed": "failed",
+        "uncertain": "uncertain"
+      },
+      "answeredIn": "Answered in {{time}}",
+      "offlineMap": "Offline map",
+      "speedLabel": "Speed",
+      "speedBoth": "{{rate}} tok/s (~{{words}} words/s)",
+      "model": "Model",
+      "tokenCount": "{{tokens}} tokens (~{{words}} words)"
     }
   },
   "flows": {
@@ -825,6 +857,13 @@
         "compact": "Quicker answers, less memory",
         "default": "Better answers, a bit slower"
       }
+    },
+    "knowledge": {
+      "topicPacksTitle": "Topic packs",
+      "topicPacksFooter": "Collections on one subject, readable without internet. Each file is checked before use."
     }
+  },
+  "nav": {
+    "knowledge": "Knowledge"
   }
 }

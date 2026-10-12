@@ -575,6 +575,38 @@
       "tagline": "Respostas deste celular, com fontes",
       "fill": "Colocar no campo para editar",
       "ask": "Perguntar: {{question}}"
+    },
+    "receipt": {
+      "sourcePassage": "Trecho da fonte",
+      "localModel": "Modelo local",
+      "noOfflineSource": "Sem fonte offline",
+      "calculator": "Cálculo",
+      "started": "começou em {{time}}",
+      "offline": "offline",
+      "speed": "{{rate}} tok/s",
+      "details": "Detalhes de desempenho",
+      "load": "Carregar modelo",
+      "search": "Busca",
+      "prefill": "Leitura das fontes",
+      "context": "Contexto",
+      "start": "Início",
+      "words": "Gerado",
+      "wordCount": "~{{words}} palavras",
+      "total": "Total",
+      "verification": "Verificação",
+      "copy": "Copiar recibo",
+      "copied": "Recibo copiado",
+      "verified": {
+        "passed": "aprovada",
+        "failed": "reprovada",
+        "uncertain": "incerta"
+      },
+      "answeredIn": "Respondido em {{time}}",
+      "offlineMap": "Mapa offline",
+      "speedLabel": "Velocidade",
+      "speedBoth": "{{rate}} tok/s (~{{words}} palavras/s)",
+      "model": "Modelo",
+      "tokenCount": "{{tokens}} tokens (~{{words}} palavras)"
     }
   },
   "flows": {
@@ -825,6 +857,13 @@
         "compact": "Respostas mais rápidas, menos memória",
         "default": "Respostas melhores, um pouco mais lento"
       }
+    },
+    "knowledge": {
+      "topicPacksTitle": "Pacotes temáticos",
+      "topicPacksFooter": "Coleções sobre um assunto, para ler sem internet. Cada arquivo é conferido antes do uso."
     }
+  },
+  "nav": {
+    "knowledge": "Conhecimento"
   }
 }

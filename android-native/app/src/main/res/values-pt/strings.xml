@@ -449,6 +449,34 @@
     <string name="chat_empty_tagline" formatted="false">Respostas deste celular, com fontes</string>
     <string name="chat_empty_fill" formatted="false">Colocar no campo para editar</string>
     <string name="chat_empty_ask" formatted="false">Perguntar: {{question}}</string>
+    <string name="chat_receipt_sourcePassage" formatted="false">Trecho da fonte</string>
+    <string name="chat_receipt_localModel" formatted="false">Modelo local</string>
+    <string name="chat_receipt_noOfflineSource" formatted="false">Sem fonte offline</string>
+    <string name="chat_receipt_calculator" formatted="false">Cálculo</string>
+    <string name="chat_receipt_started" formatted="false">começou em {{time}}</string>
+    <string name="chat_receipt_offline" formatted="false">offline</string>
+    <string name="chat_receipt_speed" formatted="false">{{rate}} tok/s</string>
+    <string name="chat_receipt_details" formatted="false">Detalhes de desempenho</string>
+    <string name="chat_receipt_load" formatted="false">Carregar modelo</string>
+    <string name="chat_receipt_search" formatted="false">Busca</string>
+    <string name="chat_receipt_prefill" formatted="false">Leitura das fontes</string>
+    <string name="chat_receipt_context" formatted="false">Contexto</string>
+    <string name="chat_receipt_start" formatted="false">Início</string>
+    <string name="chat_receipt_words" formatted="false">Gerado</string>
+    <string name="chat_receipt_wordCount" formatted="false">~{{words}} palavras</string>
+    <string name="chat_receipt_total" formatted="false">Total</string>
+    <string name="chat_receipt_verification" formatted="false">Verificação</string>
+    <string name="chat_receipt_copy" formatted="false">Copiar recibo</string>
+    <string name="chat_receipt_copied" formatted="false">Recibo copiado</string>
+    <string name="chat_receipt_verified_passed" formatted="false">aprovada</string>
+    <string name="chat_receipt_verified_failed" formatted="false">reprovada</string>
+    <string name="chat_receipt_verified_uncertain" formatted="false">incerta</string>
+    <string name="chat_receipt_answeredIn" formatted="false">Respondido em {{time}}</string>
+    <string name="chat_receipt_offlineMap" formatted="false">Mapa offline</string>
+    <string name="chat_receipt_speedLabel" formatted="false">Velocidade</string>
+    <string name="chat_receipt_speedBoth" formatted="false">{{rate}} tok/s (~{{words}} palavras/s)</string>
+    <string name="chat_receipt_model" formatted="false">Modelo</string>
+    <string name="chat_receipt_tokenCount" formatted="false">{{tokens}} tokens (~{{words}} palavras)</string>
     <string name="flows_onboarding_brandSub" formatted="false">Assistente de pesquisa offline</string>
     <string name="flows_onboarding_introLabel" formatted="false">Como funciona</string>
     <string name="flows_onboarding_phoneLabel" formatted="false">Este celular</string>
@@ -657,4 +685,7 @@
     <string name="flows_row_fitWhy_insufficient" formatted="false">Falta memória livre neste celular</string>
     <string name="flows_assistant_sub_compact" formatted="false">Respostas mais rápidas, menos memória</string>
     <string name="flows_assistant_sub_default" formatted="false">Respostas melhores, um pouco mais lento</string>
+    <string name="flows_knowledge_topicPacksTitle" formatted="false">Pacotes temáticos</string>
+    <string name="flows_knowledge_topicPacksFooter" formatted="false">Coleções sobre um assunto, para ler sem internet. Cada arquivo é conferido antes do uso.</string>
+    <string name="nav_knowledge" formatted="false">Conhecimento</string>
 </resources>
