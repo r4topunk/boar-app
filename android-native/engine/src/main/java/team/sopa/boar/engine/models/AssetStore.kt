@@ -84,9 +84,9 @@ class AssetStore(
 
     fun statusAll(): List<Status> = catalog.models.map(::status)
 
-    /** Setup is complete: every required asset plus one answer model on disk with the right size. */
+    /** Setup is complete: every required asset plus one model setup offers on disk with the right size. */
     fun requiredPresent(): Boolean =
-        catalog.models.filter { it.required }.all { status(it).present } && catalog.answerModels.any { status(it).present }
+        catalog.models.filter { it.required }.all { status(it).present } && catalog.setupModels.any { status(it).present }
 
     /** Streams the installed file through SHA-256 and remembers a match. */
     suspend fun verify(asset: CatalogAsset, onProgress: (Progress) -> Unit = {}): Boolean = withContext(Dispatchers.IO) {

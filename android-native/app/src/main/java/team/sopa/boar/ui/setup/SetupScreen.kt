@@ -261,10 +261,13 @@ private fun ModelStep(state: SetupState, vm: SetupViewModel) {
     }) {
         StepHeader(1, t("flows.onboarding.modelTitle"), t("flows.onboarding.modelSub"))
         for (m in state.models) {
-            val tier = vm.tierOf(m)
             OptionCard(m.shortName, m.id == state.chosenId, Units.formatBytes(m.sizeBytes),
                 if (m.id == state.recommendedId) t("flows.onboarding.recommended") else null, { vm.choose(m.id) }) {
-                Meta("${t("flows.onboarding.answerTier.$tier")} · ${t("flows.assistant.sub.$tier")}", c.textSecondary)
+                // The two answer tiers have translated lines; the other catalog models carry their manifest description.
+                if (m.answerTier != null) {
+                    val tier = vm.tierOf(m)
+                    Meta("${t("flows.onboarding.answerTier.$tier")} · ${t("flows.assistant.sub.$tier")}", c.textSecondary)
+                } else Meta(m.description, c.textSecondary)
                 if (vm.isHeavy(m)) Meta(t("flows.row.fit.thrashing"), c.textAccentAmber)
             }
         }

@@ -15,6 +15,14 @@ class CatalogTest {
         assertEquals(listOf(AnswerTier.DEFAULT, AnswerTier.COMPACT), catalog.answerModels.map { it.answerTier })
     }
 
+    @Test fun `setup offers every suggested model, smallest first, never a hidden one`() {
+        val ids = catalog.setupModels.map { it.id }
+        assertEquals("qwen2.5-1.5b-instruct-q4km", ids.first())
+        assertTrue(catalog.answerModels.all { it.id in ids })
+        assertTrue("phi-3.5-mini-instruct-q4km" !in ids)
+        assertEquals(catalog.setupModels.sortedBy { it.sizeBytes }, catalog.setupModels)
+    }
+
     @Test fun `required models are the embedding model plus the default answer model`() {
         assertEquals(setOf(AssetKind.EMBEDDING, AssetKind.LLM), catalog.requiredModels.map { it.kind }.toSet())
     }

@@ -17,9 +17,16 @@ object SetupModel {
         return models.firstOrNull { it.answerTier == tier } ?: models.firstOrNull()
     }
 
-    /** True when the model is bigger than this phone is recommended for: it may be slow or closed in the background. */
-    fun heavyForPhone(model: CatalogAsset, totalRamBytes: Long): Boolean =
-        model.answerTier == AnswerTier.DEFAULT && totalRamBytes > 0 && totalRamBytes < RECOMMEND_DEFAULT_MIN_RAM_BYTES
+    /**
+     * True when the model is bigger than this phone is recommended for: it may be slow or closed in the background.
+     * The 4B (2.5 GB) is heavy under 12 GB, as measured above; that is a file over a quarter of the RAM, which
+     * the same rule applies to the other catalog models (7-8B, ~5 GB: heavy on a 12 GB phone too). Never the compact tier.
+     */
+    fun heavyForPhone(model: CatalogAsset, totalRamBytes: Long): Boolean = when {
+        model.answerTier == AnswerTier.COMPACT || totalRamBytes <= 0 -> false
+        model.answerTier == AnswerTier.DEFAULT -> totalRamBytes < RECOMMEND_DEFAULT_MIN_RAM_BYTES
+        else -> model.sizeBytes > totalRamBytes / 4
+    }
 
     /** The model to download: the user's pick, else one already on the phone, else the recommended one. */
     fun toInstall(models: List<CatalogAsset>, present: Set<String>, totalRamBytes: Long, chosenId: String? = null): CatalogAsset? =

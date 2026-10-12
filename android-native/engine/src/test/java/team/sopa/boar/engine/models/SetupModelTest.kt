@@ -31,6 +31,12 @@ class SetupModelTest {
 
     @Test fun `doesn't warn when the RAM couldn't be read`() = assertFalse(SetupModel.heavyForPhone(big, 0))
 
+    @Test fun `flags a 5 GB catalog model even on a 12 GB phone, a 1 GB one nowhere above 4 GB`() {
+        fun other(bytes: Double) = CatalogAsset("other", AssetKind.LLM, "other", null, "models/other.gguf", (bytes * gb).toLong(), "", "", "", "", false)
+        assertTrue(SetupModel.heavyForPhone(other(5.2), ram(10.7)))
+        assertFalse(SetupModel.heavyForPhone(other(1.0), ram(7.3)))
+    }
+
     @Test fun `takes the user's pick over everything`() =
         assertEquals(big, SetupModel.toInstall(models, setOf(small.id), ram(10.7), big.id))
 

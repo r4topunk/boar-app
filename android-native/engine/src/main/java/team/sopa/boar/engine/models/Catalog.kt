@@ -20,6 +20,10 @@ data class Catalog(
         get() = models.filter { it.kind == AssetKind.LLM && it.answerTier != null }
             .sortedBy { if (it.answerTier == AnswerTier.DEFAULT) 0 else 1 }
 
+    /** Every suggested LLM the user can pick at setup, smallest first: the two answer tiers plus the other catalog models. */
+    val setupModels: List<CatalogAsset>
+        get() = models.filter { it.kind == AssetKind.LLM && !it.hidden }.sortedBy { it.sizeBytes }
+
     val defaultAnswerModel: CatalogAsset get() = answerModels.first { it.answerTier == AnswerTier.DEFAULT }
     val compactAnswerModel: CatalogAsset get() = answerModels.first { it.answerTier == AnswerTier.COMPACT }
     val requiredModels: List<CatalogAsset> get() = models.filter { it.required } + defaultAnswerModel

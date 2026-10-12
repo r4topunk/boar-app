@@ -111,8 +111,8 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         val ram = runCatching { ActivityManager.MemoryInfo().also { app.getSystemService(ActivityManager::class.java).getMemoryInfo(it) }.totalMem }.getOrDefault(0L)
-        val answer = services.catalog.answerModels
-        val rec = SetupModel.recommended(answer, ram)
+        val answer = services.catalog.setupModels
+        val rec = SetupModel.recommended(services.catalog.answerModels, ram)
         _state.update { it.copy(totalRamBytes = ram, models = answer, recommendedId = rec?.id, chosenId = rec?.id) }
         restore()
         refreshPlans()
