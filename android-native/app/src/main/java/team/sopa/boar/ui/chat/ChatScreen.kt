@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -91,8 +92,17 @@ fun ChatScreen(
     val list = rememberLazyListState()
     var input by remember { mutableStateOf("") }
     val last = state.messages.lastOrNull()
+    // Follow the end of the answer while it streams, unless the user scrolled up to read: a drag that ends short of
+    // the bottom stops following, reaching the bottom again resumes it, and a new message always does.
+    var follow by remember { mutableStateOf(true) }
+    LaunchedEffect(list) {
+        snapshotFlow { list.isScrollInProgress }.collect { moving -> if (!moving) follow = !list.canScrollForward }
+    }
+    LaunchedEffect(state.messages.size) { follow = true }
     LaunchedEffect(state.messages.size, last?.text?.length) {
-        if (state.messages.isNotEmpty()) list.animateScrollToItem(state.messages.size - 1)
+        // Jump to the end of the last message (the offset is clamped to the list's end); not animated, since this
+        // runs on every streamed token.
+        if (follow && !list.isScrollInProgress && state.messages.isNotEmpty()) list.scrollToItem(state.messages.size - 1, Int.MAX_VALUE / 2)
     }
     Box(Modifier.fillMaxSize().background(c.bgTerminal)) {
         Ambient()
