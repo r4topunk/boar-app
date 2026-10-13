@@ -115,4 +115,5 @@
     <string name="native_browse_unvetted" formatted="false">Not vetted by BOAR</string>
     <string name="native_browse_more" formatted="false">Loading more…</string>
     <string name="native_browse_files" formatted="false">Files</string>
+    <string name="native_browse_discoverTitle" formatted="false">Discover GGUF models</string>
 </resources>
