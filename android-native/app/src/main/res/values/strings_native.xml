@@ -127,4 +127,9 @@
     <string name="native_tweaks_preset_cool" formatted="false">Cool Down</string>
     <string name="native_tweaks_preset_coolNote" formatted="false">For a hot phone: 1 thread, small prompt batches, a smaller context, no reasoning, 5 minutes at most per step. The slowest.</string>
     <string name="native_tweaks_presetCustom" formatted="false">Custom: your own settings below. Pick a preset to start over from it.</string>
+    <string name="native_browse_discoverTitle" formatted="false">Discover GGUF models</string>
+    <string name="native_models_cancelDownload" formatted="false">Cancel</string>
+    <string name="native_settings_embeddingOk" formatted="false">Search model (for packs and documents): {{model}} ✓</string>
+    <string name="native_settings_embeddingMissing" formatted="false">Search model (for packs and documents): {{model}}, not on the phone. Run setup again from Recovery.</string>
+    <string name="native_browse_discoverSubtitle" formatted="false">Browse Hugging Face models</string>
 </resources>

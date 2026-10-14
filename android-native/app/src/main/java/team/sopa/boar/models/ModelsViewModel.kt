@@ -44,6 +44,8 @@ data class ModelsState(
     val hfBusy: Boolean = false,
     val hfError: String? = null,
     val hfAdded: String? = null,
+    /** The catalog id of the model just added from Hugging Face (setup picks it up and uses it). */
+    val hfAddedId: String? = null,
     /** The browse page's filters and paging: no request until the page is opened. */
     val hfQuery: String = "",
     val hfSize: HfQuery.Size = HfQuery.Size.ANY,
@@ -79,7 +81,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         val request = hfSearch.incrementAndGet()
         hfRequest.incrementAndGet() // a repo's files still loading belong to the old results
         _state.update { it.copy(hfQuery = query, hfSize = size, hfSort = sort, hfSearching = true, hfSearched = true, hfError = null,
-            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfBusy = false, hfAdded = null) }
+            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfBusy = false, hfAdded = null, hfAddedId = null) }
         fetchPage(request, HfQuery.searchUrl(query, size, sort), append = false)
     }
 
@@ -114,13 +116,16 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Forgets the last model added, so a page opened now only reacts to what's added from here on (setup). */
+    fun clearAdded() = _state.update { it.copy(hfAdded = null, hfAddedId = null) }
+
     /** Adds the file to the list above as a downloadable model (not downloaded yet). */
     fun hfAdd(repo: String, f: HfBrowser.GgufFile) {
         viewModelScope.launch(Dispatchers.IO) {
             val asset = runCatching { HfBrowser.toAsset(repo, f) }.getOrElse { e -> _state.update { it.copy(hfError = e.message) }; return@launch }
             services.addDiscovered(asset)
             store = AssetStore(getApplication<Application>().filesDir, services.catalog)
-            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label) }
+            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label, hfAddedId = asset.id) }
             refresh()
         }
     }
@@ -138,10 +143,12 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun row(id: String, change: (Row) -> Row) = _state.update { s -> s.copy(rows = s.rows + (id to change(s.rows[id] ?: Row()))) }
 
+    private val downloads = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+
     fun download(a: CatalogAsset) {
         if (_state.value.rows[a.id]?.downloading == true) return
         row(a.id) { Row(downloading = true) }
-        viewModelScope.launch(Dispatchers.IO) {
+        downloads[a.id] = viewModelScope.launch(Dispatchers.IO) {
             var lastT = System.nanoTime()
             var lastB = 0L
             var speed: Double? = null
@@ -161,9 +168,36 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
                 row(a.id) { Row(present = true) }
                 if (a.kind == AssetKind.CORPUS && a.format != "sqlite-pack") index(a)
                 if (a.kind == AssetKind.CORPUS) services.reloadPacks()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Cancelled by the user: the partial file goes too, so nothing is left half-downloaded.
+                store.delete(a)
+                row(a.id) { Row() }
+                throw e
             } catch (e: Exception) {
                 row(a.id) { Row(error = e.message ?: e.toString()) }
+            } finally {
+                downloads.remove(a.id)
             }
+            refresh()
+        }
+    }
+
+    /** Stops a download and deletes what it wrote so far. */
+    fun cancelDownload(a: CatalogAsset) {
+        downloads[a.id]?.cancel() ?: return
+        refresh()
+    }
+
+    /** A model added from Hugging Face but not downloaded: in the list only, so it can leave it (the Expo app's ✕). */
+    fun isDiscovered(a: CatalogAsset) = services.discovered().any { it.id == a.id }
+
+    fun removeFromList(a: CatalogAsset) {
+        viewModelScope.launch(Dispatchers.IO) {
+            downloads[a.id]?.cancel()
+            store.delete(a)
+            services.removeDiscovered(a.id)
+            store = AssetStore(getApplication<Application>().filesDir, services.catalog)
+            _state.update { s -> s.copy(rows = s.rows - a.id) }
             refresh()
         }
     }

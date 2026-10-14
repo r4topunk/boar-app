@@ -14,7 +14,11 @@ android {
     // Without them the build has no Share button, as the Expo app.
     val env = rootProject.file("../.env").takeIf { it.isFile }?.readLines().orEmpty()
         .mapNotNull { l -> l.split("=", limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim().trim('"') } }.toMap()
+    // Uncensored and adult models (HfQuery.uncensored) are hidden from Discover GGUF models unless ALLOW_UNCENSORED_MODELS=true
+    // (.env, the environment, or -Pboar.allowUncensoredModels=true).
+    val allowUncensored = (providers.gradleProperty("boar.allowUncensoredModels").orNull ?: env["ALLOW_UNCENSORED_MODELS"] ?: System.getenv("ALLOW_UNCENSORED_MODELS"))?.trim()?.toBoolean() ?: false
     defaultConfig {
+        buildConfigField("boolean", "ALLOW_UNCENSORED_MODELS", "$allowUncensored")
         buildConfigField("String", "SUPABASE_URL", "\"${env["EXPO_PUBLIC_SUPABASE_URL"] ?: ""}\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${env["EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ?: ""}\"")
         // The release keeps the Expo app's id and key, so it installs over v1.1.x with its models.

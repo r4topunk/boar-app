@@ -113,6 +113,10 @@ private fun ModelsSection(services: BoarServices, onOpen: (String) -> Unit) {
         val llms = services.installed(team.sopa.boar.engine.models.AssetKind.LLM)
         Text(t("native.settings.activeModel", "model" to (services.answerModel()?.shortName ?: "—")), style = Boar.type.body, color = c.textPrimary)
         Text(t("modelSetupScreen.installedModels") + ": " + llms.joinToString(", ") { it.shortName }.ifEmpty { "—" }, style = Boar.type.subtext, color = c.textSecondary)
+        // The embedding model searches the knowledge packs and documents; it isn't a choice, so not in the catalog.
+        val emb = services.catalog.models.firstOrNull { it.kind == team.sopa.boar.engine.models.AssetKind.EMBEDDING }
+        if (emb != null) Text(t(if (services.fileOf(emb).isFile) "native.settings.embeddingOk" else "native.settings.embeddingMissing", "model" to emb.shortName),
+            style = Boar.type.subtext, color = c.textSecondary)
         LinkButton(t("native.settings.openCatalog")) { onOpen("models") }
     }
 }

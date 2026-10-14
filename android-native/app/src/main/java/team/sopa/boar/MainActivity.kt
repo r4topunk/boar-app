@@ -132,9 +132,22 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
             lifecycle.addObserver(observer)
             onDispose { lifecycle.removeObserver(observer) }
         }
+        // "Discover GGUF models" from the model step: the Hugging Face page on top of setup; a model added there is
+        // listed in setup and chosen, and setup comes back.
+        var browsing by rememberSaveable { mutableStateOf(false) }
+        val setupModels: ModelsViewModel = viewModel()
+        if (browsing) {
+            val modelsState by setupModels.state.collectAsState()
+            LaunchedEffect(modelsState.hfAddedId) { modelsState.hfAddedId?.let { id -> setup.pickDiscovered(id); browsing = false } }
+            BackHandler { browsing = false }
+            BrowseScreen(modelsState, setupModels) { browsing = false }
+            return
+        }
         SetupScreen(setupState, setup, team.sopa.boar.ui.setup.currentLanguage(services.settings.languageId),
             onLanguage = { id -> services.settings.languageId = id; prefs.setLanguage(id) },
             onSkip = if (wasReady) ({ setup.forget(); screen = "chat" }) else null,
+            // Cleared first: a model added earlier from Models must not be picked the moment the page opens.
+            onBrowse = { setupModels.clearAdded(); browsing = true },
         ) { setup.forget(); vm.refreshModel(); screen = afterSetup(services.pinLock.isSet) }
         return
     }
