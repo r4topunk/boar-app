@@ -39,6 +39,7 @@ class SettingsDeviceTest {
         val services = BoarServices.get(ctx)
         // Clear All really clears: only run where the app has no chats of its own (a test install).
         org.junit.Assume.assumeTrue("the app has chats; not clearing them", services.chats.listSessions().isEmpty())
+        services.settings.showLiveStats = true // Hardware telemetry is a technical detail
         val s = services.chats.createSession("Settings test chat")
         services.chats.addMessage(s.id, "user", "hello", services.chats.newId())
         try {
@@ -89,6 +90,7 @@ class SettingsDeviceTest {
     /** The sections brought back from the Expo app, without touching the app's chats or settings. */
     @Test fun restoredSectionsAreThere() {
         val services = BoarServices.get(ctx)
+        services.settings.showLiveStats = true // Hardware telemetry is a technical detail
         var opened by mutableStateOf<String?>(null)
         val prefs = object : DisplayPrefs { override fun setTheme(id: String) {}; override fun setFontScale(scale: String) {}; override fun setLanguage(id: String?) {} }
         compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = {}, onSetup = {}, onOpen = { opened = it }) {} } }
@@ -98,6 +100,23 @@ class SettingsDeviceTest {
             "voiceSettings.enabledLabel", "voiceSettings.speechEngineLabel", "interfaceSettings.hapticFeedbackLabel", "native.settings.security")) {
             compose.onNode(hasScrollAction()).performScrollToNode(hasText(t(label)))
             compose.onNodeWithText(t(label)).assertExists()
+        }
+    }
+
+    /** Show technical details off (the default): no Hardware telemetry section; the switch sits in Advanced tweaks. */
+    @Test fun telemetryHidesWithoutTechnicalDetails() {
+        val services = BoarServices.get(ctx)
+        val was = services.settings.showLiveStats
+        services.settings.showLiveStats = false
+        try {
+            val prefs = object : DisplayPrefs { override fun setTheme(id: String) {}; override fun setFontScale(scale: String) {}; override fun setLanguage(id: String?) {} }
+            compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = {}, onSetup = {}, onOpen = {}) {} } }
+            compose.onNodeWithText(t("native.telemetry.chip")).assertDoesNotExist()
+            click(t("native.tweaks.title"))
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText(t("native.tweaks.technicalDetails")))
+            compose.onNodeWithText(t("native.tweaks.technicalDetails")).assertExists()
+        } finally {
+            services.settings.showLiveStats = was
         }
     }
 }

@@ -74,6 +74,8 @@ data class ChatState(
     val modelLabel: String? = null,
     val noModel: Boolean = false,
     val deepResearch: Boolean = false,
+    /** Advanced tweaks → Show technical details (AppSettings.showLiveStats). */
+    val technicalDetails: Boolean = false,
     val error: String? = null,
     /** CR-2, shown once: the model that closed the app and the one answering instead. */
     val loadCrash: team.sopa.boar.engine.models.LoadGuard.Crash? = null,
@@ -95,7 +97,7 @@ data class ChatState(
  */
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val services = BoarServices.get(app)
-    private val _state = MutableStateFlow(ChatState(deepResearch = services.settings.deepResearchMode))
+    private val _state = MutableStateFlow(ChatState(deepResearch = services.settings.deepResearchMode, technicalDetails = services.settings.showLiveStats))
     val state: StateFlow<ChatState> = _state
     private var job: Job? = null
     /** A chat title or summary still being written; a new question stops it (one model, one generation). */
@@ -132,7 +134,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshSettings() {
         refreshTone()
         refreshModel()
-        _state.update { it.copy(deepResearch = services.settings.deepResearchMode) }
+        _state.update { it.copy(deepResearch = services.settings.deepResearchMode, technicalDetails = services.settings.showLiveStats) }
         // The open chat was erased (Clear all chat history, or a forgotten PIN): start a new one.
         val open = _state.value.sessionId
         if (open != null && services.chats.listSessions().none { it.id == open }) newChat()

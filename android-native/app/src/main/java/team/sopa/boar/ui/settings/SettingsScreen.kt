@@ -61,16 +61,18 @@ interface DisplayPrefs {
 fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) -> Unit, onSetup: () -> Unit, onOpen: (String) -> Unit = {}, onBack: () -> Unit) {
     val c = Boar.colors
     val s = services.settings
+    var tech by remember { mutableStateOf(s.showLiveStats) }
     Column(Modifier.fillMaxSize().background(c.bgTerminal).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().background(c.bgSurface).padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("←", style = Boar.type.titleLg, color = c.textPrimary, modifier = Modifier.clickable(onClick = onBack).padding(4.dp))
             Text(t("modelSetupScreen.header.title"), style = Boar.type.titleLg, color = c.textHeading)
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // The agreed order (Oct 14): answering, what BOAR knows, how it looks and speaks, who can open it, then the
+            // technical corner. Hardware telemetry is a technical detail, shown with Advanced tweaks → Show technical details.
             ToneSection(services)
             ModelsSection(services, onOpen)
             KnowledgeSection(services, onOpen)
-            SecuritySection(services, onPin)
             Section(t("modelSetupScreen.sections.memory")) {
                 var auto by remember { mutableStateOf(s.autoSummarize) }
                 SwitchRow(t("memorySettings.autoSummarizeLabel"), t("memorySettings.autoSummarizeValue"), auto) { auto = it; s.autoSummarize = it }
@@ -94,9 +96,10 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) 
                 var lang by remember { mutableStateOf(s.languageId ?: "system") }
                 Choices(null, listOf("system" to "System", "en" to "English", "pt" to "Português"), lang) { lang = it; val id = it.takeIf { v -> v != "system" }; s.languageId = id; prefs.setLanguage(id) }
             }
-            TelemetrySection(services)
+            SecuritySection(services, onPin)
             VoiceSection(services)
-            TweaksSection(services)
+            if (tech) TelemetrySection(services)
+            TweaksSection(services, tech) { tech = it }
             RecoverySection(onSetup)
         }
     }
@@ -277,7 +280,7 @@ private fun ToneSection(services: BoarServices) {
 }
 
 @Composable
-private fun TweaksSection(services: BoarServices) {
+private fun TweaksSection(services: BoarServices, technical: Boolean, onTechnical: (Boolean) -> Unit) {
     val s = services.settings
     val scope = rememberCoroutineScope()
     var tw by remember { mutableStateOf(s.engineTweaks) }
@@ -337,6 +340,8 @@ private fun TweaksSection(services: BoarServices) {
             t("native.tweaks.resetAll"), style = Boar.type.body, color = Boar.colors.textAccentEmerald, fontWeight = FontWeight.Bold,
             modifier = Modifier.clickable { save(EngineTweaks()) }.padding(vertical = 6.dp),
         )
+        // One switch for everything technical in the chat and the menu (the receipt's time and speed stay for everyone).
+        SwitchRow(t("native.tweaks.technicalDetails"), t("native.tweaks.technicalDetailsNote"), technical) { s.showLiveStats = it; onTechnical(it) }
     }
 }
 

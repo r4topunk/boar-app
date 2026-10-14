@@ -77,6 +77,10 @@ class AppSettings(private val file: File) {
     var voiceInputEnabled: Boolean get() = bool("voiceInputEnabled") ?: true; set(v) = set("voiceInputEnabled", JsonPrimitive(v))
     var hapticsEnabled: Boolean get() = bool("hapticsEnabled") ?: true; set(v) = set("hapticsEnabled", JsonPrimitive(v))
     var hidePromptIdeas: Boolean get() = bool("hidePromptIdeas") ?: false; set(v) = set("hidePromptIdeas", JsonPrimitive(v))
+    /**
+     * Advanced tweaks → Show technical details (the Expo app's live-stats key): off, the chat shows the short receipt
+     * only; on, the receipt's details, live tok/s in the header, the menu's memory and storage bars, Hardware telemetry.
+     */
     var showLiveStats: Boolean get() = bool("showLiveStats") ?: false; set(v) = set("showLiveStats", JsonPrimitive(v))
 
     /** DEFAULT_MEMORY_SETTINGS when unset. */

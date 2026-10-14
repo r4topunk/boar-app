@@ -115,4 +115,6 @@
     <string name="native_browse_unvetted" formatted="false">Not vetted by BOAR</string>
     <string name="native_browse_more" formatted="false">Loading more…</string>
     <string name="native_browse_files" formatted="false">Files</string>
+    <string name="native_tweaks_technicalDetails" formatted="false">Show technical details</string>
+    <string name="native_tweaks_technicalDetailsNote" formatted="false">Under each answer, tap the time and speed for the details (time to the first word, context, model); live speed in the header while BOAR answers; memory and storage at the bottom of the menu; Hardware telemetry in Settings.</string>
 </resources>
