@@ -63,6 +63,11 @@ class DeepResearch(
     ): ResearchResult {
         timedOut = false
         onProgress(ResearchProgress(ResearchStage.DECOMPOSING))
+        // A follow-up ("conclusion", "continue", "and its side effects?") is split, searched and judged as a standalone
+        // question; split as written it searched for "conclusion" and refused (X6, Oct 13).
+        val exchange = lastExchange(query, history)
+        val asked = query
+        @Suppress("NAME_SHADOWING") val query = if (exchange != null) standalone(query, exchange) else query
         val subQuestions = decompose(query)
         val subResults = ArrayList<Pair<String, String>>()
         val perQuestion = ArrayList<List<Chunk>>()
@@ -88,7 +93,7 @@ class DeepResearch(
         onSources(all)
         if (shouldStop()) return ResearchResult("", subQuestions, all, full(), timedOut)
         onProgress(ResearchProgress(ResearchStage.SYNTHESIZING))
-        val answer = synthesize(query, subResults, systemPrompt, maxTokens, onToken, answerLanguage)
+        val answer = synthesize(query, subResults, systemPrompt, maxTokens, onToken, answerLanguage, exchange?.let { it to asked })
         return ResearchResult(answer, subQuestions, all, full(), timedOut)
     }
 
@@ -108,6 +113,17 @@ class DeepResearch(
         return parseSubQuestions(stage("You plan research.", prompt, 150, 0.4f, null), query)
     }
 
+    /** The follow-up rewritten from [exchange] into one question that names its subject; [query] if that fails. */
+    private suspend fun standalone(query: String, exchange: Exchange): String {
+        val prompt = "Previous question: ${exchange.question}\n\nPrevious answer: ${exchange.answer}\n\n" +
+            "Follow-up: $query\n\nRewrite the follow-up as one standalone question that names its subject, in the " +
+            "follow-up's language. If it asks to continue, conclude or expand, ask for that about the previous topic. " +
+            "Reply with the question only.\n\nStandalone question:"
+        val text = stage("You rewrite follow-up questions.", prompt, 80, 0.2f, null)
+        return text.split("\n").map { Js.trim(it.replaceFirst(LIST_MARK, "")).trim('"') }
+            .firstOrNull { it.length > 8 && !REFUSAL.containsMatchIn(it) } ?: query
+    }
+
     private suspend fun researchSubQuestion(sub: String, chunks: List<Chunk>, globalIndices: List<Int>, systemPrompt: String?, history: ConversationHistory?): String {
         val summary = history?.summary?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }?.let { "Summary of earlier conversation:\n$it\n\n" } ?: ""
         val context = if (chunks.isNotEmpty()) "Context:\n${numberedContext(chunks, globalIndices)}\n\n" else ""
@@ -117,13 +133,15 @@ class DeepResearch(
         return stage(system, "$summary${context}Question: $sub", 300, 0.6f, null)
     }
 
-    private suspend fun synthesize(query: String, results: List<Pair<String, String>>, systemPrompt: String?, maxTokens: Int, onToken: (String) -> Unit, answerLanguage: String?): String {
+    /** [followUp]: the last exchange and the follow-up as the user wrote it, when [query] was rewritten from them. */
+    private suspend fun synthesize(query: String, results: List<Pair<String, String>>, systemPrompt: String?, maxTokens: Int, onToken: (String) -> Unit, answerLanguage: String?, followUp: Pair<Exchange, String>? = null): String {
         val perspectives = results.mapIndexed { i, (q, a) -> "Perspective ${i + 1} ($q):\n$a" }.joinToString("\n\n")
         val system = "${instructionOf(systemPrompt)} You are synthesizing multiple research perspectives into one answer. " +
             "Compare them, reconcile any conflicts, and write one unified, well-reasoned answer. " +
             "Keep the source numbers exactly as the perspectives cite them, like [3]; do not renumber or invent sources."
         val language = answerLanguage?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }?.let { "\n\n($it)" } ?: ""
-        return stage(system, "Original question: $query\n\n$perspectives$language", maxTokens, 0.6f, onToken)
+        val earlier = followUp?.let { (e, asked) -> "Previous question: ${e.question}\n\nPrevious answer: ${e.answer}\n\nFollow-up as asked: $asked\n\n" } ?: ""
+        return stage(system, "${earlier}Original question: $query\n\n$perspectives$language", maxTokens, 0.6f, onToken)
     }
 
     companion object {
@@ -131,9 +149,36 @@ class DeepResearch(
         const val SUB_QUESTION_CONTEXT_TOKENS = 600
         private val LIST_MARK = Regex("^[-*\\d.)${Js.WS.removePrefix("[").removeSuffix("]")}]+")
 
-        /** The decomposition's lines as sub-questions (at most 3); the question itself when none is usable. */
+        /** The earlier question and the answer to it, for a follow-up. */
+        data class Exchange(val question: String, val answer: String)
+
+        /** Characters of the previous answer a follow-up's rewrite and synthesis see (its opening carries the topic). */
+        const val PREVIOUS_ANSWER_CHARS = 800
+
+        /** A model declining instead of answering ("I'm sorry, but…", "Desculpe, não posso…"). */
+        private val REFUSAL = Regex(
+            "^(i'?m sorry|i am sorry|sorry|i (cannot|can't|can ?not|am unable|'m unable|don't have|do not have)|as an ai|" +
+                "unfortunately|desculp|lamento|infelizmente|não (posso|consigo|tenho)|nao (posso|consigo|tenho))",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /**
+         * The last exchange before [query] when [query] reads as a follow-up (FollowUp.plan: it points back, or it is short
+         * with no name of its own); null for a question that stands alone or a conversation's first.
+         */
+        fun lastExchange(query: String, history: ConversationHistory?): Exchange? {
+            val p = FollowUp.plan(query, history)
+            if (p.direct == null && p.fallback == null) return null
+            val turns = history?.turns.orEmpty()
+            val current = Js.trim(query)
+            val i = turns.indices.lastOrNull { turns[it].role == "user" && Js.trim(turns[it].text).let { t -> t.isNotEmpty() && t != current } } ?: return null
+            val answer = turns.drop(i + 1).firstOrNull { it.role == "assistant" }?.text?.let { Js.trim(it) }.orEmpty()
+            return Exchange(Js.trim(turns[i].text), if (answer.length > PREVIOUS_ANSWER_CHARS) answer.take(PREVIOUS_ANSWER_CHARS) + "…" else answer)
+        }
+
+        /** The decomposition's lines as sub-questions (at most 3), refusals dropped; the question itself when none is usable. */
         fun parseSubQuestions(text: String, query: String): List<String> {
-            val lines = text.split("\n").map { Js.trim(it.replaceFirst(LIST_MARK, "")) }.filter { it.length > 8 }
+            val lines = text.split("\n").map { Js.trim(it.replaceFirst(LIST_MARK, "")) }.filter { it.length > 8 && !REFUSAL.containsMatchIn(it) }
             return lines.take(3).ifEmpty { listOf(query) }
         }
 
