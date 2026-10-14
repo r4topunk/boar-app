@@ -295,6 +295,14 @@ private fun TweaksSection(services: BoarServices) {
     @Composable fun autoOf(value: Any) = t("native.tweaks.autoValue", "value" to value)
     Section(t("native.tweaks.title"), collapsible = true) {
         Note(t("native.tweaks.intro"))
+        // Presets first: one tap sets the knobs below; any knob changed by hand afterwards makes it Custom.
+        val preset = team.sopa.boar.engine.TweakPreset.of(tw)
+        Choices(
+            t("native.tweaks.presets"),
+            team.sopa.boar.engine.TweakPreset.entries.map<team.sopa.boar.engine.TweakPreset, Pair<team.sopa.boar.engine.TweakPreset?, String>> { it to "${it.emoji} ${t("native.tweaks.preset.${it.key}")}" },
+            preset,
+        ) { p -> p?.let { save(it.applyTo(tw)) } }
+        Note(preset?.let { t("native.tweaks.preset.${it.key}Note") } ?: t("native.tweaks.presetCustom"))
         val cpuAuto = CpuVariants.auto(features)?.let { n -> CpuVariants.ALL.first { it.name == n }.label } ?: t("native.tweaks.cpuBest")
         Choices(
             t("native.tweaks.cpuBuild"),
