@@ -186,7 +186,8 @@ private fun Header(state: ChatState, onMenu: () -> Unit, onCycleTone: () -> Unit
                 RoundButton(c.emeraldBgSubtle, c.emeraldBorder, onNewChat) { Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.textAccentEmerald) }
             }
         }
-        val tps = if (state.activity == Activity.Generating) state.liveTokPerSec else null
+        // Live speed in the header is a technical detail (Advanced tweaks → Show technical details).
+        val tps = if (state.activity == Activity.Generating && state.technicalDetails) state.liveTokPerSec else null
         if (state.deepResearch || tps != null) Row(verticalAlignment = Alignment.CenterVertically) {
             if (state.deepResearch) Row(
                 Modifier.background(c.frontierBadgeBg, RoundedCornerShape(6.dp)).border(1.dp, c.frontierBadgeBorder, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp),
@@ -411,22 +412,31 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
                     FooterButton("▼", if (m.feedback == "down") t("chatScreen.rateUnhelpful") else null, m.feedback == "down", c.crimson400, c.crimsonBgSubtle, c.crimsonBorder) { onRate(m.id, "down") }
                     // The receipt fills the gap between rating and copy (main's ReceiptToggle), tapped open below.
                     Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                        m.receipt?.let { r -> ReceiptToggle(r, receiptOpen) { receiptOpen = !receiptOpen } }
+                        // Everyone sees time and speed; the measured details open only with technical details on.
+                        m.receipt?.let { r -> if (state.technicalDetails) ReceiptToggle(r, receiptOpen) { receiptOpen = !receiptOpen } else ReceiptShort(r) }
                     }
                     if (split.thinking != null) FooterButton("💭", null, reasoningShown, c.textAccentEmerald, c.emeraldBgSubtle, c.emeraldBorder) { reasoningShown = !reasoningShown }
                     var copied by remember { mutableStateOf(false) }
                     FooterButton("⧉", null, copied, c.textAccentEmerald, c.emeraldBgSubtle, c.emeraldBorder) { clipboard.setText(AnnotatedString(shown)); copied = true }
                 }
-                if (receiptOpen) m.receipt?.let { r -> ReceiptDetails(r) }
+                if (receiptOpen && state.technicalDetails) m.receipt?.let { r -> ReceiptDetails(r) }
             }
         }
     }
 }
 
+private fun receiptShort(r: Receipt, rate: String) = listOf(ReceiptFormat.seconds(r.totalMs), rate).joinToString(" · ")
+
+/** The receipt everyone sees: "18 s · 10.4 tok/s", nothing to open. */
+@Composable
+private fun ReceiptShort(r: Receipt) =
+    Text(receiptShort(r, t("chat.receipt.speed", "rate" to ReceiptFormat.rate(r.tokPerSec))), style = Boar.type["mono.xs"], color = Boar.colors.textMuted,
+        maxLines = 1, modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp))
+
 /** The answer's receipt (main's ReceiptToggle): time and speed, tapped open for the measured details. */
 @Composable
 private fun ReceiptToggle(r: Receipt, open: Boolean, onToggle: () -> Unit) {
-    val short = listOf(ReceiptFormat.seconds(r.totalMs), t("chat.receipt.speed", "rate" to ReceiptFormat.rate(r.tokPerSec))).joinToString(" · ")
+    val short = receiptShort(r, t("chat.receipt.speed", "rate" to ReceiptFormat.rate(r.tokPerSec)))
     Text("$short " + if (open) "▴" else "▾", style = Boar.type["mono.xs"], color = Boar.colors.textMuted, maxLines = 1,
         modifier = Modifier.clickable(onClickLabel = t("chat.receipt.details"), onClick = onToggle).padding(vertical = 8.dp, horizontal = 4.dp))
 }
