@@ -138,10 +138,12 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun row(id: String, change: (Row) -> Row) = _state.update { s -> s.copy(rows = s.rows + (id to change(s.rows[id] ?: Row()))) }
 
+    private val downloads = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+
     fun download(a: CatalogAsset) {
         if (_state.value.rows[a.id]?.downloading == true) return
         row(a.id) { Row(downloading = true) }
-        viewModelScope.launch(Dispatchers.IO) {
+        downloads[a.id] = viewModelScope.launch(Dispatchers.IO) {
             var lastT = System.nanoTime()
             var lastB = 0L
             var speed: Double? = null
@@ -161,9 +163,36 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
                 row(a.id) { Row(present = true) }
                 if (a.kind == AssetKind.CORPUS && a.format != "sqlite-pack") index(a)
                 if (a.kind == AssetKind.CORPUS) services.reloadPacks()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Cancelled by the user: the partial file goes too, so nothing is left half-downloaded.
+                store.delete(a)
+                row(a.id) { Row() }
+                throw e
             } catch (e: Exception) {
                 row(a.id) { Row(error = e.message ?: e.toString()) }
+            } finally {
+                downloads.remove(a.id)
             }
+            refresh()
+        }
+    }
+
+    /** Stops a download and deletes what it wrote so far. */
+    fun cancelDownload(a: CatalogAsset) {
+        downloads[a.id]?.cancel() ?: return
+        refresh()
+    }
+
+    /** A model added from Hugging Face but not downloaded: in the list only, so it can leave it (the Expo app's ✕). */
+    fun isDiscovered(a: CatalogAsset) = services.discovered().any { it.id == a.id }
+
+    fun removeFromList(a: CatalogAsset) {
+        viewModelScope.launch(Dispatchers.IO) {
+            downloads[a.id]?.cancel()
+            store.delete(a)
+            services.removeDiscovered(a.id)
+            store = AssetStore(getApplication<Application>().filesDir, services.catalog)
+            _state.update { s -> s.copy(rows = s.rows - a.id) }
             refresh()
         }
     }

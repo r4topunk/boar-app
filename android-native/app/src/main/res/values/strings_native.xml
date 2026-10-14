@@ -116,4 +116,7 @@
     <string name="native_browse_more" formatted="false">Loading more…</string>
     <string name="native_browse_files" formatted="false">Files</string>
     <string name="native_browse_discoverTitle" formatted="false">Discover GGUF models</string>
+    <string name="native_models_cancelDownload" formatted="false">Cancel</string>
+    <string name="native_settings_embeddingOk" formatted="false">Search model (for packs and documents): {{model}} ✓</string>
+    <string name="native_settings_embeddingMissing" formatted="false">Search model (for packs and documents): {{model}}, not on the phone. Run setup again from Recovery.</string>
 </resources>

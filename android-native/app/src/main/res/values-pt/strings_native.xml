@@ -116,4 +116,7 @@
     <string name="native_browse_more" formatted="false">Carregando mais…</string>
     <string name="native_browse_files" formatted="false">Arquivos</string>
     <string name="native_browse_discoverTitle" formatted="false">Descobrir modelos GGUF</string>
+    <string name="native_models_cancelDownload" formatted="false">Cancelar</string>
+    <string name="native_settings_embeddingOk" formatted="false">Modelo de busca (pacotes e documentos): {{model}} ✓</string>
+    <string name="native_settings_embeddingMissing" formatted="false">Modelo de busca (pacotes e documentos): {{model}}, não está no celular. Rode a configuração de novo em Recuperação.</string>
 </resources>
