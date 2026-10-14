@@ -44,6 +44,8 @@ data class ModelsState(
     val hfBusy: Boolean = false,
     val hfError: String? = null,
     val hfAdded: String? = null,
+    /** The catalog id of the model just added from Hugging Face (setup picks it up and uses it). */
+    val hfAddedId: String? = null,
     /** The browse page's filters and paging: no request until the page is opened. */
     val hfQuery: String = "",
     val hfSize: HfQuery.Size = HfQuery.Size.ANY,
@@ -79,7 +81,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         val request = hfSearch.incrementAndGet()
         hfRequest.incrementAndGet() // a repo's files still loading belong to the old results
         _state.update { it.copy(hfQuery = query, hfSize = size, hfSort = sort, hfSearching = true, hfSearched = true, hfError = null,
-            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfBusy = false, hfAdded = null) }
+            hfResults = emptyList(), hfNext = null, hfOpenRepo = null, hfFiles = emptyList(), hfBusy = false, hfAdded = null, hfAddedId = null) }
         fetchPage(request, HfQuery.searchUrl(query, size, sort), append = false)
     }
 
@@ -114,13 +116,16 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Forgets the last model added, so a page opened now only reacts to what's added from here on (setup). */
+    fun clearAdded() = _state.update { it.copy(hfAdded = null, hfAddedId = null) }
+
     /** Adds the file to the list above as a downloadable model (not downloaded yet). */
     fun hfAdd(repo: String, f: HfBrowser.GgufFile) {
         viewModelScope.launch(Dispatchers.IO) {
             val asset = runCatching { HfBrowser.toAsset(repo, f) }.getOrElse { e -> _state.update { it.copy(hfError = e.message) }; return@launch }
             services.addDiscovered(asset)
             store = AssetStore(getApplication<Application>().filesDir, services.catalog)
-            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label) }
+            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label, hfAddedId = asset.id) }
             refresh()
         }
     }

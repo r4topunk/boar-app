@@ -221,7 +221,11 @@ private fun CatalogCard(item: CatalogAsset, row: AssetRow?, active: Boolean, ram
  * so it doesn't look like one: a dashed cyan outline and a tint, like an open slot.
  */
 @Composable
-private fun HfCta(onBrowse: () -> Unit) {
+private fun HfCta(onBrowse: () -> Unit) = DiscoverGgufCard(onBrowse)
+
+/** "Discover GGUF models · Browse Hugging Face models": the same card in Models and in setup's model step. */
+@Composable
+fun DiscoverGgufCard(onBrowse: () -> Unit) {
     val c = Boar.colors
     val outline = c.cyan400
     Row(
@@ -234,10 +238,9 @@ private fun HfCta(onBrowse: () -> Unit) {
             .clickable(onClick = onBrowse).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("🔭", fontSize = 28.sp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(t("native.browse.discoverTitle"), style = Boar.type.titleSm, color = c.textAccentCyan)
-            Text(t("native.browse.ctaNote"), style = Boar.type.subtext, color = c.textSecondary)
+            Text(t("native.browse.discoverSubtitle"), style = Boar.type.subtext, color = c.textSecondary)
         }
         Text("›", fontSize = 26.sp, color = c.textAccentCyan, fontWeight = FontWeight.Bold)
     }
