@@ -117,4 +117,14 @@
     <string name="native_browse_files" formatted="false">Files</string>
     <string name="native_tweaks_technicalDetails" formatted="false">Show technical details</string>
     <string name="native_tweaks_technicalDetailsNote" formatted="false">Under each answer, tap the time and speed for the details (time to the first word, context, model); live speed in the header while BOAR answers; memory and storage at the bottom of the menu; Hardware telemetry in Settings.</string>
+    <string name="native_tweaks_presets" formatted="false">Presets</string>
+    <string name="native_tweaks_preset_run" formatted="false">Run Boar Run</string>
+    <string name="native_tweaks_preset_runNote" formatted="false">Fastest answers: the fast cores only, prompts read in bigger batches, the model locked in memory, no time limit. More heat and battery.</string>
+    <string name="native_tweaks_preset_path" formatted="false">Boar\'s Path</string>
+    <string name="native_tweaks_preset_pathNote" formatted="false">Auto: what we measured best on real phones. Balanced.</string>
+    <string name="native_tweaks_preset_forage" formatted="false">Chill Forage</string>
+    <string name="native_tweaks_preset_forageNote" formatted="false">Cooler and longer battery: 2 threads, a smaller context, no reasoning, 5 minutes at most per step. Slower answers.</string>
+    <string name="native_tweaks_preset_cool" formatted="false">Cool Down</string>
+    <string name="native_tweaks_preset_coolNote" formatted="false">For a hot phone: 1 thread, small prompt batches, a smaller context, no reasoning, 5 minutes at most per step. The slowest.</string>
+    <string name="native_tweaks_presetCustom" formatted="false">Custom: your own settings below. Pick a preset to start over from it.</string>
 </resources>

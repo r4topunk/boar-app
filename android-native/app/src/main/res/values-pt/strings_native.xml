@@ -117,4 +117,14 @@
     <string name="native_browse_files" formatted="false">Arquivos</string>
     <string name="native_tweaks_technicalDetails" formatted="false">Mostrar detalhes técnicos</string>
     <string name="native_tweaks_technicalDetailsNote" formatted="false">Sob cada resposta, toque no tempo e na velocidade para ver os detalhes (tempo até a primeira palavra, contexto, modelo); velocidade ao vivo no topo enquanto o BOAR responde; memória e armazenamento no fim do menu; Telemetria de hardware nas Configurações.</string>
+    <string name="native_tweaks_presets" formatted="false">Predefinições</string>
+    <string name="native_tweaks_preset_run" formatted="false">Corre, Javali</string>
+    <string name="native_tweaks_preset_runNote" formatted="false">Respostas mais rápidas: só os núcleos rápidos, o prompt lido em lotes maiores, o modelo travado na memória, sem limite de tempo. Mais calor e bateria.</string>
+    <string name="native_tweaks_preset_path" formatted="false">Trilha do Javali</string>
+    <string name="native_tweaks_preset_pathNote" formatted="false">Auto: o que medimos como melhor em celulares reais. Equilibrado.</string>
+    <string name="native_tweaks_preset_forage" formatted="false">Forrageio Tranquilo</string>
+    <string name="native_tweaks_preset_forageNote" formatted="false">Mais frio e mais bateria: 2 threads, contexto menor, sem raciocínio, no máximo 5 minutos por etapa. Respostas mais lentas.</string>
+    <string name="native_tweaks_preset_cool" formatted="false">Esfriar</string>
+    <string name="native_tweaks_preset_coolNote" formatted="false">Para um celular quente: 1 thread, lotes pequenos, contexto menor, sem raciocínio, no máximo 5 minutos por etapa. O mais lento.</string>
+    <string name="native_tweaks_presetCustom" formatted="false">Personalizado: seus próprios ajustes abaixo. Escolha uma predefinição para recomeçar a partir dela.</string>
 </resources>
