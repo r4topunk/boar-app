@@ -6,7 +6,7 @@ package team.sopa.boar.engine
  *
  * Boar's Path is Auto. The others lean one way from it, within what the measurements allow: more threads is not more
  * power on big.LITTLE phones (8 threads ran at half the speed of 4 on the X6), so Run Boar Run keeps Auto's threads on
- * the fast cores and spends the rest (bigger prompt batches, weights locked in RAM, no time limit) instead.
+ * the fast cores and spends the rest (bigger prompt batches, no time limit) instead.
  */
 enum class TweakPreset(val emoji: String, private val values: EngineTweaks) {
     /**
