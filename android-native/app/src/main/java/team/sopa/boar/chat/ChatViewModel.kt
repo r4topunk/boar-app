@@ -41,6 +41,7 @@ import team.sopa.boar.engine.routing.ModelRole
 import team.sopa.boar.engine.routing.Profiles
 import team.sopa.boar.engine.routing.RoutingPreset
 import team.sopa.boar.engine.routing.TaskType
+import team.sopa.boar.engine.settings.AnswerLimit
 
 /** A source as the chat shows it (and stores with the answer): the passage the model read, and its similarity to the question. */
 data class Source(val title: String, val source: String?, val relevance: Double?, val similarity: Double? = null, val docId: String? = null, val body: String = "")
@@ -54,6 +55,9 @@ data class UiMessage(
     val stopped: Boolean = false,
     val timedOut: Boolean = false,
     val receipt: Receipt? = null,
+    /** It ended at this token limit, not by itself (shown as a note with a redo at [nextLimit]). */
+    val cutAt: Int? = null,
+    val nextLimit: Int? = null,
 )
 
 /** What the assistant is doing for the message being answered. */
@@ -190,8 +194,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         // Fewer than 3 tested on this model (a Hugging Face model has none; Qwen2.5 1.5B has 1 in Portuguese): fill from
         // the ideas tested on the other models, same language, only for packs on the phone.
         val own = suggestionData.forModel(m?.id, lang, installed)
-        val ideas = if (own.size >= 3) own else (own + suggestionData.validation.byModel.keys.flatMap { suggestionData.forModel(it, lang, installed) }).distinct().take(6)
-        _state.update { it.copy(modelLabel = label, noModel = m == null, suggestions = ideas) }
+        val tested = if (own.size >= 3) own else (own + suggestionData.validation.byModel.keys.flatMap { suggestionData.forModel(it, lang, installed) }).distinct()
+        // Plus the short questions of BOAR's own 17-question evaluation, so each new chat shows a different few.
+        ideaPool = (tested + BENCH_IDEAS).distinct()
+        _state.update { it.copy(modelLabel = label, noModel = m == null, suggestions = pickIdeas()) }
     }
 
     fun dismissLoadCrash() = _state.update { it.copy(loadCrash = null) }
@@ -201,9 +207,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(deepResearch = on) }
     }
 
+    /** Every prompt idea this model and language can show; [pickIdeas] draws a few at random. */
+    private var ideaPool: List<String> = emptyList()
+
+    private fun pickIdeas() = ideaPool.shuffled().take(IDEAS_SHOWN)
+
     fun newChat() {
         if (job?.isActive == true) return
-        _state.update { it.copy(sessionId = null, messages = emptyList(), error = null) }
+        _state.update { it.copy(sessionId = null, messages = emptyList(), error = null, suggestions = pickIdeas()) }
     }
 
     /** The drawer's 🗑️: the chat and its messages; the open one becomes a new chat. */
@@ -237,7 +248,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         services.host.current()?.cancel()
     }
 
-    fun send(query: String) {
+    /** Asks [answerId]'s question again with a higher token limit, for this answer only (the setting stays as it is). */
+    fun redoWithLimit(answerId: String, limit: Int) {
+        val messages = _state.value.messages
+        val i = messages.indexOfFirst { it.id == answerId }
+        val q = messages.take(i.coerceAtLeast(0)).lastOrNull { it.role == "user" }?.text ?: return
+        send(q, limit)
+    }
+
+    /** [limit] overrides the answer's token limit (the "Allow more and redo" note); null uses the setting. */
+    fun send(query: String, limit: Int? = null) {
         val q = query.trim()
         if (q.isEmpty() || job?.isActive == true) return
         stopRequested = false
@@ -273,6 +293,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             var timedOut = false
             var firstAt = 0L
             var tokens = 0
+            val budget = limit ?: settings.answerTokens(services.host.openedContext)
+            // The limit the answer could hit; the adaptive router picks its own.
+            var limited: Int? = budget
             fun onPiece(piece: String) {
                 tokens++
                 if (firstAt == 0L) firstAt = System.nanoTime()
@@ -289,7 +312,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update { it.copy(noModel = true, error = "no-model") }
                 } else if (_state.value.deepResearch) {
                     val r = DeepResearch(SessionEngine(session, settings.engineTweaks.thinkingEnabled), services.retriever::retrieve, settings.engineTweaks::stageTimeoutMs, settings.engineTweaks::writeUpTimeoutMs).run(
-                        q, systemPrompt, history, settings.answerTokens(services.host.openedContext),
+                        q, systemPrompt, history, budget,
                         onProgress = { p -> _state.update { it.copy(activity = Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount)) } },
                         onToken = ::onPiece,
                         shouldStop = { stopRequested },
@@ -300,12 +323,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     if (r.fromPreviousAnswer) reusedSources = lastAnswer?.sources
                     timedOut = r.timedOut
                 } else if (settings.adaptiveRoutingEnabled) {
+                    limited = null
                     val r = adaptive(q, systemPrompt, styleReminder, history, ::onPiece)
                     sources = r.first
                     timedOut = r.second
                 } else {
                     val pipeline = AnswerPipeline(session, services.retriever::retrieve, { Classify.classifyTask(it).value }, { Classify.isRetrievalIrrelevant(TaskType.of(it)) })
-                    pipeline.answer(AnswerRequest(q, systemPrompt, styleReminder, settings.answerTokens(services.host.openedContext), history, enableThinking = settings.engineTweaks.thinkingEnabled)).collect { e ->
+                    pipeline.answer(AnswerRequest(q, systemPrompt, styleReminder, budget, history, enableThinking = settings.engineTweaks.thinkingEnabled)).collect { e ->
                         when (e) {
                             is AnswerEvent.Stage -> _state.update { it.copy(activity = when (e.stage) { AnswerStage.RETRIEVING -> Activity.Retrieving; AnswerStage.THINKING -> Activity.Thinking; AnswerStage.GENERATING -> Activity.Generating }) }
                             is AnswerEvent.Sources -> sources = e.chunks
@@ -320,13 +344,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val shown = reusedSources ?: sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
             val stopped = stopRequested
             val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)
+            val cutAt = limited?.takeIf { !stopped && !timedOut && text.isNotBlank() && AnswerLimit.reached(metrics?.generatedTokens ?: tokens, it) }
+            val nextLimit = cutAt?.let { AnswerLimit.next(it, services.personalities.maxTokensOptions, services.host.openedContext) }
             chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
             if (shown.isNotEmpty() || receipt != null) chats.setMessageMeta(answerId, metaOf(shown, receipt))
             afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
             chats.prune(settings.maxSavedSessions)
             _state.update { s ->
                 s.copy(answeringId = null, activity = null, stopping = false,
-                    messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt) else it })
+                    messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt, cutAt = cutAt, nextLimit = nextLimit) else it })
             }
         }
     }
@@ -447,5 +473,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Messages sent verbatim as history (ChatScreen.tsx VERBATIM_MESSAGE_COUNT). */
         const val VERBATIM_MESSAGE_COUNT = 6
+
+        /** Prompt ideas shown in an empty chat, drawn again for each new chat. */
+        const val IDEAS_SHOWN = 5
+
+        /**
+         * Short questions (two lines at most) from the evaluations: b1…b9 from BOAR's 17-question set (eval-set.json),
+         * b10…b21 from the public BOAR Bench v0.1 items, without its trap, emergency, crypto and restaurant questions.
+         * Their text is chat.suggestions.b* in the app's languages.
+         */
+        val BENCH_IDEAS = (1..21).map { "b$it" }
     }
 }

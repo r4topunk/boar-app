@@ -1,3 +1,4 @@
+import java.time.LocalDate
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -26,7 +27,13 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 4
-        versionName = "2.0.0-dev"
+        // The release name comes from the build (-Pboar.versionName=2.0.0 for a release), the commit and date from git, so
+        // About always says exactly which code this APK is.
+        versionName = (findProperty("boar.versionName") as String?)?.takeIf { it.isNotBlank() } ?: "2.0.0-dev"
+        val gitSha = runCatching { providers.exec { commandLine("git", "rev-parse", "--short=8", "HEAD"); isIgnoreExitValue = true }.standardOutput.asText.get().trim() }.getOrNull().orEmpty()
+        val gitDirty = runCatching { providers.exec { commandLine("git", "status", "--porcelain", "--untracked-files=no", "--ignore-submodules=all"); isIgnoreExitValue = true }.standardOutput.asText.get().isNotBlank() }.getOrDefault(false)
+        buildConfigField("String", "GIT_SHA", "\"${gitSha}${if (gitDirty) "+" else ""}\"")
+        buildConfigField("String", "BUILD_DATE", "\"${LocalDate.now()}\"")
         ndk { abiFilters += listOf("arm64-v8a") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
