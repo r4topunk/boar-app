@@ -39,6 +39,7 @@ class SettingsDeviceTest {
         val services = BoarServices.get(ctx)
         // Clear All really clears: only run where the app has no chats of its own (a test install).
         org.junit.Assume.assumeTrue("the app has chats; not clearing them", services.chats.listSessions().isEmpty())
+        val was = services.settings.showLiveStats
         services.settings.showLiveStats = true // Hardware telemetry is a technical detail
         val s = services.chats.createSession("Settings test chat")
         services.chats.addMessage(s.id, "user", "hello", services.chats.newId())
@@ -84,22 +85,28 @@ class SettingsDeviceTest {
             compose.onNodeWithText(t("modelSetupScreen.dangerModal.confirmButton")).assertExists()
         } finally {
             runCatching { services.chats.deleteSession(s.id) }
+            services.settings.showLiveStats = was
         }
     }
 
     /** The sections brought back from the Expo app, without touching the app's chats or settings. */
     @Test fun restoredSectionsAreThere() {
         val services = BoarServices.get(ctx)
+        val was = services.settings.showLiveStats
         services.settings.showLiveStats = true // Hardware telemetry is a technical detail
-        var opened by mutableStateOf<String?>(null)
-        val prefs = object : DisplayPrefs { override fun setTheme(id: String) {}; override fun setFontScale(scale: String) {}; override fun setLanguage(id: String?) {} }
-        compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = {}, onSetup = {}, onOpen = { opened = it }) {} } }
-        click(t("native.settings.openCatalog")); assertEquals("models", opened)
-        click(t("native.settings.openDocuments")); assertEquals("documents", opened)
-        for (label in listOf("modelSetupScreen.sections.models", "modelSetupScreen.sections.knowledgeBase", "native.telemetry.chip", "native.telemetry.note",
-            "voiceSettings.enabledLabel", "voiceSettings.speechEngineLabel", "interfaceSettings.hapticFeedbackLabel", "native.settings.security")) {
-            compose.onNode(hasScrollAction()).performScrollToNode(hasText(t(label)))
-            compose.onNodeWithText(t(label)).assertExists()
+        try {
+            var opened by mutableStateOf<String?>(null)
+            val prefs = object : DisplayPrefs { override fun setTheme(id: String) {}; override fun setFontScale(scale: String) {}; override fun setLanguage(id: String?) {} }
+            compose.setContent { BoarTheme { SettingsScreen(services, prefs, onPin = {}, onSetup = {}, onOpen = { opened = it }) {} } }
+            click(t("native.settings.openCatalog")); assertEquals("models", opened)
+            click(t("native.settings.openDocuments")); assertEquals("documents", opened)
+            for (label in listOf("modelSetupScreen.sections.models", "modelSetupScreen.sections.knowledgeBase", "native.telemetry.chip", "native.telemetry.note",
+                "voiceSettings.enabledLabel", "voiceSettings.speechEngineLabel", "interfaceSettings.hapticFeedbackLabel", "native.settings.security")) {
+                compose.onNode(hasScrollAction()).performScrollToNode(hasText(t(label)))
+                compose.onNodeWithText(t(label)).assertExists()
+            }
+        } finally {
+            services.settings.showLiveStats = was
         }
     }
 

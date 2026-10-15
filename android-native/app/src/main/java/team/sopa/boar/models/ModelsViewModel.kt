@@ -5,6 +5,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -193,7 +194,8 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removeFromList(a: CatalogAsset) {
         viewModelScope.launch(Dispatchers.IO) {
-            downloads[a.id]?.cancel()
+            // Wait for the download's own cleanup, so it can't run after the delete and bring the row back.
+            downloads[a.id]?.cancelAndJoin()
             store.delete(a)
             services.removeDiscovered(a.id)
             store = AssetStore(getApplication<Application>().filesDir, services.catalog)
