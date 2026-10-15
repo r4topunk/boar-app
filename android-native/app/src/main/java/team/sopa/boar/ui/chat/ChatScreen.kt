@@ -522,7 +522,8 @@ private fun Badge(text: String) {
 private fun InputBar(text: String, onText: (String) -> Unit, answering: Boolean, onSend: () -> Unit, onStop: () -> Unit, voiceEnabled: Boolean, toneIcon: String, stopping: Boolean, onOpenStyles: () -> Unit) {
     val c = Boar.colors
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderDefault))
-    Row(Modifier.fillMaxWidth().background(c.bgCardElevated).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Tight gaps, full-size buttons: the field gets the room, and the round buttons keep a 48 dp tap target.
+    Row(Modifier.fillMaxWidth().background(c.bgCardElevated).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(Modifier.size(48.dp).clip(CircleShape).background(c.bgInput).border(1.dp, c.borderDefault, CircleShape).clickable(onClick = onOpenStyles), contentAlignment = Alignment.Center) {
             Text(toneIcon, fontSize = 18.sp)
         }
