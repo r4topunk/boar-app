@@ -413,8 +413,10 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
                 m.text.isEmpty() && streaming -> ProcessingIndicator(if (state.stopping) t("native.chat.stopping") else activityLabel(state.activity))
                 split.thinkingInProgress && split.answer.isEmpty() && streaming ->
                     Text("💭 " + (split.thinking?.takeLast(160) ?: ""), fontSize = 12.sp, lineHeight = 17.sp, fontStyle = FontStyle.Italic, color = c.textDim, modifier = reasoningStyle)
+                // The reasoning used the whole answer budget: the note says "tap 💭", so 💭 shows what it reasoned.
                 split.thinkingInProgress && split.answer.isEmpty() ->
-                    Text("💭 " + t("chatScreen.reasoningUnfinished"), fontSize = 12.sp, lineHeight = 17.sp, fontStyle = FontStyle.Italic, color = c.textDim, modifier = reasoningStyle)
+                    Text(if (reasoningShown && split.thinking != null) split.thinking!! else "💭 " + t("chatScreen.reasoningUnfinished"),
+                        fontSize = 12.sp, lineHeight = 17.sp, fontStyle = FontStyle.Italic, color = c.textDim, modifier = reasoningStyle)
                 else -> {
                     if (reasoningShown && split.thinking != null) Text(split.thinking!!, fontSize = 12.sp, lineHeight = 17.sp, fontStyle = FontStyle.Italic, color = c.textDim, modifier = reasoningStyle)
                     MarkdownMessage(shown, streaming)
