@@ -52,7 +52,7 @@ class AppSettingsTest {
         s.pinSalt = "salt"; s.pinWrapped = "wrapped"
         s.languageId = "pt"; s.customSystemPrompt = "Be brief."
         s.themeId = "campfire"; s.personalityId = "succinct"; s.deepResearchMode = true; s.maxTokensChoice = 2048
-        s.fontScale = "large"; s.showLiveStats = true; s.researchBannerHidden = true
+        s.fontScale = "large"; s.showLiveStats = false; s.researchBannerHidden = true
         s.engineTweaks = EngineTweaks(threads = 2)
         s.resetPreferences()
         val again = AppSettings(f)
@@ -60,7 +60,7 @@ class AppSettingsTest {
         assertEquals("salt", again.pinSalt); assertEquals("wrapped", again.pinWrapped)
         assertEquals("pt", again.languageId); assertEquals("Be brief.", again.customSystemPrompt)
         assertNull(again.themeId); assertNull(again.personalityId); assertNull(again.maxTokensChoice)
-        assertFalse(again.deepResearchMode); assertFalse(again.showLiveStats); assertFalse(again.researchBannerHidden)
+        assertFalse(again.deepResearchMode); assertTrue(again.showLiveStats); assertFalse(again.researchBannerHidden)
         assertEquals("standard", again.fontScale)
         assertEquals(EngineTweaks(), again.engineTweaks)
     }

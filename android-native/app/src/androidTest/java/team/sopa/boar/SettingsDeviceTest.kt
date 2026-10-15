@@ -110,7 +110,7 @@ class SettingsDeviceTest {
         }
     }
 
-    /** Show technical details off (the default): no Hardware telemetry section; the switch sits in Advanced tweaks. */
+    /** Show technical details off (on by default): no Hardware telemetry section; the switch sits in Advanced tweaks. */
     @Test fun telemetryHidesWithoutTechnicalDetails() {
         val services = BoarServices.get(ctx)
         val was = services.settings.showLiveStats

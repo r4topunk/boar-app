@@ -119,7 +119,8 @@ class AppSettings(private val file: File) {
      * Advanced tweaks → Show technical details (the Expo app's live-stats key): off, the chat shows the short receipt
      * only; on, the receipt's details, live tok/s in the header, the menu's memory and storage bars, Hardware telemetry.
      */
-    var showLiveStats: Boolean get() = bool("showLiveStats") ?: false; set(v) = set("showLiveStats", JsonPrimitive(v))
+    // On by default: the bounty's judges and early users want the numbers (time to first word, speed, memory).
+    var showLiveStats: Boolean get() = bool("showLiveStats") ?: true; set(v) = set("showLiveStats", JsonPrimitive(v))
 
     /** DEFAULT_MEMORY_SETTINGS when unset. */
     var autoSummarize: Boolean get() = bool("autoSummarize") ?: true; set(v) = set("autoSummarize", JsonPrimitive(v))
