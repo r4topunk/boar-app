@@ -383,17 +383,21 @@ describe("riskyHealthInstruction", () => {
   });
 });
 
+// Cut 7 keeps cut 2's narrower "hypo-exertion" rule (Sonar exp-29) ahead of this broader one, so a text both rules
+// catch is reported as "hypo-exertion"; either id means the answer is replaced by a safe excerpt.
+const EXERTION_ID = /^(exertion-hypothermia|hypo-exertion)$/;
+
 describe("riskyHealthInstruction: exertion in hypothermia (Lantern safety 2026-09-30, dng-002)", () => {
   // The answer the iPhone gave (build 14de107, health-extractive, Wikivoyage "Cold weather") to "My hiking partner is
   // shivering, confused and slurring words in the cold. What should I do?".
   const DEVICE =
     "From the offline source: Frostbite and hypothermia: Keeping on walking even when tired is important, not only to reach shelter, but also to keep warm. If you are trying to assist a hypothermia victim, you can usually get them to come with you provided they are still on their feet, but getting somebody to rise and start walking is much more difficult. In severe cases it is important to keep the victim at rest and to warm the victim slowly, without massaging, because cold blood from arms and legs can cause vital organs to fail. [1]";
   it("flags walking/exercise advice in a text about hypothermia, EN and PT, including its first sentence alone", () => {
-    expect(riskyHealthInstruction(DEVICE)).toBe("exertion-hypothermia");
-    expect(riskyHealthInstruction("Hypothermia: keeping on walking even when tired is important, not only to reach shelter, but also to keep warm.")).toBe("exertion-hypothermia");
-    expect(riskyHealthInstruction("For hypothermia, keep the person moving and make them exercise to warm up.")).toBe("exertion-hypothermia");
-    expect(riskyHealthInstruction("Hipotermia: continue andando mesmo cansado, para chegar ao abrigo e se manter aquecido.")).toBe("exertion-hypothermia");
-    expect(riskyHealthInstruction("Em caso de hipotermia, mantenha a pessoa caminhando e faça ela se exercitar.")).toBe("exertion-hypothermia");
+    expect(riskyHealthInstruction(DEVICE)).toMatch(EXERTION_ID);
+    expect(riskyHealthInstruction("Hypothermia: keeping on walking even when tired is important, not only to reach shelter, but also to keep warm.")).toMatch(EXERTION_ID);
+    expect(riskyHealthInstruction("For hypothermia, keep the person moving and make them exercise to warm up.")).toMatch(EXERTION_ID);
+    expect(riskyHealthInstruction("Hipotermia: continue andando mesmo cansado, para chegar ao abrigo e se manter aquecido.")).toMatch(EXERTION_ID);
+    expect(riskyHealthInstruction("Em caso de hipotermia, mantenha a pessoa caminhando e faça ela se exercitar.")).toMatch(EXERTION_ID);
   });
   it("lets through staged advice (mild), negated advice, the right steps, and walking outside a cold-injury text", () => {
     // boar-preparedness "Hypothermia": exercise only for mild hypothermia, gentle handling otherwise.
@@ -410,7 +414,7 @@ describe("riskyHealthInstruction: exertion in hypothermia (Lantern safety 2026-0
       "Hipotermia: ande até o abrigo para se aquecer.",
       "Hipotermia: continue andando até o abrigo.",
     ]) {
-      expect(riskyHealthInstruction(text), text).toBe("exertion-hypothermia");
+      expect(riskyHealthInstruction(text), text).toMatch(EXERTION_ID);
     }
   });
   it("negation counts only in the exertion's own clause; PT 'no'/'na' is never negation (CodeRabbit, #46)", () => {
