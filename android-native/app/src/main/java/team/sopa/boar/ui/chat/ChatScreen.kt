@@ -103,6 +103,8 @@ fun ChatScreen(
     val list = rememberLazyListState()
     var input by remember { mutableStateOf("") }
     var toneSheet by remember { mutableStateOf(false) }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
     if (toneSheet) ToneSheet(state, onSetTone, onSetDeepResearch) { toneSheet = false }
     val last = state.messages.lastOrNull()
     // Follow the end of the answer while it streams, unless the user scrolled up to read: a drag that ends short of
@@ -137,7 +139,10 @@ fun ChatScreen(
                     items(state.messages, key = { it.id }) { m -> Bubble(m, state, onRate, onReuse = { input = it; onReused() }) }
                 }
             }
-            InputBar(input, { input = it }, state.answeringId != null, onSend = { onSend(input); input = "" }, onStop, voiceEnabled, state.toneIcon, state.stopping) { toneSheet = true }
+            InputBar(input, { input = it }, state.answeringId != null, onSend = {
+                // The answer gets the whole screen: the keyboard closes on send.
+                onSend(input); input = ""; keyboard?.hide(); focus.clearFocus()
+            }, onStop, voiceEnabled, state.toneIcon, state.stopping) { toneSheet = true }
         }
     }
     state.toast?.let { Toast(it, onToastHidden) }
