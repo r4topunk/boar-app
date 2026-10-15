@@ -141,4 +141,6 @@
     <string name="native_settings_resetConfirmTitle" formatted="false">Reset all settings?</string>
     <string name="native_settings_resetConfirmBody" formatted="false">Settings go back to their defaults and setup opens again. Downloaded models and packs, your chats, your PIN, your language and your custom prompt are kept.</string>
     <string name="native_settings_resetConfirmButton" formatted="false">Reset</string>
+    <string name="native_sourceFootnotes_localIndex" formatted="false">FROM</string>
+    <string name="native_sourceFootnotes_yourDocuments" formatted="false">Your documents</string>
 </resources>

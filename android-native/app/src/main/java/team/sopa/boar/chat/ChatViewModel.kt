@@ -24,6 +24,7 @@ import team.sopa.boar.engine.answer.AnswerPipeline
 import team.sopa.boar.engine.answer.AnswerRequest
 import team.sopa.boar.engine.answer.AnswerStage
 import team.sopa.boar.engine.answer.AnswerText
+import team.sopa.boar.engine.answer.SourceGroups
 import team.sopa.boar.engine.answer.DeepResearch
 import team.sopa.boar.engine.answer.HistoryBudget
 import team.sopa.boar.engine.answer.PipelineInput
@@ -317,7 +318,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Throwable) {
                 _state.update { it.copy(error = e.message ?: e.toString()) }
             }
-            val shown = reusedSources ?: sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
+            val passages = sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
+            // One source per article, best first; the answer's numbers follow (a reused list is already grouped).
+            val grouped = SourceGroups.group(passages, { it.docId ?: it.title }, { it.similarity ?: it.relevance }) { g ->
+                g.first().copy(similarity = g.mapNotNull { it.similarity }.maxOrNull(), relevance = g.mapNotNull { it.relevance }.maxOrNull(),
+                    body = g.joinToString("\n…\n") { it.body })
+            }
+            val shown = reusedSources ?: grouped.items
+            if (reusedSources == null) SourceGroups.renumber(text.toString(), grouped.renumber).let { if (it != text.toString()) { text.setLength(0); text.append(it) } }
             val stopped = stopRequested
             val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)
             chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
