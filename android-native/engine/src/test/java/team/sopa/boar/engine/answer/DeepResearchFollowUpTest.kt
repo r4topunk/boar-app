@@ -78,6 +78,12 @@ class DeepResearchFollowUpTest {
         assertEquals("How does the greenhouse effect warm the planet?", DeepResearch.lastExchange("continue", h)?.question)
     }
 
+    @Test fun `a second continue builds on the first one's answer`() {
+        val h = ConversationHistory(turns = history.turns + ConversationTurn("user", "continue") + ConversationTurn("assistant", "More on trapped heat [2]."))
+        assertEquals("continue", DeepResearch.lastExchange("continue", h)?.question)
+        assertEquals("More on trapped heat [2].", DeepResearch.lastExchange("continue", h)?.answer)
+    }
+
     @Test fun `refusal lines are not sub-questions`() {
         assertEquals(listOf("q"), DeepResearch.parseSubQuestions("Desculpe, não posso ajudar com isso.\nI cannot answer that question", "q"))
     }

@@ -177,7 +177,8 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 row(a.id) { Row(error = e.message ?: e.toString()) }
             } finally {
-                downloads.remove(a.id)
+                // Only this job's entry: a retry started right after a cancel has already registered its own.
+                coroutineContext[kotlinx.coroutines.Job]?.let { downloads.remove(a.id, it) }
             }
             refresh()
         }
