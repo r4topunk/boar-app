@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-
-const ROUTE_GATE_SYSTEM_B5_LENGTH = ROUTE_GATE_SYSTEM.length;
 import { BOAR_SELF_DESCRIPTION, gatedTaskType, routeGateSkip, routeGateMessages, routeGateVerdict, ROUTE_GATE_SYSTEM } from "./routeGate";
+
+/** Measured (cut 7 gate prompt, sha256 7708281b…); update only with a new gate measurement. */
+const ROUTE_GATE_SYSTEM_B5_LENGTH = 1673;
 
 describe("routeGateMessages", () => {
   it("sends a single message as is, after the B4 system prompt", () => {

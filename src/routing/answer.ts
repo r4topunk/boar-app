@@ -648,8 +648,9 @@ export function createAnswerer(deps: AnswerDeps) {
       if (!req.reuseSources && req.tier !== "deep") {
         // Snakebite first aid: a fixed card from the WHO text, never a pack passage (Boar, after 3ffd7e0).
         if (isSnakebiteFirstAid(req.query)) {
-          const esQ = isSpanishQuestion(req.query);
-          const card = snakebiteFirstAidCard(req.query, !esQ && isPortugueseQuestion(req.query), esQ);
+          // Same precedence as the other card sites: Portuguese first, then Spanish.
+          const ptQ = isPortugueseQuestion(req.query);
+          const card = snakebiteFirstAidCard(req.query, ptQ, !ptQ && isSpanishQuestion(req.query));
           markVisible();
           const r: AnswerReceipt = { modelId: "grounding-guard", modelLabel: "First aid (WHO)", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: ["answer:first-aid-card-snakebite"] };
           emit({ type: "token", answerId, tier: "instant", text: card });
@@ -795,8 +796,11 @@ export function createAnswerer(deps: AnswerDeps) {
           stage("loading_model", "fast", fastLlm.id);
           const ls = deps.now();
           try {
-            await deps.engine.load(fastLlm.filename, { meta: { modelId: fastLlm.id, label: fastLlm.label } });
+            const r = await deps.engine.load(fastLlm.filename, { meta: { modelId: fastLlm.id, label: fastLlm.label } });
             gateCodes.push("route-gate:cold-load");
+            // As ensureLoaded: the answer below finds the model resident, so this load's result is the only report.
+            if (r?.warning) emit({ type: "warning", answerId, code: "model_streams_from_storage", message: r.warning });
+            if (r?.backend?.kind === "cpu-fallback") gateCodes.push("backend:cpu-fallback");
           } catch (e: any) {
             console.warn("[answer] route gate cold load failed:", e?.message ?? e);
           }

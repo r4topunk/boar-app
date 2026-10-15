@@ -1442,8 +1442,12 @@ export function riskyHealthInstruction(answer: string): string | null {
   return null;
 }
 
-/** A Spanish question (no ES path elsewhere): inverted marks, or two words Portuguese and English don't use. */
-const ES_ONLY = /(?<![\p{L}])(qué|cómo|cuándo|dónde|hago|hijo|hija|niño|niña|niños|bebé|mi|una|está|tragó|picó|mordió|ayuda|ayudarlo|ayudarla|pila|alacrán|peligroso|grave|es|se|muy|tiene|puedo|debo|hacer)(?![\p{L}])/giu;
+/**
+ * A Spanish question (no ES path elsewhere): inverted marks, or three distinct words Portuguese and English don't use.
+ * Words that are also Portuguese ("está", "se", "grave") are not in the list: three of them made a Portuguese question
+ * ("…e está inchando, se piorar é grave?") Spanish.
+ */
+const ES_ONLY = /(?<![\p{L}])(qué|cómo|cuándo|dónde|hago|hijo|hija|niño|niña|niños|bebé|mi|una|tragó|picó|mordió|ayuda|ayudarlo|ayudarla|pila|alacrán|peligroso|es|muy|tiene|puedo|debo|hacer)(?![\p{L}])/giu;
 export function isSpanishQuestion(query: string): boolean {
   if (/[¿¡]/.test(query)) return true;
   return new Set((query.match(ES_ONLY) ?? []).map((w) => w.toLowerCase())).size >= 3;

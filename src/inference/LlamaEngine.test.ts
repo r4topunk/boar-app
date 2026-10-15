@@ -670,3 +670,90 @@ describe("KV session files (A15 smoke: models/ in the key left saveSession witho
     expect(log.loaded.filter((p) => p.endsWith(".nosrc.bin"))).toHaveLength(1);
   });
 });
+
+describe("unload during KV session I/O (CodeRabbit: queue and genQueue are independent)", () => {
+  const PREFIX = { system: "You are Boar. Use the context below.", prompt: "You are Boar. Use the context below.\n\n" };
+  const gateMsgs = [{ role: "system", content: "router" }, { role: "user", content: "oi" }];
+
+  /** A loaded engine whose session calls wait for `resolveIo()`; records native calls made after release. */
+  async function slowSessions() {
+    const engine = new LlamaEngine();
+    await engine.load("models/a.gguf");
+    const ctx = created.at(-1) as any;
+    const log = { afterRelease: [] as string[], completions: 0, loads: 0, saves: 0 };
+    let pending: (() => void)[] = [];
+    const io = (name: string) => {
+      if (ctx.released) log.afterRelease.push(name);
+      return new Promise<number>((r) => pending.push(() => r(1)));
+    };
+    Object.assign(ctx, {
+      isJinjaSupported: () => true,
+      completion: (p: any) => {
+        if (ctx.released) log.afterRelease.push("completion");
+        log.completions++;
+        return Promise.resolve({ text: "ok", completion_probabilities: p.n_probs ? [{ probs: [{ tok_str: "SEARCH", prob: 1 }] }] : undefined });
+      },
+      loadSession: (path: string) => (log.loads++, kvFs.files.add("file://" + path), io("loadSession")),
+      saveSession: (path: string) => (log.saves++, kvFs.files.add("file://" + path), io("saveSession")),
+    });
+    const resolveIo = () => {
+      const p = pending;
+      pending = [];
+      p.forEach((f) => f());
+    };
+    const ioPending = () => pending.length;
+    return { engine, ctx, log, resolveIo, ioPending };
+  }
+  const tick = () => new Promise((r) => setTimeout(r, 1));
+
+  it("an answer restoring its prefix: unload waits for loadSession, then the answer fails instead of running on the released context", async () => {
+    const { engine, ctx, log, resolveIo, ioPending } = await slowSessions();
+    engine.setAnswerPrefix(PREFIX);
+    // The saved prefix file exists, so generate() restores it with loadSession before its completion.
+    const key = (engine as any).answerKvKey(PREFIX) as string;
+    kvFs.files.add((engine as any).kvPath(key).uri);
+    const answer = engine.generate({ messages: [{ role: "system", content: `${PREFIX.system}\n\nContext:\nx` }, { role: "user", content: "q" }] });
+    while (!ioPending()) await tick();
+    let unloaded = false;
+    const unload = engine.unload().then(() => (unloaded = true));
+    await tick();
+    expect(unloaded).toBe(false); // waits for the session load instead of releasing under it
+    expect(ctx.released).toBe(false);
+    resolveIo();
+    await unload;
+    await expect(answer).rejects.toThrow("model unloaded");
+    expect(ctx.released).toBe(true);
+    expect(log.afterRelease).toEqual([]);
+    expect(log.completions).toBe(0);
+  });
+
+  it("the route gate's first prefill: unload during saveSession waits for it, and the gate returns null without a completion", async () => {
+    const { engine, ctx, log, resolveIo, ioPending } = await slowSessions();
+    const probs = engine.nextTokenProbs(gateMsgs, { modelFilename: "models/a.gguf", nProbs: 20 });
+    while (!ioPending()) await tick(); // the prefill ran; saveSession is pending
+    expect(log.saves).toBe(1);
+    const unload = engine.unload();
+    await tick();
+    expect(ctx.released).toBe(false);
+    resolveIo();
+    await unload;
+    expect(await probs).toBeNull();
+    expect(ctx.released).toBe(true);
+    expect(log.afterRelease).toEqual([]);
+    expect(log.completions).toBe(1); // the prefill only, no gate completion after the unload
+  });
+
+  it("no session call starts after an unload that ran during the directory check", async () => {
+    const { engine, ctx, log } = await slowSessions();
+    engine.setAnswerPrefix(PREFIX);
+    const key = (engine as any).answerKvKey(PREFIX) as string;
+    kvFs.files.add((engine as any).kvPath(key).uri);
+    const answer = engine.generate({ messages: [{ role: "system", content: `${PREFIX.system}\n\nContext:\nx` }, { role: "user", content: "q" }] });
+    await engine.unload(); // runs while generateNow awaits getInfoAsync, before loadSession
+    await expect(answer).rejects.toThrow(/model unloaded|not loaded/);
+    expect(ctx.released).toBe(true);
+    expect(log.afterRelease).toEqual([]);
+    expect(log.loads).toBe(0);
+    expect(kvFs.files.has((engine as any).kvPath(key).uri)).toBe(true); // the saved prefix is not deleted
+  });
+});

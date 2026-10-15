@@ -1404,6 +1404,13 @@ describe("answer(): a snakebite first-aid question gets the WHO card (SAFETY, af
     }
     expect(f.generations).toHaveLength(0);
   });
+  it("a Portuguese question with 'está', 'se' and 'grave' gets the PT card, a Spanish one the ES card", async () => {
+    const pt = await collect("Uma cobra me picou e está inchando, se piorar é grave? O que faço?");
+    expect(pt.result.text).toMatch(/^Picada de cobra, primeiros socorros: /);
+    const es = await collect("Una serpiente mordió a mi hijo, qué hago?");
+    expect(es.result.text).toMatch(/^Mordedura de serpiente, primeros auxilios: /);
+    expect(f.generations).toHaveLength(0);
+  });
 });
 
 describe("answer(): trv-009 PT, exact question and gate sources (bc7db6d)", () => {
@@ -2116,6 +2123,18 @@ describe("answer(): route gate (Anvil B4 arm)", () => {
     const second = await collect("and another fun fact?");
     expect(f.loads).toEqual([qwen4.filename]);
     expect(codes(second.result)).not.toContain("route-gate:cold-load");
+  });
+
+  it("cold start: the gate's load reports a storage-streaming warning and a CPU fallback (the answer's load is skipped)", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    const load0 = f.deps.engine.load.bind(f.deps.engine);
+    f.deps.engine.load = async (fn, o) => ({ ...(await load0(fn, o)), warning: "streams from storage", backend: { kind: "cpu-fallback", reason: "failed to initialize MTL0 backend" } });
+    gate([{ token: "ANS", prob: 0.97 }, { token: "SEARCH", prob: 0.03 }]);
+    const { events, result } = await collect("tell me something fun about yourself");
+    expect(f.loads).toEqual([qwen4.filename]);
+    expect(result.receipt.reasonCodes).toContain("backend:cpu-fallback");
+    expect(events.find((e) => e.type === "warning" && (e as any).code === "model_streams_from_storage")).toMatchObject({ message: "streams from storage" });
   });
 
   it("rules when the engine can't run it, and never on the 1.5B", async () => {

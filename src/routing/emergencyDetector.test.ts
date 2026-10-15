@@ -134,6 +134,42 @@ describe("EmergencyDetector", () => {
     expect(state.inits).toHaveLength(1);
   });
 
+  it("remembers a terminal load status: a second load() does not re-initialise the model; 'absent' is re-checked", async () => {
+    state.vector = (text: string) => vecFor(text.includes("choking") ? 30 : -30).map((x) => x * 1.4);
+    const failed = new EmergencyDetector();
+    expect(await failed.load()).toBe(false);
+    expect(failed.status).toBe("canary-fail");
+    expect(await failed.load()).toBe(false);
+    expect(failed.status).toBe("canary-fail");
+    expect(state.inits).toHaveLength(1);
+
+    delete state.files[DETECTOR_CANARY_FILE];
+    const noCanary = new EmergencyDetector();
+    expect(await noCanary.load()).toBe(false);
+    expect(await noCanary.load()).toBe(false);
+    expect(noCanary.status).toBe("no-canary");
+    expect(state.inits).toHaveLength(2);
+
+    state.files[DETECTOR_HEAD_FILE] = "{not json";
+    state.files[DETECTOR_CANARY_FILE] = JSON.stringify(canaryFile());
+    const broken = new EmergencyDetector();
+    expect(await broken.load()).toBe(false);
+    expect(broken.status).toBe("load-failed");
+    state.files[DETECTOR_HEAD_FILE] = JSON.stringify(head);
+    expect(await broken.load()).toBe(false);
+    expect(state.inits).toHaveLength(2);
+
+    state.vector = (text: string) => vecFor(text.includes("choking") ? 30 : -30);
+    delete state.files[DETECTOR_MODEL_FILE];
+    const absent = new EmergencyDetector();
+    expect(await absent.load()).toBe(false);
+    expect(absent.status).toBe("absent");
+    state.files[DETECTOR_MODEL_FILE] = "gguf";
+    expect(await absent.load()).toBe(true);
+    expect(absent.status).toBe("ready");
+    expect(state.inits).toHaveLength(3);
+  });
+
   it("deviceEmergencyScore is null when the detector is not installed (answer() then uses the lexical predicate)", async () => {
     state.files = {};
     expect(await deviceEmergencyScore("my child is choking", [])).toBeNull();

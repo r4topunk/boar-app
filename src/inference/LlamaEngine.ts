@@ -212,6 +212,24 @@ export class LlamaEngine {
   /** generate() calls not settled yet: a prefix refill never waits in front of one of them. */
   private pending = 0;
 
+  /**
+   * Native session I/O (saveSession/loadSession) on `context`, tracked in `inFlight` like a completion: load/unload run
+   * on `queue`, not `genQueue`, so unloadNow() must wait for it instead of releasing the context under it.
+   */
+  private async tracked<T>(op: Promise<T>): Promise<T> {
+    this.inFlight = op;
+    try {
+      return await op;
+    } finally {
+      if (this.inFlight === op) this.inFlight = null;
+    }
+  }
+
+  /** After an await on the generation path: throws when `context` was unloaded (or replaced) meanwhile. */
+  private assertCurrent(context: LlamaContext): void {
+    if (this.context !== context) throw new Error("LlamaEngine: model unloaded");
+  }
+
   private enqueue(task: () => Promise<void>): Promise<void> {
     const run = this.queue.then(task);
     this.queue = run.catch(() => {});
@@ -382,13 +400,18 @@ export class LlamaEngine {
   private async unloadNow() {
     // Stop takes effect between tokens, so a completion still processing its
     // prompt can run on for a while; wait for it rather than release under it.
-    if (this.inFlight) {
+    // A loop, not an if: the genQueue task that owned the settled op may start its next native call (a session load
+    // followed by the completion) before this resumes. Once inFlight is empty, the context is cleared in the same
+    // synchronous step, so any later step of that task fails its assertCurrent() check instead of using the context.
+    while (this.inFlight) {
+      const op = this.inFlight;
       // try/await, not .catch(): llama.rn's JSI stopCompletion returns undefined (typed Promise<void>; rc.4 and rc.6),
       // and a throw here left the old context loaded next to the new one (two LLMs mapped, 0.4 tok/s).
       try {
         await this.context?.stopCompletion();
       } catch {}
-      await this.inFlight.catch(() => {});
+      await op.catch(() => {});
+      if (this.inFlight === op) this.inFlight = null;
     }
     const context = this.context;
     this.context = null;
@@ -513,7 +536,8 @@ export class LlamaEngine {
     enableThinking,
     staticSystem,
   }: GenerateOptions): Promise<string> {
-    if (!this.context) throw new Error("LlamaEngine: model not loaded");
+    const context = this.context;
+    if (!context) throw new Error("LlamaEngine: model not loaded");
     if (!prompt && !messages) {
       throw new Error("LlamaEngine.generate: either prompt or messages must be provided");
     }
@@ -558,7 +582,8 @@ export class LlamaEngine {
       : { prompt: prompt!, n_predict: nPredict, temperature, n_probs: 0, stop: stop ?? DEFAULT_STOP_SEQUENCES };
 
     if (this.prefix && !this.prefixCached && this.sharesPrefix({ prompt, messages })) {
-      const ms = await this.loadKv(this.context, this.answerKvKey(this.prefix));
+      const ms = await this.loadKv(context, this.answerKvKey(this.prefix));
+      this.assertCurrent(context);
       if (ms !== null) {
         this.prefixCached = true;
         console.warn(`[gate] answer prefix restored in ${ms} ms`);
@@ -566,19 +591,20 @@ export class LlamaEngine {
     }
     this.gateCachedKey = null;
     // CUT5-SPEED: the no-source answer's static system message comes from its own session file (or is prefilled once and saved).
-    const staticMsg = staticSystem && messages?.[0]?.role === "system" && this.context.isJinjaSupported() ? messages[0] : null;
+    const staticMsg = staticSystem && messages?.[0]?.role === "system" && context.isJinjaSupported() ? messages[0] : null;
     let staticReady = !!staticMsg && this.nosrcCached;
     if (staticMsg && !this.nosrcCached) {
-      const ok = await this.restoreStaticSystem(this.context, this.noSourceKvKey(staticMsg.content), staticMsg).catch((e: any) => {
+      const ok = await this.restoreStaticSystem(context, this.noSourceKvKey(staticMsg.content), staticMsg).catch((e: any) => {
         console.warn("[engine] no-source prefix failed:", e?.message ?? e);
         return false;
       });
+      this.assertCurrent(context);
       if (ok) this.prefixCached = false;
       staticReady = ok;
     }
     this.nosrcCached = staticReady;
     let full = "";
-    const completion = this.context.completion(completionParams, (data) => {
+    const completion = context.completion(completionParams, (data) => {
       full += data.token;
       onToken?.(data.token);
     });
@@ -628,6 +654,7 @@ export class LlamaEngine {
     let loadGateMs: number | null = null;
     if (this.gateCachedKey !== key) {
       loadGateMs = await this.loadKv(context, key);
+      if (this.context !== context) return null;
       if (loadGateMs === null) {
         // First gate on this model: prefill the fixed part once, the same way warmNow does the answer prefix.
         const warm = context.completion({ messages: [messages[0], { role: "user", content: "" }], jinja: true, n_predict: 0, n_probs: 0 });
@@ -638,6 +665,7 @@ export class LlamaEngine {
           if (this.inFlight === warm) this.inFlight = null;
         }
         await this.saveKv(context, key).catch((e: any) => console.warn("[gate] session save failed:", e?.message ?? e));
+        if (this.context !== context) return null;
       }
     }
     this.prefixCached = false;
@@ -672,6 +700,7 @@ export class LlamaEngine {
   /** Restores the static no-source prefix, or prefills it once (n_predict 0, same format as warmNow) and saves it. */
   private async restoreStaticSystem(context: LlamaContext, key: string, system: ChatMessageInput): Promise<boolean> {
     const ms = await this.loadKv(context, key);
+    this.assertCurrent(context);
     if (ms !== null) {
       console.warn(`[engine] no-source prefix restored in ${ms} ms`);
       return true;
@@ -683,6 +712,7 @@ export class LlamaEngine {
     } finally {
       if (this.inFlight === warm) this.inFlight = null;
     }
+    this.assertCurrent(context);
     await this.saveKv(context, key).catch((e: any) => console.warn("[engine] no-source prefix save failed:", e?.message ?? e));
     return true;
   }
@@ -702,7 +732,8 @@ export class LlamaEngine {
     try {
       await FileSystem.makeDirectoryAsync(kv.uri.slice(0, kv.uri.lastIndexOf("/") + 1), { intermediates: true });
     } catch {}
-    await context.saveSession(kv.path);
+    this.assertCurrent(context);
+    await this.tracked(context.saveSession(kv.path));
   }
 
   /** Restores a saved prefix into the KV cache; the ms it took, or null when there is no file (or it failed). */
@@ -712,8 +743,10 @@ export class LlamaEngine {
       const kv = this.kvPath(key);
       uri = kv.uri;
       if (!(await FileSystem.getInfoAsync(uri)).exists) return null;
+      // Unloaded meanwhile: no native call, and the file is fine (the catch below would delete it).
+      if (this.context !== context) return null;
       const t0 = Date.now();
-      await context.loadSession(kv.path);
+      await this.tracked(context.loadSession(kv.path));
       return Date.now() - t0;
     } catch (e: any) {
       console.warn(`[gate] session load failed (${key}):`, e?.message ?? e);

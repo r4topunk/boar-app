@@ -12,6 +12,7 @@ import {
   stripModelDisclaimer,
   stripModelReferences,
   isPortugueseQuestion,
+  isSpanishQuestion,
   excerptRules,
   withAfterPart,
   imperativeSteps,
@@ -970,5 +971,17 @@ describe("isHealthQuestion: health for the content, translation for the form (Se
     expect(isHealthQuestion("Which direction is Arabic written in, and how do you say hello in Arabic?")).toBe(false);
     expect(isHealthQuestion("How do I say thank you in Thai, and does it change if I'm a man or a woman?")).toBe(false);
     expect(isHealthQuestion("Como se diz obrigado em tailandês, e muda se eu for homem ou mulher?")).toBe(false);
+  });
+});
+
+describe("isSpanishQuestion: words shared with Portuguese do not count", () => {
+  it("a Portuguese snakebite question with 'está', 'se' and 'grave' is not Spanish", () => {
+    const q = "Uma cobra me picou e está inchando, se piorar é grave? O que faço?";
+    expect(isSpanishQuestion(q)).toBe(false);
+    expect(isPortugueseQuestion(q)).toBe(true);
+  });
+  it("a Spanish question is Spanish, with or without inverted marks", () => {
+    expect(isSpanishQuestion("Una serpiente mordió a mi hijo, qué hago?")).toBe(true);
+    expect(isSpanishQuestion("¿Qué hago si me mordió una serpiente?")).toBe(true);
   });
 });

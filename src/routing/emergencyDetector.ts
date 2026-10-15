@@ -23,6 +23,8 @@ export const DETECTOR_HEAD_FILE = "models/emergency-detector.head.json";
 export const DETECTOR_CANARY_FILE = "models/emergency-detector.canary.json";
 
 export type DetectorStatus = "absent" | "loading" | "ready" | "no-canary" | "canary-fail" | "load-failed";
+/** Load outcomes that a retry in the same session would not change; load() does not re-init after them. */
+const TERMINAL_STATUSES: ReadonlySet<DetectorStatus> = new Set(["canary-fail", "no-canary", "load-failed"]);
 export interface CanaryItem { text: string; p: number; l2: number; vec: number[] }
 export interface CanaryFile { model_sha256: string; head_sha256: string; thresholds: { cos_min: number; l2_rel_max: number; p_abs_max: number }; items: CanaryItem[] }
 
@@ -64,9 +66,15 @@ export class EmergencyDetector {
     return this.context !== null && this.head !== null;
   }
 
-  /** Loads once; true when the detector is ready, false when its files are not installed or loading failed. */
+  /**
+   * Loads once; true when the detector is ready, false when its files are not installed or loading failed.
+   * A terminal failure (canary-fail, no-canary, load-failed) is remembered: later calls return false without
+   * re-initialising the mmBERT model next to the resident chat model. "absent" stays re-checkable (the kit may be
+   * installed later).
+   */
   load(): Promise<boolean> {
     if (this.loaded) return Promise.resolve(true);
+    if (TERMINAL_STATUSES.has(this.status)) return Promise.resolve(false);
     this.loading ??= this.loadNow().finally(() => (this.loading = null));
     return this.loading;
   }
