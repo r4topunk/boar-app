@@ -24,6 +24,7 @@ import type {
 } from "../../routing/events";
 import type { ConversationHistory, ConversationTurn } from "../../rag/pure";
 import type { QueryStats } from "../../services/telemetry";
+import type { TaskType } from "../../routing/types";
 import { stripThinking } from "../../services/thinking";
 
 /** Previous messages sent to the model verbatim; older ones live in the session summary. */
@@ -68,6 +69,12 @@ export type AnswerFn = (req: AnswerRequest, onEvent: AnswerEventHandler, ctx: An
 export interface RunChatAnswerOptions {
   answer: AnswerFn;
   query: string;
+  /**
+   * The rest of the answer() request, for follow-up actions on an answer: answerAnyway ("Answer anyway"
+   * after a decline), tier "deep" + reuseSources ("Deeper answer", as deepen() does), place (the city typed
+   * after "which city?"). The chat sends none of these yet (no buttons on Android); plumbing only.
+   */
+  request?: Omit<AnswerRequest, "query">;
   ctx: AnswerContext;
   sink: ChatAnswerSink;
   now: () => number;
@@ -185,7 +192,7 @@ export async function runChatAnswer(opts: RunChatAnswerOptions): Promise<ChatAns
     }
   };
 
-  const handle = opts.answer({ query: opts.query }, onEvent, opts.ctx);
+  const handle = opts.answer({ ...opts.request, query: opts.query }, onEvent, opts.ctx);
   answerId ??= handle.answerId;
   opts.onHandle?.(handle);
   if (opts.isStopRequested()) await handle.stop().catch(() => {});
@@ -200,16 +207,21 @@ export async function runChatAnswer(opts: RunChatAnswerOptions): Promise<ChatAns
   // text (places), else the instant snippet when it was the whole answer.
   const primary = d?.finalText ?? (streamed.trim() ? streamed : (result?.text ?? ""));
   const base = primary.trim() ? primary : (instantText ?? "");
-  let text = [base, ...placesList(p?.places ?? [])].filter((s) => s.trim().length > 0).join("\n");
+  // A places answer's text already lists the places (formatPlacesAnswer); the list is only added
+  // when the engine gave no text (as the eval's answerTextOf, without its duplication).
+  let text = base.trim() ? base : placesList(p?.places ?? []).join("\n");
   const error = d?.error ?? undefined;
-  if (!text.trim() && outcome === "error" && error) text = `Error: ${error.message}`;
+  // An error ends the answer visibly, also after some streamed text (the legacy path's "Error: …" bubble).
+  if (outcome === "error" && error) text = text.trim() ? `${text.trimEnd()}\n\nError: ${error.message}` : `Error: ${error.message}`;
+  else if (!text.trim() && outcome === "error") text = "Error: the answer failed.";
   // The streamed text is on screen; replace it only when the final text differs (CT-1 citations, declines, places).
   const shown = instantText !== null && streamedTokens === 0 ? instantText : streamed;
   if (text !== shown) sink.setText(text);
 
   return {
     text,
-    citations: cited.length > 0 ? finalSources : [],
+    // Places answers cite their records ([n]) but carry no cited list: show them all.
+    citations: cited.length > 0 || (d?.receipt ?? result?.receipt)?.modelId === "places" ? finalSources : [],
     sources: finalSources,
     cited,
     outcome,
@@ -226,10 +238,32 @@ export async function runChatAnswer(opts: RunChatAnswerOptions): Promise<ChatAns
   };
 }
 
+const TASK_TYPES: readonly TaskType[] = [
+  "greeting",
+  "conversation",
+  "chat",
+  "lookup",
+  "research",
+  "summarize",
+  "compare",
+  "calculate",
+  "extract",
+  "translate",
+  "code",
+  "unknown",
+];
+
+/** The engine's task type, from its "task:<type>" reason code (places and other non-task codes: none). */
+export function taskTypeOf(reasonCodes: string[] | undefined): TaskType | undefined {
+  const code = reasonCodes?.find((c) => c.startsWith("task:"))?.slice(5);
+  return TASK_TYPES.find((t) => t === code);
+}
+
 /**
  * The chat's in-memory usage stats (telemetry.recordQueryStats) from the answer's receipt.
  * answer() itself persists the execution record (recordExecution) when a model generated,
- * so the chat must not record a second one for this path.
+ * so the chat must not record a second one for this path. adaptiveRoutingUsed stays unset: that
+ * flag is the legacy runAdaptiveChat path's.
  */
 export function queryStatsFromAnswer(
   o: ChatAnswerOutcome,
@@ -244,8 +278,8 @@ export function queryStatsFromAnswer(
     peakRssBytes: t.peakRssBytes,
     timestamp: t.timestamp,
     totalLatencyMs: r?.totalMs ?? t.durationMs,
-    adaptiveRoutingUsed: true,
     modelId: r && r.modelId !== "none" ? r.modelId : t.fallbackModelId,
+    ...(taskTypeOf(r?.reasonCodes) ? { taskType: taskTypeOf(r?.reasonCodes) } : {}),
     reasonCodes: r?.reasonCodes ?? [],
     retrievalUsed: o.sources.length > 0,
     ...(r?.loadMs !== undefined ? { modelLoadMs: r.loadMs } : {}),

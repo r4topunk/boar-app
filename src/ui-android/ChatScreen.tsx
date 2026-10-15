@@ -99,6 +99,8 @@ interface Message {
   stopped?: boolean;
   timedOut?: boolean;
   interruptedByBackground?: boolean;
+  /** The measured path ended with an error: shown, never persisted, kept out of the history. */
+  failed?: boolean;
   feedback?: "up" | "down" | null;
 }
 
@@ -565,7 +567,10 @@ export function ChatScreen({
       const styleReminder = activePersonalityId === "custom" ? undefined : personality.styleReminder;
 
       // Same window for every path: the session summary + the last VERBATIM_MESSAGE_COUNT messages.
-      const { history, priorMessages } = buildChatHistory(messagesRef.current, sessionSummaryRef.current);
+      const { history, priorMessages } = buildChatHistory(
+        messagesRef.current.filter((m) => !m.failed),
+        sessionSummaryRef.current
+      );
 
       let firstToken = true;
       let firstTokenTime = 0;
@@ -595,6 +600,9 @@ export function ChatScreen({
       // Set when the measured path answered: its stats come from the receipt, and answer() already
       // persisted the execution record.
       let measuredStats: QueryStats | null = null;
+      // The measured answer ended in an error (also after some streamed text): no success haptic,
+      // not persisted, no title or summary from it.
+      let measuredFailed = false;
 
       if (deepResearchModeRef.current) {
         // Deep Research Mode is completely separate from adaptive routing
@@ -685,6 +693,7 @@ export function ChatScreen({
           });
           assistantText = r.text;
           tokensGenerated = r.streamedTokens;
+          measuredFailed = r.outcome === "error";
           chunks = r.citations;
           if (r.timedOut) {
             setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, timedOut: true } : m)));
@@ -793,10 +802,10 @@ export function ChatScreen({
       const wasStopped = stopRequestedRef.current;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, citations: chunks, stopped: wasStopped } : m
+          m.id === assistantId ? { ...m, citations: chunks, stopped: wasStopped, ...(measuredFailed ? { failed: true } : {}) } : m
         )
       );
-      notification(wasStopped ? NotificationFeedbackType.Warning : NotificationFeedbackType.Success);
+      notification(wasStopped || measuredFailed ? NotificationFeedbackType.Warning : NotificationFeedbackType.Success);
 
       const durationMs = performance.now() - startTime;
       const finalStats: QueryStats = measuredStats ?? {
@@ -837,14 +846,16 @@ export function ChatScreen({
         outcome: finalStats.outcome ?? (wasStopped ? "cancelled" : "success"),
       }).catch(() => {});
 
-      if (assistantText.trim().length > 0) {
+      if (assistantText.trim().length > 0 && !measuredFailed) {
         await persistMessage(sessionId, "assistant", assistantText, assistantId);
       }
 
       const settings = memorySettingsRef.current;
       const allMessages = [...priorMessages, userMsg, { ...userMsg, id: assistantId, role: "assistant" as const, text: assistantText }];
 
-      if (isNewSession && settings.autoGenerateTitles && !wasStopped) {
+      if (measuredFailed) {
+        // Nothing to title or summarize: the failed answer is not saved.
+      } else if (isNewSession && settings.autoGenerateTitles && !wasStopped) {
         const sid = sessionId;
         backgroundTaskRef.current = generateSessionTitle(query)
           .then(async (title) => {

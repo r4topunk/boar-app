@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AnswerEvent, AnswerHandle, AnswerReceipt, AnswerResult, SourceChunk } from "../../routing/events";
 import type { AnswerContext } from "../../routing/answer";
-import { AnswerFn, buildChatHistory, ChatAnswerSink, queryStatsFromAnswer, runChatAnswer, VERBATIM_MESSAGE_COUNT } from "./answerBridge";
+import { AnswerFn, buildChatHistory, ChatAnswerSink, queryStatsFromAnswer, runChatAnswer, taskTypeOf, VERBATIM_MESSAGE_COUNT } from "./answerBridge";
 
 const ID = "ans-1";
 const receipt = (over: Partial<AnswerReceipt> = {}): AnswerReceipt => ({
@@ -250,19 +250,74 @@ describe("runChatAnswer", () => {
     expect(out.deepAvailable).toBe(true);
   });
 
-  it("places: the result text plus the listed places", async () => {
-    const place = { id: "osm:node/1", name: "Green Cafe", lat: 0, lon: 0, address: "Main St 1", cuisine: ["vegan"], source: "osm" as const };
+  it("places (registered providers): the engine's places text is kept as is, with its records as sources", async () => {
+    const place = { id: "osm:node/1", name: "Green Cafe", lat: 0, lon: 0, address: "Main St 1", cuisine: ["vegan"], source: "osm" as const, sourceIndex: 0 };
+    const placeSources = [src(1)];
+    const engineText = "Vegan places in Lisbon:\n1. Green Cafe — Main St 1 [1]";
     const { fn } = fakeAnswer(
       [
-        { type: "places", tier: "instant", places: [place], area: { kind: "city" }, criterion: "diet_match", coverage: "ok", attribution: [] },
-        { type: "done", tier: "instant", outcome: "success", receipt: receipt({ modelId: "places", tokens: 0 }) },
+        { type: "stage", stage: "retrieving", tier: "instant", at: 0 },
+        { type: "places", tier: "instant", places: [place], area: { kind: "city", place: { name: "Lisbon" } }, filters: ["vegan"], criterion: "diet_match", coverage: "ok", attribution: [{ source: "osm", license: "ODbL" }] },
+        { type: "done", tier: "instant", outcome: "success", receipt: receipt({ modelId: "places", modelLabel: "Offline places", tokens: 0, reasonCodes: ["task:places", "near:city", "diet:vegan", "places:1"] }) },
       ],
-      { text: "Vegan places in Rome:" }
+      { text: engineText, sources: placeSources }
     );
     const r = recorder();
+    const out = await runChatAnswer({ answer: fn, query: "vegan food in Lisbon", ctx, sink: r.sink, now: clock(), isStopRequested: () => false });
+    expect(r.log[0]).toBe("status:retrieving");
+    expect(out.text).toBe(engineText); // not listed twice
+    expect(r.text()).toBe(engineText);
+    expect(out.citations).toEqual(placeSources);
+    expect(out.tier).toBe("instant");
+  });
+
+  it("places with no engine text: the places are listed", async () => {
+    const place = { id: "osm:node/1", name: "Green Cafe", lat: 0, lon: 0, address: "Main St 1", cuisine: ["vegan"], source: "osm" as const };
+    const { fn } = fakeAnswer([
+      { type: "places", tier: "instant", places: [place], area: { kind: "city" }, criterion: "diet_match", coverage: "ok", attribution: [] },
+      { type: "done", tier: "instant", outcome: "success", receipt: receipt({ modelId: "places", tokens: 0 }) },
+    ]);
+    const r = recorder();
     const out = await runChatAnswer({ answer: fn, query: "vegan food in Rome", ctx, sink: r.sink, now: clock(), isStopRequested: () => false });
-    expect(out.text).toBe("Vegan places in Rome:\n- Green Cafe (Main St 1) · vegan");
+    expect(out.text).toBe("- Green Cafe (Main St 1) · vegan");
     expect(r.text()).toBe(out.text);
+  });
+
+  it("an error after some streamed tokens is marked, not shown as a finished answer", async () => {
+    const { fn } = fakeAnswer([
+      { type: "sources", tier: "fast", sources: [src(1)] },
+      { type: "token", tier: "fast", text: "Partial answer" },
+      { type: "token", tier: "fast", text: " so far" },
+      { type: "done", tier: "fast", outcome: "error", receipt: receipt(), cited: [], error: { code: "generation_failed", message: "context overflow" } },
+    ]);
+    const r = recorder();
+    const out = await runChatAnswer({ answer: fn, query: "q", ctx, sink: r.sink, now: clock(), isStopRequested: () => false });
+    expect(out.outcome).toBe("error");
+    expect(out.text).toBe("Partial answer so far\n\nError: context overflow");
+    expect(r.text()).toBe(out.text);
+    expect(out.stopped).toBe(false);
+    expect(out.citations).toEqual([]);
+  });
+
+  it("passes the rest of the request through (answerAnyway, deeper answer, place)", async () => {
+    const { fn, calls } = fakeAnswer([{ type: "done", tier: "deep", outcome: "success", receipt: receipt(), cited: [] }]);
+    const reqs: unknown[] = [];
+    const spy: AnswerFn = (req, onEvent, c) => {
+      reqs.push(req);
+      return fn(req, onEvent, c);
+    };
+    const reuse = [src(1)];
+    await runChatAnswer({ answer: spy, query: "q", request: { answerAnyway: true }, ctx, sink: recorder().sink, now: clock(), isStopRequested: () => false });
+    await runChatAnswer({ answer: spy, query: "q", request: { tier: "deep", reuseSources: reuse }, ctx, sink: recorder().sink, now: clock(), isStopRequested: () => false });
+    await runChatAnswer({ answer: spy, query: "q", request: { place: "Lisbon" }, ctx, sink: recorder().sink, now: clock(), isStopRequested: () => false });
+    await runChatAnswer({ answer: spy, query: "q", ctx, sink: recorder().sink, now: clock(), isStopRequested: () => false });
+    expect(reqs).toEqual([
+      { answerAnyway: true, query: "q" },
+      { tier: "deep", reuseSources: reuse, query: "q" },
+      { place: "Lisbon", query: "q" },
+      { query: "q" },
+    ]);
+    expect(calls.length).toBe(4);
   });
 
   it("drops events of another answer id and events after done", async () => {
@@ -342,10 +397,11 @@ describe("queryStatsFromAnswer", () => {
       modelId: "qwen3-4b",
       modelLoadMs: 1200,
       retrievalUsed: true,
-      adaptiveRoutingUsed: true,
+      taskType: "lookup",
       outcome: "cancelled",
       reasonCodes: ["task:lookup"],
     });
+    expect(s.adaptiveRoutingUsed).toBeUndefined();
   });
 
   it("falls back to the loaded model id when the receipt names none", () => {
@@ -359,7 +415,7 @@ describe("queryStatsFromAnswer", () => {
         tier: "fast",
         stopped: false,
         timedOut: false,
-        receipt: receipt({ modelId: "none" }),
+        receipt: receipt({ modelId: "none", reasonCodes: ["error:unexpected"] }),
         warnings: [],
         declined: false,
         safety: false,
@@ -369,6 +425,16 @@ describe("queryStatsFromAnswer", () => {
       { durationMs: 1, peakRssBytes: 0, timestamp: 0, fallbackModelId: "loaded" }
     );
     expect(s.modelId).toBe("loaded");
+    expect(s.taskType).toBeUndefined();
     expect(s.outcome).toBe("failure");
+  });
+});
+
+describe("taskTypeOf", () => {
+  it("reads the engine's task:<type> code; places and unknown codes give none", () => {
+    expect(taskTypeOf(["task:research", "gate:x"])).toBe("research");
+    expect(taskTypeOf(["task:places", "near:city"])).toBeUndefined();
+    expect(taskTypeOf(["error:unexpected"])).toBeUndefined();
+    expect(taskTypeOf(undefined)).toBeUndefined();
   });
 });
