@@ -54,6 +54,25 @@ class DeepResearchFollowUpTest {
         assertTrue(gen.calls[1].second.contains("Question: continue"))
     }
 
+    @Test fun `Stop during the rewrite ends the answer before the split`() = runBlocking {
+        var stop = false
+        val gen = Recorder { system, _ -> if (system.startsWith("You rewrite")) { stop = true; "What is the conclusion about the greenhouse effect?" } else "ok" }
+        val r = DeepResearch(gen, { _, _ -> emptyList() }, { null }).run("conclusion", null, history, 256, shouldStop = { stop })
+        assertEquals(1, gen.calls.size)
+        assertTrue(r.subQuestions.isEmpty())
+    }
+
+    @Test fun `the write-up gets its own time limit`() = runBlocking {
+        val limits = ArrayList<Long?>()
+        val gen = object : StageGenerator {
+            override suspend fun generate(system: String, user: String, nPredict: Int, temperature: Float, timeoutMs: Long?, onToken: ((String) -> Unit)?): GenResult {
+                limits += timeoutMs; return GenResult(if (system.startsWith("You plan")) "Sub one about gases?\nSub two about heat?" else "ok")
+            }
+        }
+        DeepResearch(gen, { _, _ -> emptyList() }, { 1000L }, { null }).run("How does the greenhouse effect warm the planet?", null, null, 256)
+        assertEquals(listOf(1000L, 1000L, 1000L, null), limits)
+    }
+
     @Test fun `refusal lines are not sub-questions`() {
         assertEquals(listOf("q"), DeepResearch.parseSubQuestions("Desculpe, não posso ajudar com isso.\nI cannot answer that question", "q"))
     }

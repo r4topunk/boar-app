@@ -55,17 +55,25 @@ class AppSettings(private val file: File) {
     var customSystemPrompt: String? get() = str("customSystemPrompt"); set(v) = set("customSystemPrompt", v?.let(::JsonPrimitive))
     /** The answer length the user picked in Settings; null is Auto. */
     var maxTokensChoice: Int? get() = int("maxTokens"); set(v) = set("maxTokens", v?.let(::JsonPrimitive))
-    /** The answer's token limit: the user's pick, else Auto by style. */
-    val maxTokens: Int get() = maxTokensChoice ?: autoMaxTokens(personalityId)
+    /** The answer's token limit: the user's pick, else Auto by style (and Deep Research). */
+    val maxTokens: Int get() = maxTokensChoice ?: autoMaxTokens(personalityId, deepResearchMode)
 
     companion object {
         const val AUTO_MAX_TOKENS = 512
         /** Detailed answers ran past 512 tokens and stopped mid-sentence (X6, Oct 11). */
         const val AUTO_MAX_TOKENS_DETAILED = 1024
+        /**
+         * A Deep Research write-up, any style: a Detailed one ran past 1024 tokens and stopped mid-sentence inside its own
+         * conclusion (X6, Oct 14). The largest choice in Settings; the style still sets how long it really is.
+         */
+        const val AUTO_MAX_TOKENS_RESEARCH = 2048
 
         /** No style set means Detailed, the native app's default (BoarServices.DEFAULT_PERSONALITY_ID). */
-        fun autoMaxTokens(personalityId: String?): Int =
-            if ((personalityId ?: "detailed") == "detailed") AUTO_MAX_TOKENS_DETAILED else AUTO_MAX_TOKENS
+        fun autoMaxTokens(personalityId: String?, deepResearch: Boolean = false): Int = when {
+            deepResearch -> AUTO_MAX_TOKENS_RESEARCH
+            (personalityId ?: "detailed") == "detailed" -> AUTO_MAX_TOKENS_DETAILED
+            else -> AUTO_MAX_TOKENS
+        }
     }
     var deepResearchMode: Boolean get() = bool("deepResearchMode") ?: false; set(v) = set("deepResearchMode", JsonPrimitive(v))
     var adaptiveRoutingEnabled: Boolean get() = bool("adaptiveRoutingEnabled") ?: false; set(v) = set("adaptiveRoutingEnabled", JsonPrimitive(v))

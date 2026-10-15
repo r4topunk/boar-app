@@ -271,12 +271,12 @@ private fun ToneSection(services: BoarServices) {
             Field(prompt, t("personalitySettings.customPromptPlaceholder")) { prompt = it; s.customSystemPrompt = it }
         }
         var tokens by remember { mutableStateOf(s.maxTokensChoice) }
-        val auto = AppSettings.autoMaxTokens(id)
+        var deep by remember { mutableStateOf(s.deepResearchMode) }
+        val auto = AppSettings.autoMaxTokens(id, deep)
         Choices(t("personalitySettings.maxOutputTokens"),
             listOf<Pair<Int?, String>>(null to "${t("native.tweaks.auto")} ($auto)") + personalities.maxTokensOptions.map { it to "$it" },
             tokens) { tokens = it; s.maxTokensChoice = it }
         Note(t("personalitySettings.maxOutputTokensNote"))
-        var deep by remember { mutableStateOf(s.deepResearchMode) }
         SwitchRow(t("personalitySettings.deepResearchTitle"), t("personalitySettings.deepResearchNote"), deep) { deep = it; s.deepResearchMode = it }
         var adaptive by remember { mutableStateOf(s.adaptiveRoutingEnabled) }
         SwitchRow(t("native.settings.adaptiveTitle"), t("native.settings.adaptiveNote"), adaptive) { adaptive = it; s.adaptiveRoutingEnabled = it }

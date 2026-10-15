@@ -47,6 +47,8 @@ class DeepResearch(
     private val retrieve: (String, Int) -> List<Chunk>,
     /** Time limit for a stage of n tokens (EngineTweaks.stageTimeoutMs, the user's setting); null = none. */
     private val timeoutFor: (Int) -> Long? = EngineTweaks()::stageTimeoutMs,
+    /** The final write-up's limit (EngineTweaks.writeUpTimeoutMs: none on Auto, since Stop ends it). */
+    private val writeUpTimeoutFor: (Int) -> Long? = timeoutFor,
 ) {
     suspend fun run(
         query: String,
@@ -68,6 +70,8 @@ class DeepResearch(
         val exchange = lastExchange(query, history)
         val asked = query
         @Suppress("NAME_SHADOWING") val query = if (exchange != null) standalone(query, exchange) else query
+        // Stop cancels only the generation running at that moment: the next stage would start a new one.
+        if (shouldStop()) return ResearchResult("", emptyList(), emptyList(), emptyList(), timedOut)
         val subQuestions = decompose(query)
         val subResults = ArrayList<Pair<String, String>>()
         val perQuestion = ArrayList<List<Chunk>>()
@@ -99,8 +103,8 @@ class DeepResearch(
 
     private var timedOut = false
 
-    private suspend fun stage(system: String, user: String, nPredict: Int, temperature: Float, onToken: ((String) -> Unit)?): String {
-        val r = generator.generate(system, user, nPredict, temperature, timeoutFor(nPredict), onToken)
+    private suspend fun stage(system: String, user: String, nPredict: Int, temperature: Float, onToken: ((String) -> Unit)?, timeoutMs: Long? = timeoutFor(nPredict)): String {
+        val r = generator.generate(system, user, nPredict, temperature, timeoutMs, onToken)
         if (r.timedOut) timedOut = true
         return r.text
     }
@@ -138,10 +142,13 @@ class DeepResearch(
         val perspectives = results.mapIndexed { i, (q, a) -> "Perspective ${i + 1} ($q):\n$a" }.joinToString("\n\n")
         val system = "${instructionOf(systemPrompt)} You are synthesizing multiple research perspectives into one answer. " +
             "Compare them, reconcile any conflicts, and write one unified, well-reasoned answer. " +
-            "Keep the source numbers exactly as the perspectives cite them, like [3]; do not renumber or invent sources."
+            "Keep the source numbers exactly as the perspectives cite them, like [3]; do not renumber or invent sources." +
+            // A Detailed write-up ended with "Synthesis of Perspectives: Perspective 1… 2… 3…" (X6, Oct 14); the TS prompt
+            // stops at the sentence above, so the golden recordings carry this one added.
+            " Do this silently: the reader never sees the perspectives, so never mention them, the sub-questions or the research steps, and add no section about them."
         val language = answerLanguage?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }?.let { "\n\n($it)" } ?: ""
         val earlier = followUp?.let { (e, asked) -> "Previous question: ${e.question}\n\nPrevious answer: ${e.answer}\n\nFollow-up as asked: $asked\n\n" } ?: ""
-        return stage(system, "${earlier}Original question: $query\n\n$perspectives$language", maxTokens, 0.6f, onToken)
+        return stage(system, "${earlier}Original question: $query\n\n$perspectives$language", maxTokens, 0.6f, onToken, writeUpTimeoutFor(maxTokens))
     }
 
     companion object {

@@ -273,7 +273,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 if (session == null) {
                     _state.update { it.copy(noModel = true, error = "no-model") }
                 } else if (_state.value.deepResearch) {
-                    val r = DeepResearch(SessionEngine(session, settings.engineTweaks.thinkingEnabled), services.retriever::retrieve, settings.engineTweaks::stageTimeoutMs).run(
+                    val r = DeepResearch(SessionEngine(session, settings.engineTweaks.thinkingEnabled), services.retriever::retrieve, settings.engineTweaks::stageTimeoutMs, settings.engineTweaks::writeUpTimeoutMs).run(
                         q, systemPrompt, history, settings.maxTokens,
                         onProgress = { p -> _state.update { it.copy(activity = Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount)) } },
                         onToken = ::onPiece,

@@ -54,6 +54,19 @@ class AppSettingsTest {
         }
     }
 
+    @Test fun `Auto answer length is 2048 with Deep Research on, in any style, and a pick still wins`() {
+        val s = AppSettings(file(null))
+        s.deepResearchMode = true
+        assertEquals(AppSettings.AUTO_MAX_TOKENS_RESEARCH, s.maxTokens)
+        s.personalityId = "succinct"
+        assertEquals(2048, s.maxTokens)
+        s.maxTokensChoice = 512
+        assertEquals(512, s.maxTokens)
+        s.maxTokensChoice = null
+        s.deepResearchMode = false
+        assertEquals(512, s.maxTokens)
+    }
+
     @Test fun `Auto answer length is 1024 for Detailed, 512 for the other styles, a pick wins`() {
         val s = AppSettings(file(null))
         assertNull(s.maxTokensChoice)
