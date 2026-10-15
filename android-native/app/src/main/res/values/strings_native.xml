@@ -135,4 +135,10 @@
     <string name="native_chat_stopping" formatted="false">Stopping…</string>
     <!-- The native default is Detailed: no "Default for mobile" here (the Expo app's default is Succinct). -->
     <string name="native_personalities_succinct_description" formatted="false">Fastest — 2–3 brief paragraphs or bullets, no preamble.</string>
+    <string name="native_settings_resetTitle" formatted="false">Reset settings</string>
+    <string name="native_settings_resetDesc" formatted="false">Theme, answer style, Deep Research, Advanced tweaks and display options back to their defaults. Your models, chats, PIN and language stay.</string>
+    <string name="native_settings_resetButton" formatted="false">Reset settings</string>
+    <string name="native_settings_resetConfirmTitle" formatted="false">Reset all settings?</string>
+    <string name="native_settings_resetConfirmBody" formatted="false">Settings go back to their defaults and setup opens again. Downloaded models and packs, your chats, your PIN, your language and your custom prompt are kept.</string>
+    <string name="native_settings_resetConfirmButton" formatted="false">Reset</string>
 </resources>

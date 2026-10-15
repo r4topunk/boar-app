@@ -145,10 +145,11 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
         }
         SetupScreen(setupState, setup, team.sopa.boar.ui.setup.currentLanguage(services.settings.languageId),
             onLanguage = { id -> services.settings.languageId = id; prefs.setLanguage(id) },
-            onSkip = if (wasReady) ({ setup.forget(); screen = "chat" }) else null,
+            // Settings too: after "Reset settings" the chat must show the default style and Deep Research off.
+            onSkip = if (wasReady) ({ setup.forget(); vm.refreshSettings(); screen = "chat" }) else null,
             // Cleared first: a model added earlier from Models must not be picked the moment the page opens.
             onBrowse = { setupModels.clearAdded(); browsing = true },
-        ) { setup.forget(); vm.refreshModel(); screen = afterSetup(services.pinLock.isSet) }
+        ) { setup.forget(); vm.refreshSettings(); vm.refreshModel(); screen = afterSetup(services.pinLock.isSet) }
         return
     }
     if (screen == "pinOffer") {

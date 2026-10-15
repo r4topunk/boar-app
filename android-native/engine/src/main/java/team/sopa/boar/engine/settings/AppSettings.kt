@@ -61,7 +61,20 @@ class AppSettings(private val file: File) {
     /** The limit for an answer now: the user's pick as is, else Auto fitted to the context the model was opened with. */
     fun answerTokens(openedContext: Int?): Int = maxTokensChoice ?: fitToContext(autoMaxTokens(personalityId, deepResearchMode), openedContext)
 
+    /**
+     * Settings → Reset settings: every preference back to its default (theme, answer style and length, Deep Research,
+     * Advanced tweaks, display and voice switches, chat history options). Kept: models and their roles, the PIN, the
+     * language, the custom prompt and the app's own bookkeeping. Chats live elsewhere and stay too.
+     */
+    fun resetPreferences() = update { PREFERENCE_KEYS.forEach { remove(it) } }
+
     companion object {
+        /** What "Reset settings" clears ([resetPreferences]). */
+        val PREFERENCE_KEYS = listOf(
+            "themeId", "fontScale", "personalityId", "maxTokens", "deepResearchMode", "researchBannerHidden",
+            "adaptiveRoutingEnabled", "routingPreset", "engineTweaks", "showLiveStats", "voiceInputEnabled", "hapticsEnabled",
+            "hidePromptIdeas", "autoSummarize", "historyTurnThreshold", "maxSavedSessions", "autoGenerateTitles",
+        )
         const val AUTO_MAX_TOKENS = 512
         /** Detailed answers ran past 512 tokens and stopped mid-sentence (X6, Oct 11). */
         const val AUTO_MAX_TOKENS_DETAILED = 1024

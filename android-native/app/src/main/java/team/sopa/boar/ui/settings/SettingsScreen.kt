@@ -100,7 +100,7 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) 
             VoiceSection(services)
             if (tech) TelemetrySection(services)
             TweaksSection(services, tech) { tech = it }
-            RecoverySection(onSetup)
+            RecoverySection(services, prefs, onSetup)
         }
     }
 }
@@ -223,18 +223,34 @@ private fun ClearChats(services: BoarServices) {
 
 /** ModelSetupScreen.tsx's System Recovery & Danger Zone: run setup again, or wipe everything and start over. */
 @Composable
-private fun RecoverySection(onSetup: () -> Unit) {
+private fun RecoverySection(services: BoarServices, prefs: DisplayPrefs, onSetup: () -> Unit) {
     val c = Boar.colors
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var purging by remember { mutableStateOf(false) }
+    var resetting by remember { mutableStateOf(false) }
     Section(t("modelSetupScreen.sections.recovery")) {
         Text(t("modelSetupScreen.recovery.wizardTitle"), style = Boar.type.titleSm, color = c.textHeading)
         Text(t("modelSetupScreen.recovery.wizardDesc"), style = Boar.type.subtext, color = c.textSecondary)
         LinkButton(t("modelSetupScreen.recovery.wizardButton"), onClick = onSetup)
+        // Defaults back without the multi-GB re-download "Clear all data" costs.
+        Text(t("native.settings.resetTitle"), style = Boar.type.titleSm, color = c.textHeading, modifier = Modifier.padding(top = 8.dp))
+        Text(t("native.settings.resetDesc"), style = Boar.type.subtext, color = c.textSecondary)
+        LinkButton(t("native.settings.resetButton")) { resetting = true }
         Text(t("modelSetupScreen.recovery.dangerBadge"), style = Boar.type["mono.xs"], color = c.crimson400, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
         Text(t("modelSetupScreen.recovery.dangerDesc"), style = Boar.type.subtext, color = c.textSecondary)
         LinkButton(t("modelSetupScreen.recovery.dangerButton"), danger = true) { purging = true }
     }
+    if (resetting) androidx.compose.material3.AlertDialog({ resetting = false },
+        title = { Text(t("native.settings.resetConfirmTitle")) },
+        text = { Text(t("native.settings.resetConfirmBody")) },
+        confirmButton = { androidx.compose.material3.TextButton({
+            resetting = false
+            services.settings.resetPreferences()
+            prefs.setTheme(team.sopa.boar.ui.theme.ThemeTokens.DEFAULT_ID)
+            prefs.setFontScale("standard")
+            onSetup()
+        }) { Text(t("native.settings.resetConfirmButton"), color = Boar.colors.crimson400) } },
+        dismissButton = { androidx.compose.material3.TextButton({ resetting = false }) { Text(t("common.cancel")) } })
     if (purging) androidx.compose.material3.AlertDialog({ purging = false },
         title = { Text(t("modelSetupScreen.dangerModal.title")) },
         text = {
