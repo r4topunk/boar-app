@@ -67,6 +67,20 @@ class AppSettingsTest {
         assertEquals(512, s.maxTokens)
     }
 
+    @Test fun `Auto length fits the context the model was opened with, a pick is kept as is`() {
+        assertEquals(2048, AppSettings.fitToContext(2048, null))
+        assertEquals(2048, AppSettings.fitToContext(2048, 4096))
+        assertEquals(1572, AppSettings.fitToContext(2048, 3072))
+        assertEquals(548, AppSettings.fitToContext(2048, 2048))
+        assertEquals(256, AppSettings.fitToContext(1024, 1024))
+        val s = AppSettings(file(null))
+        s.deepResearchMode = true
+        assertEquals(548, s.answerTokens(2048))
+        assertEquals(2048, s.answerTokens(4096))
+        s.maxTokensChoice = 2048
+        assertEquals(2048, s.answerTokens(2048))
+    }
+
     @Test fun `Auto answer length is 1024 for Detailed, 512 for the other styles, a pick wins`() {
         val s = AppSettings(file(null))
         assertNull(s.maxTokensChoice)

@@ -208,13 +208,15 @@ class BoarServices private constructor(private val context: Context) {
                 val meta = LoadGuard.Meta(asset.filename, asset.id, asset.label)
                 val repack = tweaks.weightRepack ?: !(loadGuard.mappedNext(asset.id) || asset.id in keepMapped)
                 loadGuard.begin(meta, previous, repack)
-                val s = LlamaSession.load(fileOf(asset).path, tweaks.resolve(topology, totalRamBytes).params.copy(repack = repack))
+                val resolved = tweaks.resolve(topology, totalRamBytes).params.copy(repack = repack)
+                val s = LlamaSession.load(fileOf(asset).path, resolved)
                 loadGuard.end(meta, s != null)
                 if (s == null) return null
                 session = s
                 filename = asset.filename
                 residentId = asset.id
                 residentRepacked = repack
+                openedContext = resolved.nCtx
                 if (repack) s.onGenerated = { m ->
                     if (LoadGuard.isDecodeStall(m.generatedTokens, m.decodeMs) && keepMapped.add(asset.id))
                         android.util.Log.w("BOAR", "${asset.id} stalled with repacked weights (${m.generatedTokens} tokens in ${m.decodeMs.toInt()} ms): mapped from the next answer")
@@ -223,6 +225,10 @@ class BoarServices private constructor(private val context: Context) {
             }
             SessionEngine(session!!, tweaks.thinkingEnabled)
         }
+
+        /** The context window the resident model was opened with (sizes Auto answer length); null before a load. */
+        @Volatile var openedContext: Int? = null
+            private set
 
         /** The loaded session, for the default path (AnswerPipeline). */
         fun current(): LlamaSession? = session

@@ -58,6 +58,9 @@ class AppSettings(private val file: File) {
     /** The answer's token limit: the user's pick, else Auto by style (and Deep Research). */
     val maxTokens: Int get() = maxTokensChoice ?: autoMaxTokens(personalityId, deepResearchMode)
 
+    /** The limit for an answer now: the user's pick as is, else Auto fitted to the context the model was opened with. */
+    fun answerTokens(openedContext: Int?): Int = maxTokensChoice ?: fitToContext(autoMaxTokens(personalityId, deepResearchMode), openedContext)
+
     companion object {
         const val AUTO_MAX_TOKENS = 512
         /** Detailed answers ran past 512 tokens and stopped mid-sentence (X6, Oct 11). */
@@ -67,6 +70,18 @@ class AppSettings(private val file: File) {
          * conclusion (X6, Oct 14). The largest choice in Settings; the style still sets how long it really is.
          */
         const val AUTO_MAX_TOKENS_RESEARCH = 2048
+
+        /** Context kept for the prompt (instructions, sources, history) when Auto sizes the answer. */
+        const val PROMPT_RESERVE = 1500
+        /** Auto never goes below this, however small the context. */
+        const val MIN_AUTO_TOKENS = 256
+
+        /**
+         * Auto length on a small context: a phone with up to 4.5 GB of RAM opens 2048 tokens (contextSizeForRam), where
+         * a 2048-token Deep Research write-up can't fit next to its prompt. Unknown context (no model loaded yet): [cap].
+         */
+        fun fitToContext(cap: Int, openedContext: Int?): Int =
+            if (openedContext == null) cap else minOf(cap, maxOf(MIN_AUTO_TOKENS, openedContext - PROMPT_RESERVE))
 
         /** No style set means Detailed, the native app's default (BoarServices.DEFAULT_PERSONALITY_ID). */
         fun autoMaxTokens(personalityId: String?, deepResearch: Boolean = false): Int = when {

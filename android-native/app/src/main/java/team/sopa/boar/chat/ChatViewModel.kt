@@ -85,6 +85,8 @@ data class ChatState(
     /** A short message over the chat for about 2 s (Toast.tsx): the new tone, a reused question. */
     val toast: String? = null,
     val toneIcon: String = "",
+    /** The styles the header sheet offers (id to icon): "custom" only when a custom prompt is written. */
+    val tones: List<Pair<String, String>> = emptyList(),
     val online: Boolean = false,
     /** Suggested question keys for the empty chat (chat.suggestions.*). */
     val suggestions: List<String> = emptyList(),
@@ -127,7 +129,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun refreshTone() {
         val id = services.settings.personalityId ?: services.personalities.defaultId
-        _state.update { it.copy(personalityId = id, toneIcon = services.personalities.get(id).icon) }
+        val custom = services.settings.customSystemPrompt.orEmpty().isNotBlank()
+        val tones = services.personalities.personalities.filter { it.id != "custom" || custom }.map { it.id to it.icon }
+        _state.update { it.copy(personalityId = id, toneIcon = services.personalities.get(id).icon, tones = tones) }
+    }
+
+    /** The header sheet: answer in this style from the next question on. */
+    fun setTone(id: String) {
+        services.settings.personalityId = id
+        refreshTone()
     }
 
     /** Back from settings: the tone, Deep Research and model may have changed. */
@@ -138,18 +148,6 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         // The open chat was erased (Clear all chat history, or a forgotten PIN): start a new one.
         val open = _state.value.sessionId
         if (open != null && services.chats.listSessions().none { it.id == open }) newChat()
-    }
-
-    /** The header's tone button: the next style ("custom" only when a custom prompt is written). */
-    fun cycleTone() {
-        val custom = services.settings.customSystemPrompt.orEmpty().isNotBlank()
-        val order = services.personalities.personalities.map { it.id }.filter { it != "custom" || custom }
-        val next = order[(order.indexOf(_state.value.personalityId) + 1) % order.size]
-        services.settings.personalityId = next
-        refreshTone()
-        val app = getApplication<Application>()
-        val tone = "${services.personalities.get(next).icon} ${team.sopa.boar.ui.I18n.t(app, "personalities.$next.label")}"
-        _state.update { it.copy(toast = team.sopa.boar.ui.I18n.t(app, "chatScreen.toneChanged", "tone" to tone)) }
     }
 
     fun showToast(key: String) = _state.update { it.copy(toast = team.sopa.boar.ui.I18n.t(getApplication(), key)) }
@@ -274,7 +272,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update { it.copy(noModel = true, error = "no-model") }
                 } else if (_state.value.deepResearch) {
                     val r = DeepResearch(SessionEngine(session, settings.engineTweaks.thinkingEnabled), services.retriever::retrieve, settings.engineTweaks::stageTimeoutMs, settings.engineTweaks::writeUpTimeoutMs).run(
-                        q, systemPrompt, history, settings.maxTokens,
+                        q, systemPrompt, history, settings.answerTokens(services.host.openedContext),
                         onProgress = { p -> _state.update { it.copy(activity = Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount)) } },
                         onToken = ::onPiece,
                         shouldStop = { stopRequested },
@@ -287,7 +285,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     timedOut = r.second
                 } else {
                     val pipeline = AnswerPipeline(session, services.retriever::retrieve, { Classify.classifyTask(it).value }, { Classify.isRetrievalIrrelevant(TaskType.of(it)) })
-                    pipeline.answer(AnswerRequest(q, systemPrompt, styleReminder, settings.maxTokens, history, enableThinking = settings.engineTweaks.thinkingEnabled)).collect { e ->
+                    pipeline.answer(AnswerRequest(q, systemPrompt, styleReminder, settings.answerTokens(services.host.openedContext), history, enableThinking = settings.engineTweaks.thinkingEnabled)).collect { e ->
                         when (e) {
                             is AnswerEvent.Stage -> _state.update { it.copy(activity = when (e.stage) { AnswerStage.RETRIEVING -> Activity.Retrieving; AnswerStage.THINKING -> Activity.Thinking; AnswerStage.GENERATING -> Activity.Generating }) }
                             is AnswerEvent.Sources -> sources = e.chunks
@@ -375,7 +373,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val statuses = services.catalog.models.filter { it.kind == AssetKind.LLM }.map { Profiles.AvailableModel(it, services.fileOf(it).isFile) }
         val preset = s.routingPreset?.let { runCatching { RoutingPreset.of(it) }.getOrNull() } ?: RoutingPreset.DEFAULT
         val overrides = s.modelRoleAssignments().mapNotNull { (k, v) -> runCatching { ModelRole.of(k) to v }.getOrNull() }.toMap()
-        val plan = AdaptivePlan.plan(q, statuses, preset, overrides, s.activeModelId("llm"), totalRamBytes(), s.maxTokens)
+        val plan = AdaptivePlan.plan(q, statuses, preset, overrides, s.activeModelId("llm"), totalRamBytes(), s.answerTokens(services.host.openedContext))
         val r = PlanExecutor(services.host, services.retriever::retrieve, { Classify.classifyTask(it).value }, timeoutFor = s.engineTweaks::stageTimeoutMs)
             .execute(plan.plan, PipelineInput(q, systemPrompt, styleReminder, history), onToken = onPiece, onStepStart = { step ->
                 _state.update { it.copy(activity = if (step.type.value == "retrieve") Activity.Retrieving else Activity.Thinking) }

@@ -85,7 +85,8 @@ fun ChatScreen(
     onStop: () -> Unit,
     onNewChat: () -> Unit,
     onMenu: () -> Unit,
-    onCycleTone: () -> Unit,
+    onSetTone: (String) -> Unit,
+    onSetDeepResearch: (Boolean) -> Unit,
     onRate: (String, String) -> Unit,
     onDismissCrash: () -> Unit = {},
     onReused: () -> Unit = {},
@@ -95,6 +96,8 @@ fun ChatScreen(
     val c = Boar.colors
     val list = rememberLazyListState()
     var input by remember { mutableStateOf("") }
+    var toneSheet by remember { mutableStateOf(false) }
+    if (toneSheet) ToneSheet(state, onSetTone, onSetDeepResearch) { toneSheet = false }
     val last = state.messages.lastOrNull()
     // Follow the end of the answer while it streams, unless the user scrolled up to read: a drag that ends short of
     // the bottom stops following, reaching the bottom again resumes it, and a new message always does.
@@ -111,7 +114,7 @@ fun ChatScreen(
     Box(Modifier.fillMaxSize().background(c.bgTerminal)) {
         Ambient()
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
-            Header(state, onMenu, onCycleTone, onNewChat)
+            Header(state, onMenu, { toneSheet = true }, onNewChat)
             if (state.deepResearch) DeepResearchBanner()
             state.loadingKey?.let { LoadingBanner(t(it)) }
             state.loadCrash?.let { CrashBanner(it, onDismissCrash) }
