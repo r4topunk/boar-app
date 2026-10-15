@@ -132,7 +132,8 @@ fun ChatScreen(
                 }
             } else {
                 LazyColumn(
-                    Modifier.weight(1f).fillMaxWidth(), state = list,
+                    // A readable line length on a wide screen (landscape, tablets), centred; a phone held upright is narrower.
+                    Modifier.weight(1f).widthIn(max = MAX_CHAT_WIDTH).fillMaxWidth().align(Alignment.CenterHorizontally), state = list,
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -147,6 +148,9 @@ fun ChatScreen(
     }
     state.toast?.let { Toast(it, onToastHidden) }
 }
+
+/** The chat column's widest: about 75 characters of body text. */
+private val MAX_CHAT_WIDTH = 720.dp
 
 /** components/Ambient.tsx: Campfire's ember glow rising from the bottom, Moonlight's faint moon at the top right. */
 @Composable
@@ -192,7 +196,7 @@ private fun Header(state: ChatState, onMenu: () -> Unit, onOpenStyles: () -> Uni
                         Text("BOAR", style = type.titleLg.copy(letterSpacing = 0.5.sp), color = c.textHeading)
                         StatusPill(state.online)
                     }
-                    Text((state.modelLabel ?: t("chatHeader.localLlmCore")).uppercase(), style = type["mono.xs"], color = c.textDim, maxLines = 1, modifier = Modifier.padding(top = 1.dp))
+                    Text((state.modelLabel ?: t("chatHeader.localLlmCore")).uppercase(), style = type["mono.xs"], color = c.textDim, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

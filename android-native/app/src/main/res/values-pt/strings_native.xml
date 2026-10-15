@@ -141,4 +141,5 @@
     <string name="native_settings_resetConfirmTitle" formatted="false">Redefinir todas as configurações?</string>
     <string name="native_settings_resetConfirmBody" formatted="false">As configurações voltam ao padrão e a configuração inicial abre de novo. Modelos e pacotes baixados, suas conversas, seu PIN, seu idioma e seu prompt personalizado são mantidos.</string>
     <string name="native_settings_resetConfirmButton" formatted="false">Redefinir</string>
+    <string name="native_drawer_answeringHint" formatted="false">Respondendo… pare a resposta para trocar de conversa.</string>
 </resources>
