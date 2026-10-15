@@ -263,6 +263,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             var retrievalMs: Double? = null
             val text = StringBuilder()
             var sources: List<Chunk> = emptyList()
+            var reusedSources: List<Source>? = null
+            // The answer a meta follow-up ("summary", "continue") is written from: the last one with text.
+            val lastAnswer = prior.lastOrNull { it.role == "assistant" && it.text.isNotBlank() }
             var timedOut = false
             var firstAt = 0L
             var tokens = 0
@@ -286,8 +289,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                         onProgress = { p -> _state.update { it.copy(activity = Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount)) } },
                         onToken = ::onPiece,
                         shouldStop = { stopRequested },
+                        previousAnswer = lastAnswer?.text?.let(AnswerText::stripThinking),
                     )
                     sources = r.citations
+                    // Written from the last answer: its numbers [n] are that answer's sources.
+                    if (r.fromPreviousAnswer) reusedSources = lastAnswer?.sources
                     timedOut = r.timedOut
                 } else if (settings.adaptiveRoutingEnabled) {
                     val r = adaptive(q, systemPrompt, styleReminder, history, ::onPiece)
@@ -307,7 +313,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Throwable) {
                 _state.update { it.copy(error = e.message ?: e.toString()) }
             }
-            val shown = sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
+            val shown = reusedSources ?: sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
             val stopped = stopRequested
             val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)
             chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)

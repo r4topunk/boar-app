@@ -2,6 +2,7 @@ package team.sopa.boar.engine.answer
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,14 +31,14 @@ class DeepResearchFollowUpTest {
             else -> "ok"
         } }
         val searched = ArrayList<String>()
-        val r = DeepResearch(gen, { q, _ -> searched += q; emptyList() }, { null }).run("conclusion", null, history, 256)
+        val r = DeepResearch(gen, { q, _ -> searched += q; emptyList() }, { null }).run("and its conclusion?", null, history, 256)
         assertTrue(gen.calls[0].second.contains("Previous question: How does the greenhouse effect"))
         assertTrue(gen.calls[1].second.contains("Question: What is the conclusion about how the greenhouse effect"))
         assertEquals(listOf("What gases drive the greenhouse effect?", "How much has the planet warmed?"), r.subQuestions)
         assertEquals(r.subQuestions, searched)
         val synthesis = gen.calls.last().second
         assertTrue(synthesis.contains("Previous answer: Gases like CO2 trap outgoing heat [1]."))
-        assertTrue(synthesis.contains("Follow-up as asked: conclusion"))
+        assertTrue(synthesis.contains("Follow-up as asked: and its conclusion?"))
     }
 
     @Test fun `a question that names its own subject is not rewritten`() = runBlocking {
@@ -50,8 +51,8 @@ class DeepResearchFollowUpTest {
 
     @Test fun `a refused rewrite keeps the follow-up as asked`() = runBlocking {
         val gen = Recorder { system, _ -> if (system.startsWith("You rewrite")) "Sorry, I cannot do that." else "ok" }
-        DeepResearch(gen, { _, _ -> emptyList() }, { null }).run("continue", null, history, 256)
-        assertTrue(gen.calls[1].second.contains("Question: continue"))
+        DeepResearch(gen, { _, _ -> emptyList() }, { null }).run("and the oceans?", null, history, 256)
+        assertTrue(gen.calls[1].second.contains("Question: and the oceans?"))
     }
 
     @Test fun `Stop during the rewrite ends the answer before the split`() = runBlocking {
@@ -82,6 +83,39 @@ class DeepResearchFollowUpTest {
         val h = ConversationHistory(turns = history.turns + ConversationTurn("user", "continue") + ConversationTurn("assistant", "More on trapped heat [2]."))
         assertEquals("continue", DeepResearch.lastExchange("continue", h)?.question)
         assertEquals("More on trapped heat [2].", DeepResearch.lastExchange("continue", h)?.answer)
+    }
+
+    @Test fun `meta follow-ups are recognized, questions with a subject of their own are not`() {
+        for (q in listOf("summary", "Conclusion", "TL;DR", "tldr", "continue", "go on", "tell me more", "a brief summary please",
+            "a executive summary please", "sum it up", "resuma", "um resumo por favor", "continua"))
+            assertTrue(q, DeepResearch.isMetaFollowUp(q))
+        for (q in listOf("summary of the causes of war", "What is the conclusion of the Treaty of Versailles?", "continue the history of Rome",
+            "How does the greenhouse effect warm the planet?", "more about volcanoes", ""))
+            assertFalse(q, DeepResearch.isMetaFollowUp(q))
+    }
+
+    @Test fun `a meta follow-up is written from the full previous answer, with no splitting or search`() = runBlocking {
+        val gen = Recorder { _, _ -> "In short: CO2 traps heat [1]." }
+        var searched = 0
+        val full = "Gases like CO2 trap outgoing heat [1]. Oceans absorb most of the excess [2]."
+        val r = DeepResearch(gen, { _, _ -> searched++; emptyList() }, { null }).run("TL;DR", null, history, 256, previousAnswer = full)
+        assertEquals(1, gen.calls.size)
+        assertEquals(0, searched)
+        assertTrue(r.fromPreviousAnswer)
+        assertTrue(r.subQuestions.isEmpty())
+        assertEquals("In short: CO2 traps heat [1].", r.answer)
+        val (system, user) = gen.calls[0]
+        assertTrue(system.contains("keep its source numbers exactly as written"))
+        assertTrue(user.contains("Previous question: How does the greenhouse effect warm the planet?"))
+        assertTrue(user.contains("Oceans absorb most of the excess [2]."))
+        assertTrue(user.endsWith("Follow-up: TL;DR"))
+    }
+
+    @Test fun `with no previous answer a meta follow-up researches as usual`() = runBlocking {
+        val gen = Recorder { _, _ -> "ok" }
+        val r = DeepResearch(gen, { _, _ -> emptyList() }, { null }).run("summary", null, null, 256)
+        assertFalse(r.fromPreviousAnswer)
+        assertTrue(gen.calls.first().first.startsWith("You plan"))
     }
 
     @Test fun `refusal lines are not sub-questions`() {
