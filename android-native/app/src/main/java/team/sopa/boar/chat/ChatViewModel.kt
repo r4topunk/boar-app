@@ -328,11 +328,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     // Written from the last answer: its numbers [n] are that answer's sources.
                     if (r.fromPreviousAnswer) reusedSources = lastAnswer?.sources
                     timedOut = r.timedOut
+                    metrics = r.metrics
                 } else if (settings.adaptiveRoutingEnabled) {
                     limited = null
                     val r = adaptive(q, systemPrompt, styleReminder, history, ::onPiece)
                     sources = r.first
                     timedOut = r.second
+                    metrics = r.third
                 } else {
                     val pipeline = AnswerPipeline(session, services.retriever::retrieve, { Classify.classifyTask(it).value }, { Classify.isRetrievalIrrelevant(TaskType.of(it)) })
                     pipeline.answer(AnswerRequest(q, systemPrompt, styleReminder, budget, history, enableThinking = settings.engineTweaks.thinkingEnabled)).collect { e ->
@@ -427,7 +429,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** runAdaptiveChat: plan with the installed models and the user's routing settings, then execute. */
-    private suspend fun adaptive(q: String, systemPrompt: String, styleReminder: String?, history: ConversationHistory, onPiece: (String) -> Unit): Pair<List<Chunk>, Boolean> {
+    private suspend fun adaptive(q: String, systemPrompt: String, styleReminder: String?, history: ConversationHistory, onPiece: (String) -> Unit): Triple<List<Chunk>, Boolean, GenerationMetrics?> {
         val s = services.settings
         val statuses = services.catalog.models.filter { it.kind == AssetKind.LLM }.map { Profiles.AvailableModel(it, services.fileOf(it).isFile) }
         val preset = s.routingPreset?.let { runCatching { RoutingPreset.of(it) }.getOrNull() } ?: RoutingPreset.DEFAULT
@@ -438,7 +440,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(activity = if (step.type.value == "retrieve") Activity.Retrieving else Activity.Thinking) }
             }, shouldStop = { stopRequested })
         if (r.answer.isBlank() && !stopRequested) error("adaptive routing produced no answer: ${r.warnings.joinToString()}")
-        return r.citations to r.timedOut
+        return Triple(r.citations, r.timedOut, r.metrics)
     }
 
     /** The phone's RAM (ram-monitor's getDeviceTotalRamBytes); 0 when unreadable. */
@@ -448,8 +450,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }.getOrDefault(0L)
 
     /**
-     * The answer's receipt, from the engine's own numbers where the pipeline reports them (Deep Research and adaptive
-     * routing don't), else from the tokens as they streamed. None when nothing was generated.
+     * The answer's receipt, from the engine's own numbers (for Deep Research and adaptive routing, those of the step that
+     * wrote the answer), else from the tokens as they streamed. None when nothing was generated.
      */
     private fun receiptOf(startAt: Long, firstAt: Long, streamed: Int, m: GenerationMetrics?, retrievalMs: Double?): Receipt? {
         if (firstAt == 0L || streamed == 0) return null
