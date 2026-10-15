@@ -178,8 +178,14 @@ class DeepResearch(
             if (p.direct == null && p.fallback == null) return null
             val turns = history?.turns.orEmpty()
             val current = Js.trim(query)
-            val i = turns.indices.lastOrNull { turns[it].role == "user" && Js.trim(turns[it].text).let { t -> t.isNotEmpty() && t != current } } ?: return null
-            val answer = turns.drop(i + 1).firstOrNull { it.role == "assistant" }?.text?.let { Js.trim(it) }.orEmpty()
+            // The latest question that got an answer: a stopped answer leaves its question in the history with no
+            // answer, and "continue" after a stopped "conclusion" researched "conclusion" itself (argumentation, X6, Oct 14).
+            fun answerAfter(i: Int): String = turns.drop(i + 1).takeWhile { it.role != "user" }
+                .firstOrNull { it.role == "assistant" }?.text?.let { Js.trim(it) }.orEmpty()
+            val i = turns.indices.lastOrNull {
+                turns[it].role == "user" && Js.trim(turns[it].text).let { t -> t.isNotEmpty() && t != current } && answerAfter(it).isNotEmpty()
+            } ?: return null
+            val answer = answerAfter(i)
             return Exchange(Js.trim(turns[i].text), if (answer.length > PREVIOUS_ANSWER_CHARS) answer.take(PREVIOUS_ANSWER_CHARS) + "…" else answer)
         }
 

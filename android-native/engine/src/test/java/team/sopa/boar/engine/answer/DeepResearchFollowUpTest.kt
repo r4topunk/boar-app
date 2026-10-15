@@ -73,6 +73,11 @@ class DeepResearchFollowUpTest {
         assertEquals(listOf(1000L, 1000L, 1000L, null), limits)
     }
 
+    @Test fun `a stopped question with no answer is skipped for the one before it`() {
+        val h = ConversationHistory(turns = history.turns + ConversationTurn("user", "conclusion"))
+        assertEquals("How does the greenhouse effect warm the planet?", DeepResearch.lastExchange("continue", h)?.question)
+    }
+
     @Test fun `refusal lines are not sub-questions`() {
         assertEquals(listOf("q"), DeepResearch.parseSubQuestions("Desculpe, não posso ajudar com isso.\nI cannot answer that question", "q"))
     }

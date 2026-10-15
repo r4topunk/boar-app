@@ -1,5 +1,10 @@
 package team.sopa.boar.ui.chat
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -132,7 +137,7 @@ fun ChatScreen(
                     items(state.messages, key = { it.id }) { m -> Bubble(m, state, onRate, onReuse = { input = it; onReused() }) }
                 }
             }
-            InputBar(input, { input = it }, state.answeringId != null, onSend = { onSend(input); input = "" }, onStop, voiceEnabled, state.toneIcon) { toneSheet = true }
+            InputBar(input, { input = it }, state.answeringId != null, onSend = { onSend(input); input = "" }, onStop, voiceEnabled, state.toneIcon, state.stopping) { toneSheet = true }
         }
     }
     state.toast?.let { Toast(it, onToastHidden) }
@@ -400,7 +405,7 @@ private fun Bubble(m: UiMessage, state: ChatState, onRate: (String, String) -> U
             val shown = if (streaming) split.answer else AnswerText.splitInlineBullets(AnswerText.cleanCitations(split.answer, m.sources.size))
             val reasoningStyle = Modifier.drawBehind { drawRect(c.borderDefault, size = size.copy(width = 2.dp.toPx())) }.padding(start = 8.dp, bottom = 8.dp)
             when {
-                m.text.isEmpty() && streaming -> ProcessingIndicator(activityLabel(state.activity))
+                m.text.isEmpty() && streaming -> ProcessingIndicator(if (state.stopping) t("native.chat.stopping") else activityLabel(state.activity))
                 split.thinkingInProgress && split.answer.isEmpty() && streaming ->
                     Text("💭 " + (split.thinking?.takeLast(160) ?: ""), fontSize = 12.sp, lineHeight = 17.sp, fontStyle = FontStyle.Italic, color = c.textDim, modifier = reasoningStyle)
                 split.thinkingInProgress && split.answer.isEmpty() ->
@@ -509,26 +514,34 @@ private fun Badge(text: String) {
  * sheet), the mic inside the field on the right (VoiceInputButton.tsx), send or stop.
  */
 @Composable
-private fun InputBar(text: String, onText: (String) -> Unit, answering: Boolean, onSend: () -> Unit, onStop: () -> Unit, voiceEnabled: Boolean, toneIcon: String, onOpenStyles: () -> Unit) {
+private fun InputBar(text: String, onText: (String) -> Unit, answering: Boolean, onSend: () -> Unit, onStop: () -> Unit, voiceEnabled: Boolean, toneIcon: String, stopping: Boolean, onOpenStyles: () -> Unit) {
     val c = Boar.colors
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderDefault))
     Row(Modifier.fillMaxWidth().background(c.bgCardElevated).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.size(48.dp).clip(CircleShape).background(c.bgInput).border(1.dp, c.borderDefault, CircleShape).clickable(onClick = onOpenStyles), contentAlignment = Alignment.Center) {
             Text(toneIcon, fontSize = 18.sp)
         }
-        Row(Modifier.weight(1f).clip(RoundedCornerShape(50)).background(c.bgInput).border(1.dp, c.borderDefault, RoundedCornerShape(50))
+        // A pill on one line; a rounded box once the question wraps (a pill's ends cut into the text).
+        var lines by remember { mutableStateOf(1) }
+        val fieldShape = if (lines > 1) RoundedCornerShape(16.dp) else RoundedCornerShape(50)
+        Row(Modifier.weight(1f).clip(fieldShape).background(c.bgInput).border(1.dp, c.borderDefault, fieldShape)
             .padding(start = 18.dp, end = if (voiceEnabled) 6.dp else 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f).padding(vertical = 12.dp)) {
                 val style = Boar.type.body.copy(fontSize = 14.sp, color = c.textPrimary)
                 if (text.isEmpty()) Text(t("chatScreen.inputPlaceholder"), style = style, color = c.textDim)
-                BasicTextField(text, onText, textStyle = style, cursorBrush = SolidColor(c.emerald500), modifier = Modifier.fillMaxWidth(), maxLines = 5)
+                BasicTextField(text, onText, textStyle = style, cursorBrush = SolidColor(c.emerald500), modifier = Modifier.fillMaxWidth(), maxLines = 5,
+                    onTextLayout = { lines = it.lineCount })
             }
             if (voiceEnabled) MicButton(text, onText, enabled = !answering, size = 34.dp)
         }
         val canSend = text.isNotBlank() && !answering
         val bg = if (answering) c.crimson600 else if (canSend) c.emerald600 else c.borderElevated
+        // After Stop, the button pulses until the answer really ends: a library search or a chunk of prompt finishes first.
+        val transition = rememberInfiniteTransition(label = "stopping")
+        val blink by transition.animateFloat(1f, 0.35f, infiniteRepeatable(tween<Float>(500), RepeatMode.Reverse), label = "pulse")
+        val pulse = if (stopping) blink else 1f
         Box(
-            Modifier.size(48.dp).alpha(if (answering || canSend) 1f else 0.35f).clip(CircleShape).background(bg).clickable(enabled = answering || canSend) { if (answering) onStop() else onSend() },
+            Modifier.size(48.dp).alpha(if (answering || canSend) pulse else 0.35f).clip(CircleShape).background(bg).clickable(enabled = answering || canSend) { if (answering) onStop() else onSend() },
             contentAlignment = Alignment.Center,
         ) { Text(if (answering) "■" else "➤", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = if (answering) 14.sp else 16.sp) }
     }

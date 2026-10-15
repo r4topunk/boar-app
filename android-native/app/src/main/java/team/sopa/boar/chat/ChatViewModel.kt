@@ -85,6 +85,8 @@ data class ChatState(
     /** A short message over the chat for about 2 s (Toast.tsx): the new tone, a reused question. */
     val toast: String? = null,
     val toneIcon: String = "",
+    /** Stop was tapped and the answer hasn't ended yet (a step in progress finishes first). */
+    val stopping: Boolean = false,
     /** The "Mixture of agents" line under the header was closed for good. */
     val researchBannerHidden: Boolean = false,
     /** The styles the header sheet offers (id to icon): "custom" only when a custom prompt is written. */
@@ -227,6 +229,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stop() {
         stopRequested = true
+        if (_state.value.answeringId != null) _state.update { it.copy(stopping = true) }
         services.host.current()?.cancel()
     }
 
@@ -312,7 +315,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
             chats.prune(settings.maxSavedSessions)
             _state.update { s ->
-                s.copy(answeringId = null, activity = null,
+                s.copy(answeringId = null, activity = null, stopping = false,
                     messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt) else it })
             }
         }
