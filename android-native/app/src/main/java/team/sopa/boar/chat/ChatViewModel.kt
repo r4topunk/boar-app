@@ -85,6 +85,8 @@ data class ChatState(
     /** A short message over the chat for about 2 s (Toast.tsx): the new tone, a reused question. */
     val toast: String? = null,
     val toneIcon: String = "",
+    /** The "Mixture of agents" line under the header was closed for good. */
+    val researchBannerHidden: Boolean = false,
     /** The styles the header sheet offers (id to icon): "custom" only when a custom prompt is written. */
     val tones: List<Pair<String, String>> = emptyList(),
     val online: Boolean = false,
@@ -131,7 +133,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val id = services.settings.personalityId ?: services.personalities.defaultId
         val custom = services.settings.customSystemPrompt.orEmpty().isNotBlank()
         val tones = services.personalities.personalities.filter { it.id != "custom" || custom }.map { it.id to it.icon }
-        _state.update { it.copy(personalityId = id, toneIcon = services.personalities.get(id).icon, tones = tones) }
+        _state.update { it.copy(personalityId = id, toneIcon = services.personalities.get(id).icon, tones = tones, researchBannerHidden = services.settings.researchBannerHidden) }
+    }
+
+    fun hideResearchBanner() {
+        services.settings.researchBannerHidden = true
+        _state.update { it.copy(researchBannerHidden = true) }
     }
 
     /** The header sheet: answer in this style from the next question on. */

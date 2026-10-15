@@ -247,6 +247,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
             onMenu = { scope.launch { drawer.open() } },
             onSetTone = vm::setTone,
             onSetDeepResearch = vm::setDeepResearch,
+            onHideResearchBanner = vm::hideResearchBanner,
             onRate = vm::rate,
             onDismissCrash = vm::dismissLoadCrash,
             onReused = { vm.showToast("chatScreen.messageReused") },
