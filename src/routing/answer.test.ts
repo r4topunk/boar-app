@@ -1407,8 +1407,10 @@ describe("answer(): a snakebite first-aid question gets the WHO card (SAFETY, af
   it("a Portuguese question with 'está', 'se' and 'grave' gets the PT card, a Spanish one the ES card", async () => {
     const pt = await collect("Uma cobra me picou e está inchando, se piorar é grave? O que faço?");
     expect(pt.result.text).toMatch(/^Picada de cobra, primeiros socorros: /);
-    const es = await collect("Una serpiente mordió a mi hijo, qué hago?");
-    expect(es.result.text).toMatch(/^Mordedura de serpiente, primeros auxilios: /);
+    for (const q of ["Una serpiente mordió a mi hijo, qué hago?", "Me picó una culebra, que hago?"]) {
+      const es = await collect(q);
+      expect(es.result.text, q).toMatch(/^Mordedura de serpiente, primeros auxilios: /);
+    }
     expect(f.generations).toHaveLength(0);
   });
 });

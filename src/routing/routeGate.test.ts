@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { BOAR_SELF_DESCRIPTION, gatedTaskType, routeGateSkip, routeGateMessages, routeGateVerdict, ROUTE_GATE_SYSTEM } from "./routeGate";
 
-/** Measured (cut 7 gate prompt, sha256 7708281b…); update only with a new gate measurement. */
-const ROUTE_GATE_SYSTEM_B5_LENGTH = 1673;
+/** Measured (cut 7 gate prompt B6, sha256 7708281b…); update only with a new gate measurement. */
+const ROUTE_GATE_SYSTEM_B6_LENGTH = 1673;
 
 describe("routeGateMessages", () => {
-  it("sends a single message as is, after the B4 system prompt", () => {
+  it("sends a single message as is, after the B6 system prompt", () => {
     expect(routeGateMessages("boa noite 🙂")).toEqual([
       { role: "system", content: ROUTE_GATE_SYSTEM },
       { role: "user", content: "boa noite 🙂" },
     ]);
-    expect(ROUTE_GATE_SYSTEM.length).toBe(ROUTE_GATE_SYSTEM_B5_LENGTH);
+    expect(ROUTE_GATE_SYSTEM.length).toBe(ROUTE_GATE_SYSTEM_B6_LENGTH);
     expect(ROUTE_GATE_SYSTEM).not.toMatch(/arithmetic|12 times 7/);
     expect(ROUTE_GATE_SYSTEM).toContain("Well-known facts too");
     expect(ROUTE_GATE_SYSTEM).toContain(`About BOAR (only for questions about the app itself): ${BOAR_SELF_DESCRIPTION}`);

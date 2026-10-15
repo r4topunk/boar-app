@@ -648,9 +648,10 @@ export function createAnswerer(deps: AnswerDeps) {
       if (!req.reuseSources && req.tier !== "deep") {
         // Snakebite first aid: a fixed card from the WHO text, never a pack passage (Boar, after 3ffd7e0).
         if (isSnakebiteFirstAid(req.query)) {
-          // Same precedence as the other card sites: Portuguese first, then Spanish.
-          const ptQ = isPortugueseQuestion(req.query);
-          const card = snakebiteFirstAidCard(req.query, ptQ, !ptQ && isSpanishQuestion(req.query));
+          // Spanish first: isPortugueseQuestion also fires on Spanish ("Me picó una culebra, que hago?"), and ES_ONLY
+          // holds no words Portuguese shares, so a Portuguese question is not Spanish here.
+          const esQ = isSpanishQuestion(req.query);
+          const card = snakebiteFirstAidCard(req.query, !esQ && isPortugueseQuestion(req.query), esQ);
           markVisible();
           const r: AnswerReceipt = { modelId: "grounding-guard", modelLabel: "First aid (WHO)", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: ["answer:first-aid-card-snakebite"] };
           emit({ type: "token", answerId, tier: "instant", text: card });
@@ -1257,7 +1258,7 @@ export function createAnswerer(deps: AnswerDeps) {
           const r = await deps.engine.load(m.filename, { meta: { modelId: m.id, label: m.label } });
           loadMs += deps.now() - ls;
           if (r.warning) emit({ type: "warning", answerId, code: "model_streams_from_storage", message: r.warning });
-          if (r.backend?.kind === "cpu-fallback") reasonCodes.push("backend:cpu-fallback");
+          if (r.backend?.kind === "cpu-fallback" && !reasonCodes.includes("backend:cpu-fallback")) reasonCodes.push("backend:cpu-fallback");
           return null;
         } catch (e: any) {
           loadFailureKind = e?.kind;

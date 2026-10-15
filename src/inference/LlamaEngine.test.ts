@@ -727,6 +727,23 @@ describe("unload during KV session I/O (CodeRabbit: queue and genQueue are indep
     expect(log.completions).toBe(0);
   });
 
+  it("an answer that fails with 'model unloaded' leaves no timeout armed (a stale timer would stop a later answer)", async () => {
+    const { engine, resolveIo, ioPending } = await slowSessions();
+    engine.setAnswerPrefix(PREFIX);
+    const key = (engine as any).answerKvKey(PREFIX) as string;
+    kvFs.files.add((engine as any).kvPath(key).uri);
+    const onTimeout = vi.fn();
+    const answer = engine.generate({ messages: [{ role: "system", content: `${PREFIX.system}\n\nContext:\nx` }, { role: "user", content: "q" }], timeoutMs: 30, onTimeout });
+    while (!ioPending()) await tick();
+    const unload = engine.unload();
+    await tick(); // unloadNow is waiting on the session load
+    resolveIo();
+    await unload;
+    await expect(answer).rejects.toThrow("model unloaded");
+    await new Promise((r) => setTimeout(r, 60));
+    expect(onTimeout).not.toHaveBeenCalled();
+  });
+
   it("the route gate's first prefill: unload during saveSession waits for it, and the gate returns null without a completion", async () => {
     const { engine, ctx, log, resolveIo, ioPending } = await slowSessions();
     const probs = engine.nextTokenProbs(gateMsgs, { modelFilename: "models/a.gguf", nProbs: 20 });

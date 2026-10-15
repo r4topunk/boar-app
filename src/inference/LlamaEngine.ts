@@ -542,13 +542,6 @@ export class LlamaEngine {
       throw new Error("LlamaEngine.generate: either prompt or messages must be provided");
     }
 
-    const timer = timeoutMs
-      ? setTimeout(() => {
-          onTimeout?.();
-          this.context?.stopCompletion();
-        }, timeoutMs)
-      : null;
-
     // messages+jinja lets llama.cpp apply the loaded GGUF's own embedded
     // chat_template — DEFAULT_STOP_SEQUENCES exist specifically because
     // this app's hand-built "Question:/Answer:" prompt shape gives the
@@ -604,6 +597,14 @@ export class LlamaEngine {
     }
     this.nosrcCached = staticReady;
     let full = "";
+    // Armed here, not before the session I/O above: a "model unloaded" throw there would leave it armed, and a stale
+    // timer later stops whatever answer is running then (review S2).
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          onTimeout?.();
+          this.context?.stopCompletion();
+        }, timeoutMs)
+      : null;
     const completion = context.completion(completionParams, (data) => {
       full += data.token;
       onToken?.(data.token);
