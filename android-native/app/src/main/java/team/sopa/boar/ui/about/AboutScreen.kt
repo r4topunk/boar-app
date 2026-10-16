@@ -67,7 +67,9 @@ fun AboutScreen(onClose: () -> Unit) {
             Profile()
             // Three posts: about BOAR, its addresses, the open work it stands on.
             Post(last = false) {
-                for (key in listOf("why", "offline", "receipt", "budget")) Text(t("native.about.post.$key"), style = Boar.type.body, color = c.textPrimary)
+                listOf("why", "offline", "receipt", "budget").forEachIndexed { i, key ->
+                    Text(t("native.about.post.$key"), style = Boar.type.body, color = c.textPrimary, modifier = Modifier.padding(top = if (i == 0) 0.dp else 8.dp))
+                }
             }
             Post(last = false) {
                 Text(t("native.about.post.open"), style = Boar.type.body, color = c.textPrimary)
@@ -105,8 +107,8 @@ private fun Profile() {
         Box(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth().aspectRatio(3f).clip(RoundedCornerShape(12.dp))) {
                 Image(painterResource(R.drawable.boar_banner), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                Text(t("native.about.tagline"), style = Boar.type.headline, color = Color(0xFFF3ECDC), fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.fillMaxWidth(0.55f).padding(start = 14.dp, top = 14.dp))
+                Text(t("native.about.tagline"), style = Boar.type.titleSm, color = Color(0xFFF3ECDC), fontWeight = FontWeight.ExtraBold, maxLines = 2,
+                    modifier = Modifier.fillMaxWidth(0.5f).padding(start = 14.dp, top = 12.dp))
             }
             Image(painterResource(R.drawable.boar_mark), null,
                 Modifier.align(Alignment.BottomStart).padding(start = 12.dp).offset(y = 40.dp).size(80.dp).clip(CircleShape)
