@@ -108,7 +108,7 @@ private fun Profile() {
             Box(Modifier.fillMaxWidth().aspectRatio(3f).clip(RoundedCornerShape(12.dp))) {
                 Image(painterResource(R.drawable.boar_banner), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 Text(t("native.about.tagline"), style = Boar.type.titleSm, color = Color(0xFFF3ECDC), fontWeight = FontWeight.ExtraBold, maxLines = 2,
-                    modifier = Modifier.fillMaxWidth(0.5f).padding(start = 14.dp, top = 12.dp))
+                    modifier = Modifier.fillMaxWidth(0.62f).padding(start = 14.dp, top = 12.dp))
             }
             Image(painterResource(R.drawable.boar_mark), null,
                 Modifier.align(Alignment.BottomStart).padding(start = 12.dp).offset(y = 40.dp).size(80.dp).clip(CircleShape)
