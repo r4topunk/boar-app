@@ -294,6 +294,9 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             var reusedSources: List<Source>? = null
             // The answer a meta follow-up ("summary", "continue") is written from: the last one with text.
             val lastAnswer = prior.lastOrNull { it.role == "assistant" && it.text.isNotBlank() }
+            // Every answered question so far, oldest first: what "summarize our conversation" is written from.
+            val conversation = prior.zipWithNext().filter { (u, a) -> u.role == "user" && a.role == "assistant" && a.text.isNotBlank() }
+                .map { (u, a) -> DeepResearch.Companion.Exchange(u.text, AnswerText.stripThinking(a.text)) }
             var timedOut = false
             var firstAt = 0L
             var tokens = 0
@@ -316,13 +319,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 limited = budget
                 if (session == null) {
                     _state.update { it.copy(noModel = true, error = "no-model") }
-                } else if (_state.value.deepResearch) {
+                } else if (_state.value.deepResearch || aboutConversation(q, history, conversation)) {
+                    val research = _state.value.deepResearch
                     val r = DeepResearch(SessionEngine(session, settings.engineTweaks.thinkingEnabled), services.retriever::retrieve, settings.engineTweaks::stageTimeoutMs, settings.engineTweaks::writeUpTimeoutMs).run(
                         q, systemPrompt, history, budget,
-                        onProgress = { p -> _state.update { it.copy(activity = Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount)) } },
+                        onProgress = { p -> _state.update { it.copy(activity = if (research) Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount) else Activity.Thinking) } },
                         onToken = ::onPiece,
                         shouldStop = { stopRequested },
                         previousAnswer = lastAnswer?.text?.let(AnswerText::stripThinking),
+                        conversation = conversation,
                     )
                     sources = r.citations
                     // Written from the last answer: its numbers [n] are that answer's sources.
@@ -488,6 +493,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Messages sent verbatim as history (ChatScreen.tsx VERBATIM_MESSAGE_COUNT). */
         const val VERBATIM_MESSAGE_COUNT = 6
+
+        /**
+         * A message about the conversation itself, answered from it without a search: "summarize our conversation", or
+         * "TL;DR" / "a summary please" after an answer, as Deep Research already did. "Summarize our conversation" covered
+         * only the last three exchanges (X6, Oct 16). "continue" keeps the search: it asks for more than the chat holds.
+         */
+        fun aboutConversation(query: String, history: ConversationHistory, conversation: List<DeepResearch.Companion.Exchange>): Boolean =
+            (DeepResearch.isConversationRecap(query) && conversation.any { !DeepResearch.isConversationRecap(it.question) && !DeepResearch.isSummaryFollowUp(it.question) }) ||
+                (DeepResearch.isSummaryFollowUp(query) && DeepResearch.lastAnswered(query, history) != null)
 
         /** Prompt ideas shown in an empty chat, drawn again for each new chat. */
         const val IDEAS_SHOWN = 5
