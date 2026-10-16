@@ -351,7 +351,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             }
             val passages = sources.map { Source(it.title, it.source, it.relevance, it.similarity, it.docId, it.body) }
             // One source per article, best first; the answer's numbers follow (a reused list is already grouped).
-            val grouped = SourceGroups.group(passages, { it.docId ?: it.title }, { it.similarity ?: it.relevance }) { g ->
+            val grouped = SourceGroups.group(passages, { SourceGroups.articleKey(it.source, it.docId, it.title) }, { it.similarity ?: it.relevance }) { g ->
                 g.first().copy(similarity = g.mapNotNull { it.similarity }.maxOrNull(), relevance = g.mapNotNull { it.relevance }.maxOrNull(),
                     body = g.joinToString("\n…\n") { it.body })
             }
