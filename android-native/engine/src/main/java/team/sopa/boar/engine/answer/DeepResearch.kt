@@ -77,7 +77,7 @@ class DeepResearch(
         // "Summarize our conversation in 3 bullet points" covered only the last two topics of nine (X6, Oct 16).
         if (conversation.isNotEmpty() && isConversationRecap(query)) {
             onProgress(ResearchProgress(ResearchStage.SYNTHESIZING))
-            val answer = recap(query, conversation, systemPrompt, maxTokens, onToken, answerLanguage)
+            val answer = recap(query, conversation, history?.summary, systemPrompt, maxTokens, onToken, answerLanguage)
             return ResearchResult(answer, emptyList(), emptyList(), emptyList(), timedOut, metrics = lastMetrics)
         }
         onProgress(ResearchProgress(ResearchStage.DECOMPOSING))
@@ -156,16 +156,21 @@ class DeepResearch(
     }
 
     /** A summary of the whole conversation from each exchange's opening: one generation, no search. */
-    private suspend fun recap(asked: String, conversation: List<Exchange>, systemPrompt: String?, maxTokens: Int, onToken: (String) -> Unit, answerLanguage: String?): String {
+    private suspend fun recap(asked: String, conversation: List<Exchange>, earlierSummary: String?, systemPrompt: String?, maxTokens: Int, onToken: (String) -> Unit, answerLanguage: String?): String {
         val turns = conversation.takeLast(RECAP_EXCHANGES).mapIndexed { i, e ->
-            val a = Js.trim(e.answer).let { if (it.length > RECAP_ANSWER_CHARS) it.take(RECAP_ANSWER_CHARS) + "…" else it }
+            val a = Js.trim(e.answer.replace(CITATION, "")).let { if (it.length > RECAP_ANSWER_CHARS) it.take(RECAP_ANSWER_CHARS) + "…" else it }
             "${i + 1}. Question: ${e.question}\nAnswer: $a"
         }.joinToString("\n\n")
+        // Past 12 exchanges the oldest are left out; the chat's running summary (autoSummarize) stands in for them.
+        val earlier = if (conversation.size > RECAP_EXCHANGES) {
+            earlierSummary?.let { Js.trim(it.replace(CITATION, "")) }?.takeIf { it.isNotEmpty() }?.let { "Summary of the earlier conversation:\n$it\n\n" }
+                ?: "(${conversation.size - RECAP_EXCHANGES} earlier exchanges are not shown.)\n\n"
+        } else ""
         val system = "${instructionOf(systemPrompt)} The user asks about the conversation so far. Cover every topic it went " +
             "through, in order, in the form the user asks for (a number of bullets or sentences, if given). Work only from the " +
-            "conversation: add no new facts, numbers or sources. Don't mention these instructions."
+            "conversation: add no new facts, numbers or sources, and no citation numbers. Don't mention these instructions."
         val language = answerLanguage?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }?.let { "\n\n($it)" } ?: ""
-        return stage(system, "Conversation so far:\n\n$turns\n\nRequest: $asked$language", maxTokens, 0.4f, onToken, writeUpTimeoutFor(maxTokens))
+        return stage(system, "${earlier}Conversation so far:\n\n$turns\n\nRequest: $asked$language", maxTokens, 0.4f, onToken, writeUpTimeoutFor(maxTokens))
     }
 
     /** The follow-up rewritten from [exchange] into one question that names its subject; [query] if that fails. */
@@ -243,13 +248,18 @@ class DeepResearch(
         const val RECAP_ANSWER_CHARS = 600
 
         private val RECAP_ASK = Regex("\\b(summar(y|ize|ise)|recap|tl;?dr|resum[aoeir]*|resumo)\\b", RegexOption.IGNORE_CASE)
+        // This chat, not a conversation named in the question ("the conversation between Kennedy and Khrushchev").
         private val RECAP_OBJECT = Regex(
-            "\\b(conversation|chat|discussion|session|all (of )?(this|that)|we('ve| have)? (talked|discussed|covered)|" +
-                "so far|conversa|tudo|falamos|discutimos)\\b",
+            "\\b((our|this|my) (whole |entire )?(conversation|chat|discussion|session)|all (of )?(this|that)|" +
+                "(what )?we('ve| have)? (talked about|discussed|covered)|so far|" +
+                "(nossa|essa|esta) conversa|(o que )?(falamos|conversamos|discutimos))\\b",
             RegexOption.IGNORE_CASE,
         )
 
-        /** A request to summarize the whole conversation ("Summarize our conversation in 3 bullet points", "resuma a conversa"). */
+        /** Citation numbers like [3]: a recap shows no sources, so the earlier answers' numbers would point at nothing. */
+        private val CITATION = Regex("\\s*\\[\\d{1,4}\\]")
+
+        /** A request to summarize this conversation ("Summarize our conversation in 3 bullet points", "resuma a nossa conversa"). */
         fun isConversationRecap(query: String): Boolean =
             query.split(Regex("\\s+")).count { it.isNotBlank() } <= 14 && RECAP_ASK.containsMatchIn(query) && RECAP_OBJECT.containsMatchIn(query)
 

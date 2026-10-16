@@ -144,6 +144,20 @@ class DeepResearchFollowUpTest {
         assertFalse(DeepResearch.isConversationRecap("Summarize the causes of the French Revolution"))
         assertFalse(DeepResearch.isConversationRecap("How do vaccines work?"))
         assertFalse(DeepResearch.isConversationRecap("summary"))
+        assertFalse(DeepResearch.isConversationRecap("Summarize the conversation between Kennedy and Khrushchev"))
+        assertFalse(DeepResearch.isConversationRecap("Summarize a chat about Ubuntu"))
+    }
+
+    @Test fun `a recap drops the old citation numbers and keeps the earlier summary past 12 exchanges`() = runBlocking {
+        val gen = Recorder { _, _ -> "ok" }
+        val conversation = (1..14).map { DeepResearch.Companion.Exchange("Question $it?", "Answer $it [2].") }
+        DeepResearch(gen, { _, _ -> emptyList() }, { null }).run("recap our chat", null,
+            ConversationHistory(summary = "Talked about tides [1]."), 256, conversation = conversation)
+        val user = gen.calls.single().second
+        assertTrue(user.contains("Summary of the earlier conversation:\nTalked about tides."))
+        assertFalse(user.contains("Question 2?"))
+        assertTrue(user.contains("1. Question: Question 3?\nAnswer: Answer 3."))
+        assertFalse(user.contains("[2]"))
     }
 
     @Test fun `a conversation recap is written from every exchange, without a search`() = runBlocking {
