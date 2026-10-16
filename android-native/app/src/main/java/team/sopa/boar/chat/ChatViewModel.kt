@@ -264,6 +264,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun send(query: String, limit: Int? = null) {
         val q = query.trim()
         if (q.isEmpty() || job?.isActive == true) return
+        team.sopa.boar.app.Haptics.sent(getApplication())
         stopRequested = false
         job = viewModelScope.launch(Dispatchers.Default) {
             stopBackground()
@@ -370,6 +371,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             if (shown.isNotEmpty() || receipt != null) chats.setMessageMeta(answerId, metaOf(shown, receipt))
             afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
             chats.prune(settings.maxSavedSessions)
+            if (!stopped && text.isNotEmpty()) team.sopa.boar.app.Haptics.finished(getApplication())
             _state.update { s ->
                 s.copy(answeringId = null, activity = null, stopping = false,
                     messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt, cutAt = cutAt, nextLimit = nextLimit) else it })
