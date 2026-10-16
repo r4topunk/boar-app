@@ -372,7 +372,7 @@ const FROSTBITE = /(^|[^\p{L}])(frostbit\p{L}*|frostnip)(?![\p{L}])/iu;
 // A follow-up turn that only asks what to do now, or how serious it is ("what do I do now?", "e agora?", "Should I go to
 // the hospital?") continues the previous user turn's health question (Sonar exp-29). It may hold only function words,
 // what-to-do words and care words: any other word ("vegan restaurant", "offline", "eat … healthy life") is a new question.
-const FOLLOW_UP_WORDS = new Set(
+export const FOLLOW_UP_WORDS = new Set(
   ("and now what then so ok okay please i we you he she they it this that them him her my our me us do does did should can could must " +
    "would will is are was be it's i'm what's how what which when where why if someone somebody happens happen anything something " +
    "go take call give get bring put need still right serious bad dangerous emergency hospital doctor ambulance er a&e clinic " +

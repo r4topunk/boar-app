@@ -129,6 +129,7 @@ import type { ExecutionOutcome, ExecutionTelemetryRecord, ModelResidency } from 
 import { smallTalkReply } from "./smallTalk";
 import { conditionCardText as cut2ConditionCardText, conversationCondition, isCardEmergency } from "./conditionCards";
 import { withReviewedSnakebiteText } from "./snakebiteCardText";
+import { classify as classifyHealthGap, doseExcerpt, healthGapCard, healthGapCodes, healthGapTitle, noDoseAnswer, type HealthGap } from "./healthGap";
 
 // SBt (cut-3 final candidate): the snakebite card's EN text is the reviewed text (snakebiteCardText.ts); the trigger and
 // the card code in firstAidCards.ts / conditionCards.ts are cut 2's, byte for byte.
@@ -140,7 +141,7 @@ const conditionCardText = (...args: Parameters<typeof cut2ConditionCardText>) =>
  * first-aid cards): a question whose terms name exactly one condition (conditionCards.ts, Compass trigger v1) gets
  * that condition's card; several or none, or a Spanish question (no ES card texts yet) → the generic card.
  */
-function noSourceHealthCard(query: string, pt: boolean, es: boolean, reasonCodes: string[], userTurns: string[] = []): { text: string; label: string } {
+function noSourceHealthCard(query: string, pt: boolean, es: boolean, reasonCodes: string[], userTurns: string[] = [], gap: HealthGap | null = null): { text: string; label: string } {
   const { condition: r, fromHistory } = conversationCondition(query, userTurns);
   if (r === "MULTI") reasonCodes.push("grounding:fa-card-multi");
   const condition = r === "MULTI" ? null : r;
@@ -149,6 +150,17 @@ function noSourceHealthCard(query: string, pt: boolean, es: boolean, reasonCodes
     reasonCodes.push(`grounding:fa-card-${condition}`);
     if (fromHistory) reasonCodes.push("grounding:fa-card-from-history");
     return { text, label: "First aid card" };
+  }
+  // HEALTHGAP (rule v1.1 §2.2): no specific card -> the class's own: the poisoning or CO card, the dose line; survival keeps the generic line.
+  const fallback = healthGapCard(gap);
+  const card = fallback ? conditionCardText(fallback, query, es ? "es" : pt ? "pt" : "en") : null;
+  if (fallback && card) {
+    reasonCodes.push(`grounding:fa-card-${fallback}`);
+    return { text: card, label: "First aid card" };
+  }
+  if (gap?.cls === "dose") {
+    reasonCodes.push("grounding:health-no-dose");
+    return { text: noDoseAnswer(pt, es), label: "No offline source" };
   }
   return { text: noHealthSourceAnswer(pt, es), label: "No offline source" };
 }
@@ -227,6 +239,12 @@ export interface AnswerDeps {
    * health predicate (OR the card triggers and the health follow-up). null = unavailable -> lexical.
    */
   emergencyScore?(query: string, userTurns: string[]): Promise<{ p: number; fire: boolean } | null>;
+  /**
+   * HEALTHGAP (src/routing/healthGap.ts, rule v1.1): a dose, poisoning, carbon-monoxide-reading or survival-time question
+   * counts as a detector fire (the health route) and gets its class's no-source answer (dose line, poisoning or CO card).
+   * Codes keep the detector's own detector:p / detector:fire and add healthgap:<class>. Default off; true = on.
+   */
+  healthgap?: boolean;
   /** FACTS instant tier (src/rag/facts.ts); default on. false = off (model-path tests whose fixtures are fact questions). */
   facts?: boolean;
   /**
@@ -660,6 +678,18 @@ export function createAnswerer(deps: AnswerDeps) {
         detectorCodes.push("numguard:fired");
       }
 
+      // HEALTHGAP (deps.healthgap): a dose, poisoning, carbon-monoxide-reading or survival-time question the detector scores low
+      // counts as a detector fire from here on (no small talk, calculator, FACTS or places; the health route). The detector's
+      // own codes stay as scored; healthgap:<class> is added after them.
+      const healthGap = deps.healthgap === true && !req.reuseSources ? classifyHealthGap(req.query, userTurns) : null;
+      if (healthGap) {
+        learned = { p: learned?.p ?? 0, fire: true };
+        detectorCodes.push(...healthGapCodes(healthGap));
+      }
+      // HEALTHGAP (rule v1.2 §2.5): a dose or survival turn keeps a source whose title names its medicine or condition.
+      const gapTitle = healthGapTitle(healthGap, req.query, userTurns);
+      const gapSource = (c: RetrievedChunk) => !!gapTitle && gapTitle.test(c.title);
+
       // Arithmetic (temperature, fuel economy, Naismith, currency at a given rate, battery Wh) is answered
       // exactly, before anything else: "Minha conta do jantar deu 2.450 baht…" is a sum, not a restaurant
       // search (Sextant 3ccf7c0, mth-003-pt went to task:places).
@@ -1075,12 +1105,12 @@ export function createAnswerer(deps: AnswerDeps) {
         reasonCodes.push("grounding:health-strict");
         // Health: only sources whose title names the health topic (never a plant, a cave or a TV show).
         const topic = healthTopicTerms(req.query, english);
-        const onTopicHealth = sources.filter((c) => onHealthTopic(topic, c));
+        const onTopicHealth = sources.filter((c) => onHealthTopic(topic, c) || gapSource(c));
         if (onTopicHealth.length < sources.length) reasonCodes.push(`grounding:health-off-topic-dropped-${sources.length - onTopicHealth.length}`);
         sources = onTopicHealth;
         // The best source to quote may have been cut by compression (relative relevance): a
         // first-aid book's section loses to the clinical article's wording. Bring it back.
-        const pool = raw.filter((c) => onHealthTopic(topic, c));
+        const pool = raw.filter((c) => onHealthTopic(topic, c) || gapSource(c));
         if (pool.length) {
           const best = pool[healthSourceIndex(pool, coreProcedure(topic))];
           if (!sources.some((c) => c.chunkId === best.chunkId)) {
@@ -1096,7 +1126,11 @@ export function createAnswerer(deps: AnswerDeps) {
       // 2. Instant snippet (no LLM): only a sentence that covers the question. Not for an extractive
       // health answer: its snippet is the excerpt below (EQ-2: the preview quoted "Do not run during
       // the quake!" by word overlap, before the Drop, Cover and Hold On excerpt).
-      const healthExtractive = health && sources.length > 0 && req.tier !== "deep";
+      // HEALTHGAP (rule v1.2 §2.6): a survival-time question with a kept source titled by its condition ("Cold weather",
+      // "Hypothermia") is answered by the model from that source under the health grounding, as the deep tier answers health.
+      const survivalSourced = healthGap?.cls === "survival" && sources.some(gapSource);
+      if (survivalSourced) reasonCodes.push("grounding:health-survival-sourced");
+      const healthExtractive = health && sources.length > 0 && req.tier !== "deep" && !survivalSourced;
       // Never for health/danger (a single sentence is never a first-aid answer, and with no source the guard below
       // answers), and never when the sources were matched against a translation instead of the question (a PT
       // question's pt-en terms or lexicon names): coverage of "child" or "India" alone let an off-topic pack line
@@ -1149,7 +1183,7 @@ export function createAnswerer(deps: AnswerDeps) {
       // "not from the offline library" instruction below, never quoting them.
       if (health && gen?.mode !== "multipass" && sources.length === 0) {
         reasonCodes.push("grounding:health-no-source");
-        const { text, label } = noSourceHealthCard(req.query, pt, !pt && isSpanishQuestion(req.query), reasonCodes, (ctx.history?.turns ?? []).filter((t) => t.role === "user").map((t) => t.text));
+        const { text, label } = noSourceHealthCard(req.query, pt, !pt && isSpanishQuestion(req.query), reasonCodes, (ctx.history?.turns ?? []).filter((t) => t.role === "user").map((t) => t.text), healthGap);
         markVisible();
         emit({ type: "token", answerId, tier: genTier, text });
         return finish(genTier, "success", text, [], receipt({ modelId: "grounding-guard", modelLabel: label, retrievalMs }));
@@ -1167,6 +1201,33 @@ export function createAnswerer(deps: AnswerDeps) {
           emit({ type: "token", answerId, tier: genTier, text: card });
           return finish(genTier, "success", card, [], receipt({ modelId: "grounding-guard", modelLabel: "First aid card", retrievalMs }));
         }
+      }
+      // HEALTHGAP: a poisoning event (a deadly mushroom, or something swallowed or breathed in) gets its card before any excerpt:
+      // the specific condition's card if there is one (button battery, chemical in the eye…), else the poisoning card.
+      if (healthExtractive && healthGap?.event) {
+        const { condition: named } = conversationCondition(req.query, userTurns);
+        const condition = named && named !== "MULTI" ? named : "poisoning";
+        const card = conditionCardText(condition, req.query, !pt && isSpanishQuestion(req.query) ? "es" : pt ? "pt" : "en");
+        if (card) {
+          reasonCodes.push(`grounding:fa-card-${condition}`, "grounding:health-card-first");
+          markVisible();
+          emit({ type: "token", answerId, tier: genTier, text: card });
+          return finish(genTier, "success", card, [], receipt({ modelId: "grounding-guard", modelLabel: "First aid card", retrievalMs }));
+        }
+      }
+      // HEALTHGAP: a dose question with a kept source gets the source's own amount, quoted and cited, or the dose line; never a
+      // first-aid excerpt and never a model.
+      if (healthExtractive && healthGap?.cls === "dose") {
+        const es = !pt && isSpanishQuestion(req.query);
+        const fullSources = sources.map((c) => raw.find((r) => r.chunkId === c.chunkId) ?? c);
+        const quoted = doseExcerpt(fullSources, gapTitle, pt, es);
+        reasonCodes.push(quoted ? "grounding:health-dose-excerpt" : "grounding:health-no-dose");
+        const text = quoted ?? noDoseAnswer(pt, es);
+        markVisible();
+        emit({ type: "token", answerId, tier: "instant", text });
+        return quoted
+          ? finish("instant", "success", text, sources, receipt({ modelId: "extractive", modelLabel: "Source excerpt", retrievalMs }))
+          : finish("instant", "success", text, [], receipt({ modelId: "grounding-guard", modelLabel: "No offline source", retrievalMs }));
       }
       if (healthExtractive) {
         reasonCodes.push("grounding:health-extractive");
@@ -1197,8 +1258,9 @@ export function createAnswerer(deps: AnswerDeps) {
         }
         // No first-aid steps in the source: the condition's card when there is one (Sonar exp-29: a diabetic's low sugar).
         if (text && isNoStepsAnswer(text)) {
-          const { condition } = conversationCondition(req.query, userTurns);
-          const card = condition && condition !== "MULTI" ? conditionCardText(condition, req.query, !pt && isSpanishQuestion(req.query) ? "es" : pt ? "pt" : "en") : null;
+          const { condition: named } = conversationCondition(req.query, userTurns);
+          const condition = named && named !== "MULTI" ? named : healthGapCard(healthGap); // HEALTHGAP: poisoning / CO card fallback
+          const card = condition ? conditionCardText(condition, req.query, !pt && isSpanishQuestion(req.query) ? "es" : pt ? "pt" : "en") : null;
           if (card) {
             reasonCodes.push("grounding:health-no-steps", `grounding:fa-card-${condition}`);
             markVisible();
@@ -1209,8 +1271,9 @@ export function createAnswerer(deps: AnswerDeps) {
         if (!text) {
           reasonCodes.push("grounding:health-no-safe-excerpt");
           // No safe excerpt: the condition's first-aid card when there is one (Sonar exp-29), else the fixed line.
-          const { condition } = conversationCondition(req.query, userTurns);
-          const card = condition && condition !== "MULTI" ? conditionCardText(condition, req.query, !pt && isSpanishQuestion(req.query) ? "es" : pt ? "pt" : "en") : null;
+          const { condition: named } = conversationCondition(req.query, userTurns);
+          const condition = named && named !== "MULTI" ? named : healthGapCard(healthGap); // HEALTHGAP: poisoning / CO card fallback
+          const card = condition ? conditionCardText(condition, req.query, !pt && isSpanishQuestion(req.query) ? "es" : pt ? "pt" : "en") : null;
           if (card) reasonCodes.push(`grounding:fa-card-${condition}`);
           const fixed = card ?? noSafeStepsAnswer(pt);
           markVisible();

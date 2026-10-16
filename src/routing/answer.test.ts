@@ -8,6 +8,7 @@ import type { GenerateOptions } from "../inference/LlamaEngine";
 import { approxTokens, HEALTH_GROUNDING_INSTRUCTION, NO_SOURCE_INSTRUCTION, noHealthSourceAnswer, PT_ANSWER_LANGUAGE } from "./context";
 import { conditionCardText } from "./conditionCards";
 import { withReviewedSnakebiteText } from "./snakebiteCardText";
+import { noDoseAnswer } from "./healthGap";
 import { ModelLoadError } from "../inference/loadError";
 import { answerReducer, initialAnswer } from "./answerReducer";
 
@@ -2327,5 +2328,87 @@ describe("answer(): FACTS instant tier (offline Wikidata table)", () => {
     expect((await collect("What is the capital of Australia?")).result.receipt.reasonCodes).not.toContain("answer:facts-capital");
     f.deps.facts = undefined;
     expect((await collect("What is the capital of Australia?")).result.receipt.reasonCodes).toEqual(["answer:facts-capital"]);
+  });
+});
+
+describe("answer(): HEALTHGAP dose / poisoning / CO / survival forms (deps.healthgap, rule v1.1)", () => {
+  it("a dose question the detector scores 0, no source: the dose line, no model; off: no dose line, no healthgap code", async () => {
+    const Q = "How many mg of ibuprofen for a 20 kg child?";
+    f.deps.emergencyScore = async () => ({ p: 0, fire: false });
+    f.deps.healthgap = true;
+    const { result } = await collect(Q);
+    expect(result.text).toBe(noDoseAnswer(false));
+    expect(result.receipt.modelId).toBe("grounding-guard");
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:p=0.000", "healthgap:dose", "grounding:health-no-source", "grounding:health-no-dose"]));
+    expect(result.receipt.reasonCodes).not.toContain("detector:fire");
+    expect(f.generations).toHaveLength(0);
+    f.deps.healthgap = undefined;
+    const off = await collect(Q);
+    expect(off.result.receipt.reasonCodes.some((c) => c.startsWith("healthgap:") || c === "grounding:health-no-dose")).toBe(false);
+    expect(off.result.text).not.toBe(noDoseAnswer(false));
+  });
+  it("a poisoning event with no specific card: the poisoning card, no model", async () => {
+    const Q = "Ate 30 g of death cap mushroom, how many ounces is that?";
+    f.deps.emergencyScore = async () => ({ p: 0.092, fire: false });
+    f.deps.healthgap = true;
+    const { result } = await collect(Q);
+    expect(result.text).toBe(conditionCardText("poisoning", Q, "en"));
+    expect(result.text).toMatch(/^Possible poisoning \(swallowed or breathed in a chemical, a plant, a mushroom, alcohol or too much medicine\)/);
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["healthgap:poison", "healthgap:event", "grounding:fa-card-poisoning"]));
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("answer:calculator"))).toBe(false);
+    expect(f.generations).toHaveLength(0);
+  });
+  it("a specific card wins over the poisoning card (a swallowed button battery gets the battery card)", async () => {
+    const Q = "My son swallowed a button battery";
+    f.deps.emergencyScore = async () => ({ p: 0, fire: false });
+    f.deps.healthgap = true;
+    const { result } = await collect(Q);
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["healthgap:poison", "healthgap:event", "grounding:fa-card-battery"]));
+    expect(result.receipt.reasonCodes).not.toContain("grounding:fa-card-poisoning");
+    expect(result.text).toBe(conditionCardText("battery", Q, "en"));
+    expect(f.generations).toHaveLength(0);
+  });
+});
+
+describe("answer(): HEALTHGAP survival with a kept source (rule v1.2 §2.6)", () => {
+  it("a source titled by the condition: the model answers from it under the health grounding; none on topic: the no-source line", async () => {
+    const Q = "How many hours can someone survive in 5 °C water?";
+    f.deps.emergencyScore = async () => ({ p: 0.012, fire: false });
+    f.deps.healthgap = true;
+    f.retrieved = [chunk("cw", "Wikivoyage: Cold weather", "Cold water: in water below 10 °C a person can lose consciousness within an hour.")];
+    const sourced = await collect(Q);
+    expect(sourced.result.receipt.reasonCodes).toEqual(expect.arrayContaining(["healthgap:survival", "grounding:health-survival-sourced"]));
+    expect(f.generations).toHaveLength(1);
+    f.generations.length = 0;
+    f.retrieved = [chunk("wv", "Wikivoyage: Vientiane", "Vientiane is the capital of Laos, on the Mekong.")];
+    const none = await collect(Q);
+    expect(none.result.text).toBe(noHealthSourceAnswer(false));
+    expect(f.generations).toHaveLength(0);
+    f.deps.healthgap = undefined;
+  });
+});
+
+describe("answer(): HEALTHGAP dose with a kept source (rule v1.2 §2.5)", () => {
+  const Q = "How many international units of vitamin D per day are recommended for adults, and who needs more?";
+  it("a source titled by the medicine with an amount: its own sentence, cited, then the dose line's label and overdose text; no model", async () => {
+    f.retrieved = [chunk("vd", "Vitamin D", "Vitamin D helps your body absorb calcium. The recommended amounts, in international units (IU), are: - Adults 19-70 years: 600 IU - Adults 71 years and older: 800 IU")];
+    f.deps.emergencyScore = async () => ({ p: 0, fire: false });
+    f.deps.healthgap = true;
+    const { result } = await collect(Q);
+    expect(result.receipt.modelId).toBe("extractive");
+    expect(result.text).toMatch(/^From the offline source:\nThe recommended amounts, in international units \(IU\), are: .*800 IU \[1\]\n\nUse the dose and the time between doses printed on the package/);
+    expect(result.text).toContain("even if they seem fine.");
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["healthgap:dose", "grounding:health-dose-excerpt"]));
+    expect(f.generations).toHaveLength(0);
+    f.deps.healthgap = undefined;
+  });
+  it("a kept source with no amount, or not titled by the medicine: the dose line, never a first-aid excerpt", async () => {
+    f.retrieved = [chunk("bf", "Bone fracture", "Treatment: Give ibuprofen for pain and keep the limb still. Call for help.")];
+    f.deps.emergencyScore = async () => ({ p: 0, fire: false });
+    f.deps.healthgap = true;
+    const { result } = await collect("How many mg of ibuprofen for a 20 kg child?");
+    expect(result.text).toBe(noDoseAnswer(false));
+    expect(f.generations).toHaveLength(0);
+    f.deps.healthgap = undefined;
   });
 });
