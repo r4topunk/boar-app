@@ -70,6 +70,7 @@ fun AboutScreen(onClose: () -> Unit) {
                 Link("boarapp.com")
                 Link("x.com/boar_app")
                 Link("farcaster.xyz/boarapp")
+                Text(t("native.about.holdToCopy"), style = Boar.type["mono.xs"], color = c.textDim)
                 Text(t("native.about.verify"), style = Boar.type.title, color = c.textAccentEmerald, fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
             }
