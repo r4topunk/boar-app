@@ -148,6 +148,15 @@ class DeepResearchFollowUpTest {
         assertFalse(DeepResearch.isConversationRecap("Summarize a chat about Ubuntu"))
     }
 
+    @Test fun `plain chat writes a summary from the last answer, not a continue`() {
+        assertTrue(DeepResearch.isSummaryFollowUp("TL;DR"))
+        assertTrue(DeepResearch.isSummaryFollowUp("a brief summary please"))
+        assertTrue(DeepResearch.isSummaryFollowUp("conclusion"))
+        assertFalse(DeepResearch.isSummaryFollowUp("continue"))
+        assertFalse(DeepResearch.isSummaryFollowUp("tell me more"))
+        assertFalse(DeepResearch.isSummaryFollowUp("How do vaccines work?"))
+    }
+
     @Test fun `a recap drops the old citation numbers and keeps the earlier summary past 12 exchanges`() = runBlocking {
         val gen = Recorder { _, _ -> "ok" }
         val conversation = (1..14).map { DeepResearch.Companion.Exchange("Question $it?", "Answer $it [2].") }
@@ -180,6 +189,23 @@ class DeepResearchFollowUpTest {
         assertFalse(user.contains("x".repeat(DeepResearch.RECAP_ANSWER_CHARS + 1)))
         assertEquals("- seasons\n- the Moon\n- vaccines", r.answer)
         assertFalse(r.fromPreviousAnswer)
+    }
+
+    @Test fun `a recap leaves out earlier recaps and summaries`() = runBlocking {
+        val gen = Recorder { _, _ -> "ok" }
+        val conversation = listOf(
+            DeepResearch.Companion.Exchange("What causes the seasons on Earth?", "The axial tilt."),
+            DeepResearch.Companion.Exchange("Summarize our conversation in 3 bullet points", "- the axial tilt"),
+            DeepResearch.Companion.Exchange("TL;DR", "Tilt."),
+            DeepResearch.Companion.Exchange("How far away is the Moon?", "About 384,000 km."),
+        )
+        DeepResearch(gen, { _, _ -> emptyList() }, { null })
+            .run("Summarize our conversation in 3 bullet points", null, history, 256, conversation = conversation)
+        val user = gen.calls.single().second
+        assertTrue(user.contains("1. Question: What causes the seasons on Earth?"))
+        assertTrue(user.contains("2. Question: How far away is the Moon?"))
+        assertFalse(user.contains("TL;DR"))
+        assertFalse(user.contains("- the axial tilt"))
     }
 
     @Test fun `without earlier exchanges a recap request is researched as asked`() = runBlocking {

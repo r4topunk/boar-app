@@ -75,9 +75,11 @@ class DeepResearch(
         timedOut = false
         lastMetrics = null
         // "Summarize our conversation in 3 bullet points" covered only the last two topics of nine (X6, Oct 16).
-        if (conversation.isNotEmpty() && isConversationRecap(query)) {
+        // Earlier recaps and summaries are left out: read back, the next recap copied them instead of the topics (X6, Oct 16).
+        val topics = conversation.filterNot { isConversationRecap(it.question) || isSummaryFollowUp(it.question) }
+        if (topics.isNotEmpty() && isConversationRecap(query)) {
             onProgress(ResearchProgress(ResearchStage.SYNTHESIZING))
-            val answer = recap(query, conversation, history?.summary, systemPrompt, maxTokens, onToken, answerLanguage)
+            val answer = recap(query, topics, history?.summary, systemPrompt, maxTokens, onToken, answerLanguage)
             return ResearchResult(answer, emptyList(), emptyList(), emptyList(), timedOut, metrics = lastMetrics)
         }
         onProgress(ResearchProgress(ResearchStage.DECOMPOSING))
@@ -167,7 +169,8 @@ class DeepResearch(
                 ?: "(${conversation.size - RECAP_EXCHANGES} earlier exchanges are not shown.)\n\n"
         } else ""
         val system = "${instructionOf(systemPrompt)} The user asks about the conversation so far. Cover every topic it went " +
-            "through, in order, in the form the user asks for (a number of bullets or sentences, if given). Work only from the " +
+            "through, in order, in the form the user asks for (a number of bullets or sentences, if given); with fewer points than " +
+            "topics, group related topics into each point so that none is left out. Work only from the " +
             "conversation: add no new facts, numbers or sources, and no citation numbers. Don't mention these instructions."
         val language = answerLanguage?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }?.let { "\n\n($it)" } ?: ""
         return stage(system, "${earlier}Conversation so far:\n\n$turns\n\nRequest: $asked$language", maxTokens, 0.4f, onToken, writeUpTimeoutFor(maxTokens))
@@ -242,6 +245,17 @@ class DeepResearch(
             val content = words.filter { it !in META_FILLER }
             return content.isNotEmpty() && content.all { it in META_CORE }
         }
+
+        /** Words of a meta follow-up that ask for more rather than a summary ("continue", "tell me more", "prossiga"). */
+        private val META_MORE = setOf("continue", "go", "more", "expand", "continua", "continuar", "prossiga", "mais")
+
+        /**
+         * A meta follow-up that only asks to summarize or conclude the last answer ("TL;DR", "a brief summary please"):
+         * plain chat writes it from that answer. "continue" isn't one: written from the last answer with nothing new
+         * allowed, it repeated that answer word for word (X6, Oct 16).
+         */
+        fun isSummaryFollowUp(query: String): Boolean =
+            isMetaFollowUp(query) && query.lowercase().split(Regex("[^\\p{L}]+")).none { it in META_MORE }
 
         /** Exchanges a recap reads (the most recent ones) and characters of each answer: 12 × ~600 stays near 2,500 tokens. */
         const val RECAP_EXCHANGES = 12

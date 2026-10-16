@@ -496,12 +496,12 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
         /**
          * A message about the conversation itself, answered from it without a search: "summarize our conversation", or
-         * "continue" / "TL;DR" after an answer. Plain chat searched for "continue" and wrote a new answer that contradicted
-         * the last one (X6, Oct 16); Deep Research already wrote these from the conversation.
+         * "TL;DR" / "a summary please" after an answer, as Deep Research already did. "Summarize our conversation" covered
+         * only the last three exchanges (X6, Oct 16). "continue" keeps the search: it asks for more than the chat holds.
          */
         fun aboutConversation(query: String, history: ConversationHistory, conversation: List<DeepResearch.Companion.Exchange>): Boolean =
-            (conversation.isNotEmpty() && DeepResearch.isConversationRecap(query)) ||
-                (DeepResearch.isMetaFollowUp(query) && DeepResearch.lastAnswered(query, history) != null)
+            (DeepResearch.isConversationRecap(query) && conversation.any { !DeepResearch.isConversationRecap(it.question) && !DeepResearch.isSummaryFollowUp(it.question) }) ||
+                (DeepResearch.isSummaryFollowUp(query) && DeepResearch.lastAnswered(query, history) != null)
 
         /** Prompt ideas shown in an empty chat, drawn again for each new chat. */
         const val IDEAS_SHOWN = 5
