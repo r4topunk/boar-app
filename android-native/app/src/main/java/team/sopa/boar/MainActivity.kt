@@ -210,7 +210,13 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var sessions by remember { mutableStateOf<List<ChatSession>>(emptyList()) }
-    LaunchedEffect(drawer.isOpen, state.answeringId) { if (drawer.isOpen) sessions = services.chats.listSessions() }
+    LaunchedEffect(drawer.isOpen, state.answeringId) {
+        if (drawer.isOpen) sessions = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            // Old "<think>" titles (named by a reasoning model before Oct 15) read as the chat's first question.
+            services.chats.repairThinkingTitles()
+            services.chats.listSessions()
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
