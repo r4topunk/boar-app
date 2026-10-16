@@ -50,6 +50,7 @@ import team.sopa.boar.ui.theme.ThemeTokens
 interface DisplayPrefs {
     fun setTheme(id: String)
     fun setFontScale(scale: String)
+    fun setOrientation(mode: String)
     fun setLanguage(id: String?)
 }
 
@@ -89,8 +90,12 @@ fun SettingsScreen(services: BoarServices, prefs: DisplayPrefs, onPin: (String) 
                 Choices(null, ThemeTokens.all.map { it.id to "${it.icon} ${it.name}" }, theme) { theme = it; s.themeId = it; prefs.setTheme(it) }
                 var scale by remember { mutableStateOf(s.fontScale) }
                 Choices(t("native.settings.textSize"), listOf("compact", "standard", "large").map { it to t("native.settings.$it") }, scale) { scale = it; s.fontScale = it; prefs.setFontScale(it) }
+                var orientation by remember { mutableStateOf(s.screenOrientation) }
+                Choices(t("native.settings.orientation"), listOf("auto", "portrait", "landscape").map { it to t("native.settings.orientation.$it") }, orientation) {
+                    orientation = it; s.screenOrientation = it; prefs.setOrientation(it)
+                }
                 var haptics by remember { mutableStateOf(s.hapticsEnabled) }
-                SwitchRow(t("interfaceSettings.hapticFeedbackLabel"), t("interfaceSettings.hapticFeedbackValue"), haptics) { haptics = it; s.hapticsEnabled = it }
+                SwitchRow(t("interfaceSettings.hapticFeedbackLabel"), t("native.interfaceSettings.hapticFeedbackValue"), haptics) { haptics = it; s.hapticsEnabled = it }
             }
             Section(t("modelSetupScreen.sections.language")) {
                 var lang by remember { mutableStateOf(s.languageId ?: "system") }
@@ -248,6 +253,7 @@ private fun RecoverySection(services: BoarServices, prefs: DisplayPrefs, onSetup
             services.settings.resetPreferences()
             prefs.setTheme(team.sopa.boar.ui.theme.ThemeTokens.DEFAULT_ID)
             prefs.setFontScale("standard")
+            prefs.setOrientation("auto")
             onSetup()
         }) { Text(t("native.settings.resetConfirmButton"), color = Boar.colors.crimson400) } },
         dismissButton = { androidx.compose.material3.TextButton({ resetting = false }) { Text(t("common.cancel")) } })

@@ -88,18 +88,29 @@ class MainActivity : ComponentActivity() {
         if (stoppedAt > 0 && BoarServices.get(this).pinLock.isSet && android.os.SystemClock.elapsedRealtime() - stoppedAt > RELOCK_AFTER_MS) locked.value = true
     }
 
+    /** Settings → Screen rotation: Auto follows the phone's own rotation lock; Portrait and Landscape hold it. */
+    private fun applyOrientation(mode: String) {
+        requestedOrientation = when (mode) {
+            "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
+            "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE
+            else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val services = BoarServices.get(this)
         // A new process has no chat key yet; a recreated activity (rotation, font size) in the same process keeps it.
         if (services.pinLock.isSet && services.chats.cipher == team.sopa.boar.engine.security.PlainCipher) locked.value = true
+        applyOrientation(services.settings.screenOrientation)
         setContent {
             var theme by remember { mutableStateOf(services.settings.themeId) }
             var fontScale by remember { mutableStateOf(services.settings.fontScale) }
             val prefs = object : DisplayPrefs {
                 override fun setTheme(id: String) { theme = id }
                 override fun setFontScale(scale: String) { fontScale = scale }
+                override fun setOrientation(mode: String) { applyOrientation(mode) }
                 override fun setLanguage(id: String?) { recreate() }
             }
             BoarTheme(theme, fontScale) {
