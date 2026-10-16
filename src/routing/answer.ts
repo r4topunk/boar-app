@@ -78,6 +78,7 @@ import { calculate } from "./calculators";
 import { travelDistanceAnswer } from "./travelDistance";
 import { verdictGuard } from "./verdictGuard";
 import { arithmeticAnswer } from "./arithmetic";
+import { numericGuard } from "./numguard";
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
 import { factsAnswer } from "../rag/facts";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
@@ -228,6 +229,13 @@ export interface AnswerDeps {
   emergencyScore?(query: string, userTurns: string[]): Promise<{ p: number; fire: boolean } | null>;
   /** FACTS instant tier (src/rag/facts.ts); default on. false = off (model-path tests whose fixtures are fact questions). */
   facts?: boolean;
+  /**
+   * NUMGUARD (src/routing/numguard.ts): when the learned detector fires on an English, single-turn pure conversion or clock
+   * calculation with no health or person word in any user turn, a deterministic calculator may answer it (codes keep detector:p,
+   * detector:fire, numguard:fired). No calculator answers -> the detector's call stands (code numguard:no-calculator): a model never
+   * answers a fired message. Default off; true = on.
+   */
+  numguard?: boolean;
   /**
    * English article names a Portuguese question mentions (Bramble's lexicon, src/rag/ptLexicon.ts
    * englishNamesIn): "Por que existem as estações do ano?" -> ["Season"]. The grounding guard matches
@@ -634,6 +642,8 @@ export function createAnswerer(deps: AnswerDeps) {
       // calculator shortcut ("help", "e agora?"). Unavailable or failing -> null -> the lexical predicate.
       const userTurns = (ctx.history?.turns ?? []).filter((t) => t.role === "user").map((t) => t.text);
       let learned = deps.emergencyScore && !req.reuseSources ? await deps.emergencyScore(req.query, userTurns).catch(() => null) : null;
+      // NUMGUARD: the window over earlier turns fired -> the conversation is the emergency, never overridden.
+      const windowFire = userTurns.length > 0 && !!learned?.fire;
       // DETMAX: earlier user turns dilute the detector window ("Hi, quick question." + a dog bite: 0.554 -> 0.049). With history, the current turn
       // is also scored alone and the larger score wins (fire if either window fires). Same threshold and model; no history -> no extra call.
       if (learned && userTurns.length && deps.emergencyScore) {
@@ -641,6 +651,14 @@ export function createAnswerer(deps: AnswerDeps) {
         if (alone) learned = { p: Math.max(learned.p, alone.p), fire: learned.fire || alone.fire };
       }
       const detectorCodes: string[] = learned ? [`detector:p=${learned.p.toFixed(3)}`, ...(learned.fire ? ["detector:fire"] : [])] : [];
+      // NUMGUARD: a pure conversion or clock calculation (EN, no health or person word in this or any earlier user turn, the history
+      // window did not fire) may take a deterministic calculator answer when the detector fires: the calculator shortcuts below see
+      // "not fired" (small talk and FACTS stay off), and if none answers the detector's call is restored before anything else runs.
+      const numguard = deps.numguard === true && !!learned?.fire && !windowFire && numericGuard(req.query, isPortugueseQuestion(req.query), userTurns);
+      if (numguard && learned) {
+        learned = { p: learned.p, fire: false };
+        detectorCodes.push("numguard:fired");
+      }
 
       // Arithmetic (temperature, fuel economy, Naismith, currency at a given rate, battery Wh) is answered
       // exactly, before anything else: "Minha conta do jantar deu 2.450 baht…" is a sum, not a restaurant
@@ -677,7 +695,7 @@ export function createAnswerer(deps: AnswerDeps) {
           return { answerId, tier: "instant", outcome: "success", text: numbers, sources: [], receipt: r, cited: [] };
         }
         // Small talk ("hi", "valeu", "who are you", "what time is it"): a fixed reply, no model load, no search.
-        const chat = learned?.fire ? null : smallTalkReply(req.query, isPortugueseQuestion(req.query), new Date());
+        const chat = learned?.fire || numguard ? null : smallTalkReply(req.query, isPortugueseQuestion(req.query), new Date());
         if (chat) {
           markVisible();
           const r: AnswerReceipt = { modelId: "small-talk", modelLabel: "BOAR", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: [`answer:small-talk-${chat.kind}`] };
@@ -688,7 +706,7 @@ export function createAnswerer(deps: AnswerDeps) {
         const calc = learned?.fire ? null : calculate(req.query, isPortugueseQuestion(req.query));
         if (calc) {
           markVisible();
-          const codes = [`answer:${calc.kind === "temperature" ? "temperature-conversion" : `calculator-${calc.kind}`}`];
+          const codes = [...(numguard ? detectorCodes : []), `answer:${calc.kind === "temperature" ? "temperature-conversion" : `calculator-${calc.kind}`}`];
           const r: AnswerReceipt = { modelId: "calculator", modelLabel: "Calculator", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: codes };
           emit({ type: "token", answerId, tier: "instant", text: calc.text });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
@@ -701,7 +719,7 @@ export function createAnswerer(deps: AnswerDeps) {
         const arith = isPortugueseQuestion(req.query) || isSpanishQuestion(req.query) ? null : arithmeticAnswer(req.query);
         if (arith) {
           markVisible();
-          const codes = [...detectorCodes, ...(learned?.fire ? ["detector:numeric-guard"] : []), `answer:calculator-${arith.kind}`];
+          const codes = [...detectorCodes, ...(learned?.fire || numguard ? ["detector:numeric-guard"] : []), `answer:calculator-${arith.kind}`];
           const r: AnswerReceipt = { modelId: "calculator", modelLabel: "Calculator", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: codes };
           emit({ type: "token", answerId, tier: "instant", text: arith.text });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
@@ -712,7 +730,7 @@ export function createAnswerer(deps: AnswerDeps) {
         const travel = learned?.fire || isPortugueseQuestion(req.query) || isSpanishQuestion(req.query) ? null : travelDistanceAnswer(req.query);
         if (travel) {
           markVisible();
-          const r: AnswerReceipt = { modelId: "calculator", modelLabel: "Calculator", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: ["answer:calculator-travel-distance"] };
+          const r: AnswerReceipt = { modelId: "calculator", modelLabel: "Calculator", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: [...(numguard ? detectorCodes : []), "answer:calculator-travel-distance"] };
           emit({ type: "token", answerId, tier: "instant", text: travel.text });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
           return { answerId, tier: "instant", outcome: "success", text: travel.text, sources: [], receipt: r, cited: [] };
@@ -721,7 +739,7 @@ export function createAnswerer(deps: AnswerDeps) {
         // table entity and asks exactly one property (population, area, capital, height, length, depth, dates, plugs/voltage,
         // host city, award winner); comparisons get a computed verdict. Never on a health or emergency message (EN only).
         const fact =
-          deps.facts === false || learned?.fire || isPortugueseQuestion(req.query) || isSpanishQuestion(req.query) || isHealthQuestion(req.query) || isCardEmergency(req.query)
+          deps.facts === false || learned?.fire || numguard || isPortugueseQuestion(req.query) || isSpanishQuestion(req.query) || isHealthQuestion(req.query) || isCardEmergency(req.query)
             ? null
             : factsAnswer(req.query);
         if (fact) {
@@ -731,6 +749,12 @@ export function createAnswerer(deps: AnswerDeps) {
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
           return { answerId, tier: "instant", outcome: "success", text: fact.text, sources: [], receipt: r, cited: [] };
         }
+      }
+
+      // NUMGUARD: no calculator answered the guarded turn -> the detector's call stands; a model never answers a fired message.
+      if (numguard && learned) {
+        learned = { p: learned.p, fire: true };
+        detectorCodes.splice(detectorCodes.indexOf("numguard:fired"), 1, "numguard:no-calculator");
       }
 
       // Places questions never touch a model: the answer is built from the

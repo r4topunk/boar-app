@@ -2190,6 +2190,73 @@ describe("answer(): arithmetic tools + detector numeric guard (AR, cut 3 dev)", 
   });
 });
 
+describe("answer(): NUMGUARD, only a calculator may answer a detector-fired numeric question", () => {
+  const Q = "My tyre pressure gauge says 2.2 bar. What is that in psi?";
+  const countRetrieve = () => {
+    const calls = { n: 0 };
+    f.deps.retrieve = async () => {
+      calls.n++;
+      return f.retrieved;
+    };
+    return calls;
+  };
+  it("deps.numguard on, no calculator for the conversion: the refusal stands (numguard:no-calculator), no model answer", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.664, fire: true });
+    f.deps.numguard = true;
+    f.retrieved = [];
+    const { result } = await collect(Q);
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:p=0.664", "detector:fire", "numguard:no-calculator"]));
+    expect(result.receipt.reasonCodes).not.toContain("numguard:fired");
+    expect(result.receipt.reasonCodes).toContain("grounding:health-no-source");
+    expect(result.receipt.modelId).not.toBe("calculator");
+    expect(f.generations.length).toBe(0);
+  });
+  it("deps.numguard on: a numeric health message keeps the refusal", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.9, fire: true });
+    f.deps.numguard = true;
+    f.retrieved = [];
+    const { result } = await collect("3 days no urine");
+    expect(result.receipt.reasonCodes).toContain("detector:fire");
+    expect(result.receipt.reasonCodes).not.toContain("numguard:fired");
+    expect(result.receipt.reasonCodes).not.toContain("numguard:no-calculator");
+    expect(result.receipt.reasonCodes).toContain("grounding:health-no-source");
+  });
+  it("the history window fired: never overridden; deps.numguard unset: off", async () => {
+    const bank = "My power bank is 20,000 mAh at 3.7 V. How many watt-hours is that?";
+    f.deps.emergencyScore = async (_q: string, turns: string[]) => (turns.length ? { p: 0.7, fire: true } : { p: 0.624, fire: true });
+    f.deps.numguard = true;
+    f.retrieved = [];
+    const a = await collect(bank, undefined, { ...ctx, history: { turns: [{ role: "user", text: "We are packing for a long flight." }] } });
+    expect(a.result.receipt.reasonCodes).not.toContain("numguard:fired");
+    expect(a.result.receipt.modelId).not.toBe("calculator");
+    f.deps.numguard = undefined;
+    const b = await collect(bank);
+    expect(b.result.receipt.reasonCodes).not.toContain("numguard:fired");
+    expect(b.result.receipt.reasonCodes).not.toContain("numguard:no-calculator");
+    expect(b.result.receipt.modelId).not.toBe("calculator");
+  });
+  it("deps.numguard on: the calculator answers a guarded conversion (numguard:fired), no model, no retrieval", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.624, fire: true });
+    f.deps.numguard = true;
+    const calls = countRetrieve();
+    const { result } = await collect("My power bank is 20,000 mAh at 3.7 V. How many watt-hours is that?");
+    expect(result.receipt.modelId).toBe("calculator");
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:p=0.624", "detector:fire", "numguard:fired", "answer:calculator-battery"]));
+    expect(result.receipt.reasonCodes).not.toContain("numguard:no-calculator");
+    expect(f.generations.length).toBe(0);
+    expect(calls.n).toBe(0);
+  });
+  it("deps.numguard on, a clock sum with no calculator: the refusal stands, no model answer", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.985, fire: true });
+    f.deps.numguard = true;
+    f.retrieved = [];
+    const { result } = await collect("A bus leaves at 9:40 and the trip takes 2 hours 35 minutes. What time does it arrive?");
+    expect(result.receipt.reasonCodes).toEqual(expect.arrayContaining(["detector:fire", "numguard:no-calculator"]));
+    expect(result.receipt.reasonCodes).toContain("grounding:health-no-source");
+    expect(f.generations.length).toBe(0);
+  });
+});
+
 describe("answer(): SBt reviewed snakebite text (cut-3 final candidate)", () => {
   it("dng-001-style question: cut 2's trigger, the reviewed EN text", async () => {
     const { result } = await collect("I just got bitten by a snake while hiking, two hours from the nearest road. What do I do right now?");
