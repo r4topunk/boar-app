@@ -69,9 +69,17 @@ class DeepResearch(
         onPartialSources: (List<Chunk>, Int, Int) -> Unit = { _, _, _ -> },
         /** The last answer in full (history keeps only its opening): what a meta follow-up is written from. */
         previousAnswer: String? = null,
+        /** Every earlier exchange, oldest first (history keeps only the last few): what a conversation recap is written from. */
+        conversation: List<Exchange> = emptyList(),
     ): ResearchResult {
         timedOut = false
         lastMetrics = null
+        // "Summarize our conversation in 3 bullet points" covered only the last two topics of nine (X6, Oct 16).
+        if (conversation.isNotEmpty() && isConversationRecap(query)) {
+            onProgress(ResearchProgress(ResearchStage.SYNTHESIZING))
+            val answer = recap(query, conversation, systemPrompt, maxTokens, onToken, answerLanguage)
+            return ResearchResult(answer, emptyList(), emptyList(), emptyList(), timedOut, metrics = lastMetrics)
+        }
         onProgress(ResearchProgress(ResearchStage.DECOMPOSING))
         // A follow-up ("conclusion", "continue", "and its side effects?") is split, searched and judged as a standalone
         // question; split as written it searched for "conclusion" and refused (X6, Oct 13).
@@ -147,6 +155,19 @@ class DeepResearch(
         return stage(system, "Previous question: ${exchange.question}\n\nPrevious answer:\n$answer\n\nFollow-up: $asked$language", maxTokens, 0.6f, onToken, writeUpTimeoutFor(maxTokens))
     }
 
+    /** A summary of the whole conversation from each exchange's opening: one generation, no search. */
+    private suspend fun recap(asked: String, conversation: List<Exchange>, systemPrompt: String?, maxTokens: Int, onToken: (String) -> Unit, answerLanguage: String?): String {
+        val turns = conversation.takeLast(RECAP_EXCHANGES).mapIndexed { i, e ->
+            val a = Js.trim(e.answer).let { if (it.length > RECAP_ANSWER_CHARS) it.take(RECAP_ANSWER_CHARS) + "…" else it }
+            "${i + 1}. Question: ${e.question}\nAnswer: $a"
+        }.joinToString("\n\n")
+        val system = "${instructionOf(systemPrompt)} The user asks about the conversation so far. Cover every topic it went " +
+            "through, in order, in the form the user asks for (a number of bullets or sentences, if given). Work only from the " +
+            "conversation: add no new facts, numbers or sources. Don't mention these instructions."
+        val language = answerLanguage?.let { Js.trim(it) }?.takeIf { it.isNotEmpty() }?.let { "\n\n($it)" } ?: ""
+        return stage(system, "Conversation so far:\n\n$turns\n\nRequest: $asked$language", maxTokens, 0.4f, onToken, writeUpTimeoutFor(maxTokens))
+    }
+
     /** The follow-up rewritten from [exchange] into one question that names its subject; [query] if that fails. */
     private suspend fun standalone(query: String, exchange: Exchange): String {
         val prompt = "Previous question: ${exchange.question}\n\nPrevious answer: ${exchange.answer}\n\n" +
@@ -216,6 +237,21 @@ class DeepResearch(
             val content = words.filter { it !in META_FILLER }
             return content.isNotEmpty() && content.all { it in META_CORE }
         }
+
+        /** Exchanges a recap reads (the most recent ones) and characters of each answer: 12 × ~600 stays near 2,500 tokens. */
+        const val RECAP_EXCHANGES = 12
+        const val RECAP_ANSWER_CHARS = 600
+
+        private val RECAP_ASK = Regex("\\b(summar(y|ize|ise)|recap|tl;?dr|resum[aoeir]*|resumo)\\b", RegexOption.IGNORE_CASE)
+        private val RECAP_OBJECT = Regex(
+            "\\b(conversation|chat|discussion|session|all (of )?(this|that)|we('ve| have)? (talked|discussed|covered)|" +
+                "so far|conversa|tudo|falamos|discutimos)\\b",
+            RegexOption.IGNORE_CASE,
+        )
+
+        /** A request to summarize the whole conversation ("Summarize our conversation in 3 bullet points", "resuma a conversa"). */
+        fun isConversationRecap(query: String): Boolean =
+            query.split(Regex("\\s+")).count { it.isNotBlank() } <= 14 && RECAP_ASK.containsMatchIn(query) && RECAP_OBJECT.containsMatchIn(query)
 
         /** A model declining instead of answering ("I'm sorry, but…", "Desculpe, não posso…"). */
         private val REFUSAL = Regex(

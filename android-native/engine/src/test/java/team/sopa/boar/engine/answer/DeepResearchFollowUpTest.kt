@@ -135,4 +135,42 @@ class DeepResearchFollowUpTest {
     @Test fun `refusal lines are not sub-questions`() {
         assertEquals(listOf("q"), DeepResearch.parseSubQuestions("Desculpe, não posso ajudar com isso.\nI cannot answer that question", "q"))
     }
+
+    @Test fun `a conversation recap is told apart from a summary of a subject`() {
+        assertTrue(DeepResearch.isConversationRecap("Summarize our conversation in 3 bullet points"))
+        assertTrue(DeepResearch.isConversationRecap("recap what we discussed"))
+        assertTrue(DeepResearch.isConversationRecap("resuma a nossa conversa"))
+        assertTrue(DeepResearch.isConversationRecap("TL;DR of this chat"))
+        assertFalse(DeepResearch.isConversationRecap("Summarize the causes of the French Revolution"))
+        assertFalse(DeepResearch.isConversationRecap("How do vaccines work?"))
+        assertFalse(DeepResearch.isConversationRecap("summary"))
+    }
+
+    @Test fun `a conversation recap is written from every exchange, without a search`() = runBlocking {
+        // It covered only the last two topics of nine: history keeps the last three exchanges (X6, Oct 16).
+        val gen = Recorder { _, _ -> "- seasons\n- the Moon\n- vaccines" }
+        val searched = ArrayList<String>()
+        val conversation = listOf(
+            DeepResearch.Companion.Exchange("What causes the seasons on Earth?", "The axial tilt of about 23.4 degrees."),
+            DeepResearch.Companion.Exchange("How far away is the Moon?", "About 384,000 km."),
+            DeepResearch.Companion.Exchange("How do vaccines work?", "They train the immune system. " + "x".repeat(2000)),
+        )
+        val r = DeepResearch(gen, { q, _ -> searched += q; emptyList() }, { null })
+            .run("Summarize our conversation in 3 bullet points", null, history, 256, conversation = conversation)
+        assertEquals(1, gen.calls.size)
+        assertTrue(searched.isEmpty())
+        val user = gen.calls[0].second
+        assertTrue(user.contains("1. Question: What causes the seasons on Earth?"))
+        assertTrue(user.contains("3. Question: How do vaccines work?"))
+        assertTrue(user.contains("Request: Summarize our conversation in 3 bullet points"))
+        assertFalse(user.contains("x".repeat(DeepResearch.RECAP_ANSWER_CHARS + 1)))
+        assertEquals("- seasons\n- the Moon\n- vaccines", r.answer)
+        assertFalse(r.fromPreviousAnswer)
+    }
+
+    @Test fun `without earlier exchanges a recap request is researched as asked`() = runBlocking {
+        val gen = Recorder { _, _ -> "ok" }
+        DeepResearch(gen, { _, _ -> emptyList() }, { null }).run("Summarize our conversation", null, null, 256)
+        assertTrue(gen.calls.any { it.first.startsWith("You plan") })
+    }
 }
