@@ -296,6 +296,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             // The answer a meta follow-up ("summary", "continue") is written from: the last one with text.
             val lastAnswer = prior.lastOrNull { it.role == "assistant" && it.text.isNotBlank() }
             // Every answered question so far, oldest first: what "summarize our conversation" is written from.
+            // How this answer is written, for the receipt's Mode row (set where the path is chosen below).
+            var path: String? = null
             val conversation = prior.zipWithNext().filter { (u, a) -> u.role == "user" && a.role == "assistant" && a.text.isNotBlank() }
                 .map { (u, a) -> DeepResearch.Companion.Exchange(u.text, AnswerText.stripThinking(a.text)) }
             var timedOut = false
@@ -322,6 +324,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     _state.update { it.copy(noModel = true, error = "no-model") }
                 } else if (_state.value.deepResearch || aboutConversation(q, history, conversation)) {
                     val research = _state.value.deepResearch
+                    path = if (research) "deep" else "chat"
                     val r = DeepResearch(SessionEngine(session, settings.engineTweaks.thinkingEnabled), services.retriever::retrieve, settings.engineTweaks::stageTimeoutMs, settings.engineTweaks::writeUpTimeoutMs).run(
                         q, systemPrompt, history, budget,
                         onProgress = { p -> _state.update { it.copy(activity = if (research) Activity.Researching(p.stage, p.subQuestionIndex?.plus(1), p.subQuestionCount) else Activity.Thinking) } },
@@ -337,6 +340,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     metrics = r.metrics
                 } else if (settings.adaptiveRoutingEnabled) {
                     limited = null
+                    path = "adaptive"
                     val r = adaptive(q, systemPrompt, styleReminder, history, ::onPiece)
                     sources = r.first
                     timedOut = r.second
@@ -364,7 +368,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val shown = reusedSources ?: grouped.items
             if (reusedSources == null) SourceGroups.renumber(text.toString(), grouped.renumber).let { if (it != text.toString()) { text.setLength(0); text.append(it) } }
             val stopped = stopRequested
-            val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)
+            val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)?.let { r ->
+                val (task, checked) = if (path == "adaptive") (lastAdaptive ?: (null to false)) else (null to false)
+                r.copy(style = settings.personalityId ?: services.personalities.defaultId, path = path, task = task, checked = checked)
+            }
             val cutAt = limited?.takeIf { !stopped && !timedOut && text.isNotBlank() && AnswerLimit.reached(metrics?.generatedTokens ?: tokens, it) }
             val nextLimit = cutAt?.let { AnswerLimit.next(it, services.personalities.maxTokensOptions, services.host.openedContext) }
             chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
@@ -436,12 +443,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** runAdaptiveChat: plan with the installed models and the user's routing settings, then execute. */
+    /** The last adaptive plan's task type and whether it had a verify step, for the receipt. */
+    @Volatile private var lastAdaptive: Pair<String, Boolean>? = null
+
     private suspend fun adaptive(q: String, systemPrompt: String, styleReminder: String?, history: ConversationHistory, onPiece: (String) -> Unit): Triple<List<Chunk>, Boolean, GenerationMetrics?> {
         val s = services.settings
         val statuses = services.catalog.models.filter { it.kind == AssetKind.LLM }.map { Profiles.AvailableModel(it, services.fileOf(it).isFile) }
         val preset = s.routingPreset?.let { runCatching { RoutingPreset.of(it) }.getOrNull() } ?: RoutingPreset.DEFAULT
         val overrides = s.modelRoleAssignments().mapNotNull { (k, v) -> runCatching { ModelRole.of(k) to v }.getOrNull() }.toMap()
         val plan = AdaptivePlan.plan(q, statuses, preset, overrides, s.activeModelId("llm"), totalRamBytes(), s.answerTokens(services.host.openedContext))
+        lastAdaptive = plan.taskType.value to plan.plan.steps.any { it.type == team.sopa.boar.engine.routing.RoutingStepType.VERIFY }
         val r = PlanExecutor(services.host, services.retriever::retrieve, { Classify.classifyTask(it).value }, timeoutFor = s.engineTweaks::stageTimeoutMs)
             .execute(plan.plan, PipelineInput(q, systemPrompt, styleReminder, history), onToken = onPiece, onStepStart = { step ->
                 _state.update { it.copy(activity = if (step.type.value == "retrieve") Activity.Retrieving else Activity.Thinking) }
