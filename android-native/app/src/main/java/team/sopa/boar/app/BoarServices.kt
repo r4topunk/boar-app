@@ -237,10 +237,14 @@ class BoarServices private constructor(private val context: Context) {
                 residentId = asset.id
                 residentRepacked = repack
                 openedContext = resolved.nCtx
-                if (repack) s.onGenerated = { m ->
-                    if (LoadGuard.isDecodeStall(m.generatedTokens, m.decodeMs) && keepMapped.add(asset.id))
+                s.onGenerated = { m ->
+                    // A finished answer proves the model fits: the load guard's marker can go.
+                    loadGuard.settled(asset.id)
+                    if (repack && LoadGuard.isDecodeStall(m.generatedTokens, m.decodeMs) && keepMapped.add(asset.id))
                         android.util.Log.w("BOAR", "${asset.id} stalled with repacked weights (${m.generatedTokens} tokens in ${m.decodeMs.toInt()} ms): mapped from the next answer")
                 }
+                // Or a minute loaded without being killed: Android kills an app whose model doesn't fit within seconds.
+                lifeScope.launch { kotlinx.coroutines.delay(LOAD_SETTLE_MS); if (residentId == asset.id) loadGuard.settled(asset.id) }
                 settings.lastLoadedModelId = asset.id
                 settings.stampModel(AppSettings.MODEL_LAST_USED, asset.id)
             }
@@ -256,6 +260,8 @@ class BoarServices private constructor(private val context: Context) {
 
         /** Frees the model; the next answer loads it again (with changed Advanced tweaks, or another model). */
         suspend fun unload() = lock.withLock {
+            // Unloaded on purpose (free memory, Close BOAR): the model didn't kill the app, so its load marker goes.
+            residentId?.let(loadGuard::settled)
             session?.close()
             session = null
             filename = null
@@ -317,6 +323,8 @@ class BoarServices private constructor(private val context: Context) {
     }
 
     companion object {
+        /** How long a loaded model must stay alive before its load counts as safe (LoadGuard.settled). */
+        const val LOAD_SETTLE_MS = 60_000L
         /**
          * The Custom answer style (a prompt the user writes) is hidden from Settings and the style sheet: it could be used to
          * make BOAR say anything and post it as BOAR's own words. The setting and prompt still work if already chosen.
