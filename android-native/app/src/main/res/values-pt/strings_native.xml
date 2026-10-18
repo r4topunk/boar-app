@@ -272,6 +272,7 @@
     <string name="native_tweaks_freeMemoryAfter" formatted="false">Liberar memória depois de</string>
     <string name="native_tweaks_freeMemoryAfterNote" formatted="false">Quanto tempo o BOAR espera em segundo plano antes de descarregar o modelo, quando Liberar memória quando eu sair do BOAR está ligado.</string>
     <string name="native_tweaks_immediately" formatted="false">Na hora</string>
+    <string name="native_drawer_closeStillSaving" formatted="false">Ainda salvando a resposta. Tente de novo em instantes.</string>
     <string name="native_drawer_close" formatted="false">Fechar o BOAR (libera memória)</string>
     <string name="native_drawer_closeConfirm" formatted="false">Uma resposta ainda está sendo escrita. Fechar mesmo assim?</string>
     <string name="native_drawer_closeButton" formatted="false">Fechar</string>

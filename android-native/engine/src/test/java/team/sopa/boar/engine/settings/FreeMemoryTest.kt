@@ -22,7 +22,9 @@ class FreeMemoryTest {
         assertEquals(Decision.WAIT, FreeMemory.decide(enabled = true, inForeground = false, loaded = true, busy = true))
         assertEquals(Decision.SKIP, FreeMemory.decide(enabled = false, inForeground = false, loaded = true, busy = false))
         assertEquals(Decision.SKIP, FreeMemory.decide(enabled = true, inForeground = true, loaded = true, busy = false))
-        assertEquals(Decision.SKIP, FreeMemory.decide(enabled = true, inForeground = false, loaded = false, busy = true))
+        // A model still loading counts as busy: wait for it rather than leave it in memory once loaded.
+        assertEquals(Decision.WAIT, FreeMemory.decide(enabled = true, inForeground = false, loaded = false, busy = true))
+        assertEquals(Decision.SKIP, FreeMemory.decide(enabled = true, inForeground = false, loaded = false, busy = false))
     }
 
     @Test fun `on and Auto by default, and Reset settings restores both`() {

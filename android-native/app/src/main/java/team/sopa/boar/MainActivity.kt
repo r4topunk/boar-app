@@ -238,7 +238,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
     fun closeBoar() {
         if (closing) return
         closing = true
-        scope.launch { runCatching { vm.closeAndFreeMemory() }; activity?.finishAndRemoveTask() }
+        scope.launch { if (runCatching { vm.closeAndFreeMemory() }.getOrDefault(true)) activity?.finishAndRemoveTask() else closing = false }
     }
     if (confirmClose) androidx.compose.material3.AlertDialog({ confirmClose = false },
         text = { Text(t("native.drawer.closeConfirm")) },

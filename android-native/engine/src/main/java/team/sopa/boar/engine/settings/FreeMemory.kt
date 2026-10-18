@@ -22,8 +22,10 @@ object FreeMemory {
      * a chat title or summary, or a load still running is waited for; otherwise the model goes.
      */
     fun decide(enabled: Boolean, inForeground: Boolean, loaded: Boolean, busy: Boolean): Decision = when {
-        !enabled || inForeground || !loaded -> Decision.SKIP
+        !enabled || inForeground -> Decision.SKIP
+        // Busy first: a model still loading isn't "loaded" yet, and skipping would leave it in memory once it is.
         busy -> Decision.WAIT
+        !loaded -> Decision.SKIP
         else -> Decision.UNLOAD
     }
 }

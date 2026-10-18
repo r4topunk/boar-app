@@ -153,12 +153,17 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
      * Menu → Close BOAR: stops an answer (what it wrote so far is saved, as with Stop) and a title or summary, then
      * frees the model. The caller closes the app after.
      */
-    suspend fun closeAndFreeMemory() {
+    suspend fun closeAndFreeMemory(): Boolean {
         stop()
-        kotlinx.coroutines.withTimeoutOrNull(CLOSE_WAIT_MS) { job?.join() } ?: job?.cancel()
+        // The stopped answer saves what it wrote as it ends; until it has, closing would lose it.
+        if (kotlinx.coroutines.withTimeoutOrNull(CLOSE_WAIT_MS) { job?.join() } == null && job?.isActive == true) {
+            showToast("native.drawer.closeStillSaving")
+            return false
+        }
         stopBackground()
         preloading?.cancel()
         services.host.unload()
+        return true
     }
 
     /** Loads the model when the chat opens, as the Expo app does, so the first answer doesn't wait for it. */
@@ -567,7 +572,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         /** Messages sent verbatim as history (ChatScreen.tsx VERBATIM_MESSAGE_COUNT). */
         const val VERBATIM_MESSAGE_COUNT = 6
         /** Close BOAR waits this long for a stopped answer to save what it wrote. */
-        const val CLOSE_WAIT_MS = 5_000L
+        const val CLOSE_WAIT_MS = 15_000L
 
         /**
          * A message about the conversation itself, answered from it without a search: "summarize our conversation", or
