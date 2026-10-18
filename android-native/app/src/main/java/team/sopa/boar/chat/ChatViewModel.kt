@@ -321,7 +321,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 val budget = limit ?: settings.answerTokens(services.host.openedContext)
                 limited = budget
                 if (session == null) {
-                    _state.update { it.copy(noModel = true, error = "no-model") }
+                    _state.update { it.copy(noModel = true, error = team.sopa.boar.engine.UserErrors.NO_MODEL) }
                 } else if (_state.value.deepResearch || aboutConversation(q, history, conversation)) {
                     val research = _state.value.deepResearch
                     path = if (research) "deep" else "chat"
