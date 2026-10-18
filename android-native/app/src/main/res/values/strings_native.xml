@@ -102,6 +102,7 @@
     <string name="native_pin_newTitle" formatted="false">Choose a PIN</string>
     <string name="native_pin_newSubtitle" formatted="false">4 to 8 digits. You\'ll enter it each time you open BOAR.</string>
     <string name="native_pin_confirmTitle" formatted="false">Enter it again</string>
+    <string name="native_pin_saveFailed" formatted="false">Couldn\'t change the PIN. Try again.</string>
     <string name="native_pin_mismatch" formatted="false">The PINs didn\'t match. Choose it again.</string>
     <string name="native_pin_offerTitle" formatted="false">Lock BOAR with a PIN?</string>
     <string name="native_pin_offerBody" formatted="false">With a PIN, your chats are stored sealed: someone with your phone or its files over USB can\'t read them. You can set it or remove it later in Settings.</string>

@@ -102,6 +102,7 @@
     <string name="native_pin_newTitle" formatted="false">Escolha um PIN</string>
     <string name="native_pin_newSubtitle" formatted="false">De 4 a 8 dígitos. Você vai digitá-lo sempre que abrir o BOAR.</string>
     <string name="native_pin_confirmTitle" formatted="false">Digite de novo</string>
+    <string name="native_pin_saveFailed" formatted="false">Não foi possível alterar o PIN. Tente de novo.</string>
     <string name="native_pin_mismatch" formatted="false">Os PINs não conferem. Escolha de novo.</string>
     <string name="native_pin_offerTitle" formatted="false">Trancar o BOAR com um PIN?</string>
     <string name="native_pin_offerBody" formatted="false">Com um PIN, suas conversas ficam guardadas lacradas: quem tiver seu celular ou os arquivos dele via USB não consegue lê-las. Dá para ativar ou remover depois, nas Configurações.</string>
