@@ -270,12 +270,19 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             stopBackground()
             val chats = services.chats
             val isNewSession = _state.value.sessionId == null
-            // The question stands in as the title until the model writes one.
-            val sessionId = _state.value.sessionId ?: chats.createSession().also { s -> chats.setTitle(s.id, q.take(60)) }.id
             val prior = _state.value.messages.filter { it.text.isNotEmpty() }
             val userId = chats.newId()
             val answerId = chats.newId()
-            chats.addMessage(sessionId, "user", q, userId)
+            // A failed write (disk full) shows as a failed answer instead of closing the app.
+            val sessionId = try {
+                // The question stands in as the title until the model writes one.
+                (_state.value.sessionId ?: chats.createSession().also { s -> chats.setTitle(s.id, q.take(60)) }.id)
+                    .also { chats.addMessage(it, "user", q, userId) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _state.update { it.copy(error = e.message ?: e.toString(), messages = it.messages + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", "")) }
+                return@launch
+            }
             _state.update {
                 it.copy(sessionId = sessionId, error = null, answeringId = answerId, activity = Activity.Retrieving, liveTokPerSec = null,
                     messages = it.messages + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", ""))
@@ -283,7 +290,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val settings = services.settings
             val (systemPrompt, styleReminder) = services.personalities.promptFor(settings.personalityId, settings.customSystemPrompt)
             val history = ConversationHistory(
-                summary = chats.listSessions().firstOrNull { it.id == sessionId }?.summary,
+                summary = runCatching { chats.listSessions().firstOrNull { it.id == sessionId }?.summary }.getOrNull(),
                 // Within a token budget: earlier answers cut to their opening sentences (HistoryBudget).
                 turns = HistoryBudget.budget(prior.takeLast(VERBATIM_MESSAGE_COUNT).map { ConversationTurn(it.role, if (it.role == "assistant") AnswerText.stripThinking(it.text) else it.text) }),
             )
@@ -374,10 +381,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             }
             val cutAt = limited?.takeIf { !stopped && !timedOut && text.isNotBlank() && AnswerLimit.reached(metrics?.generatedTokens ?: tokens, it) }
             val nextLimit = cutAt?.let { AnswerLimit.next(it, services.personalities.maxTokensOptions, services.host.openedContext) }
-            chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
-            if (shown.isNotEmpty() || receipt != null) chats.setMessageMeta(answerId, metaOf(shown, receipt))
-            afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
-            chats.prune(settings.maxSavedSessions)
+            try {
+                chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
+                if (shown.isNotEmpty() || receipt != null) chats.setMessageMeta(answerId, metaOf(shown, receipt))
+                afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
+                chats.prune(settings.maxSavedSessions)
+            } catch (e: Exception) {
+                // Not saved (disk full): the answer stays on screen with the error under it; the app keeps running.
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _state.update { it.copy(error = e.message ?: e.toString()) }
+            }
             if (!stopped && text.isNotEmpty()) team.sopa.boar.app.Haptics.finished(getApplication())
             _state.update { s ->
                 s.copy(answeringId = null, activity = null, stopping = false,
