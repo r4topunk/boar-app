@@ -231,6 +231,19 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
             services.chats.listSessions()
         }
     }
+    // Menu → Close BOAR: the answer stops (what it wrote is saved), the model is freed, the app closes. Chats are saved.
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    var confirmClose by remember { mutableStateOf(false) }
+    var closing by remember { mutableStateOf(false) }
+    fun closeBoar() {
+        if (closing) return
+        closing = true
+        scope.launch { runCatching { vm.closeAndFreeMemory() }; activity?.finishAndRemoveTask() }
+    }
+    if (confirmClose) androidx.compose.material3.AlertDialog({ confirmClose = false },
+        text = { Text(t("native.drawer.closeConfirm")) },
+        confirmButton = { androidx.compose.material3.TextButton({ confirmClose = false; closeBoar() }) { Text(t("native.drawer.closeButton"), color = Boar.colors.crimson400) } },
+        dismissButton = { androidx.compose.material3.TextButton({ confirmClose = false }) { Text(t("common.cancel")) } })
     ModalNavigationDrawer(
         drawerState = drawer,
         drawerContent = {
@@ -246,6 +259,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
                         DrawerItem("models", t("modelCatalogScreen.title")) { go { screen = "models" } },
                         DrawerItem("settings", t("chatScreen.drawerItems.settings")) { go { screen = "settings" } },
                         DrawerItem("evaluation", t("evaluation.title")) { go { screen = "evaluation" } },
+                        DrawerItem("close", t("native.drawer.close")) { go { if (state.answeringId != null) confirmClose = true else closeBoar() } },
                         DrawerItem("about", t("chatScreen.drawerItems.about")) { go { screen = "about" } },
                     ),
                     lastTokPerSec = state.liveTokPerSec.takeIf { state.answeringId == null },

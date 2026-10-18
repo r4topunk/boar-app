@@ -149,6 +149,18 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         super.onCleared()
     }
 
+    /**
+     * Menu → Close BOAR: stops an answer (what it wrote so far is saved, as with Stop) and a title or summary, then
+     * frees the model. The caller closes the app after.
+     */
+    suspend fun closeAndFreeMemory() {
+        stop()
+        kotlinx.coroutines.withTimeoutOrNull(CLOSE_WAIT_MS) { job?.join() } ?: job?.cancel()
+        stopBackground()
+        preloading?.cancel()
+        services.host.unload()
+    }
+
     /** Loads the model when the chat opens, as the Expo app does, so the first answer doesn't wait for it. */
     private fun preload() {
         if (services.activeModel() == null) return
@@ -554,6 +566,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Messages sent verbatim as history (ChatScreen.tsx VERBATIM_MESSAGE_COUNT). */
         const val VERBATIM_MESSAGE_COUNT = 6
+        /** Close BOAR waits this long for a stopped answer to save what it wrote. */
+        const val CLOSE_WAIT_MS = 5_000L
 
         /**
          * A message about the conversation itself, answered from it without a search: "summarize our conversation", or
