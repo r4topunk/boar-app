@@ -130,6 +130,10 @@
     <string name="native_telemetry_build" formatted="false">Build de CPU do motor</string>
     <string name="native_telemetry_appMemory" formatted="false">Memória do app agora</string>
     <string name="native_telemetry_storage" formatted="false">Armazenamento do BOAR</string>
+    <string name="native_telemetry_memory" formatted="false">Memória</string>
+    <string name="native_telemetry_memoryCaption" formatted="false">BOAR {{app}} · outros apps {{others}}</string>
+    <string name="native_telemetry_disk" formatted="false">Armazenamento</string>
+    <string name="native_telemetry_technical" formatted="false">TÉCNICO</string>
     <string name="native_telemetry_storageValue" formatted="false">{{used}} de {{limit}} do limite do BOAR</string>
     <string name="native_telemetry_ramValue" formatted="false">{{total}} · {{used}} em uso agora</string>
     <string name="native_telemetry_chats" formatted="false">Conversas salvas</string>
