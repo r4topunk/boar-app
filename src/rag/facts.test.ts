@@ -232,3 +232,16 @@ describe("FACTS r6: five trigger fixes (FACTS-r6-criterion.md B)", () => {
     expect(factsAnswer("Which is taller, K2 or Everest?")).toBeNull(); // "Everest" alone is not a label/alias (no hand aliases)
   });
 });
+
+describe("FACTS asset r7: labels and currencies (native app report, 2026-10-18)", () => {
+  const text = (q: string) => factsAnswer(q)?.text ?? null;
+  it("fills labels the snapshot returned as bare QIDs", () => {
+    expect(text("What currency does Germany use?")).toMatch(/^Germany's currency: euro\./);
+    expect(text("Who won the Nobel Prize in Literature in 1907?")).toMatch(/1907: Rudyard Kipling\./);
+  });
+  it("drops ended, never-issued and Caribbean-only tenders, and leaves an unclear case to the model", () => {
+    expect(text("What is the currency of El Salvador?")).toMatch(/^El Salvador's currency: United States dollar\./);
+    expect(text("What currency do they use in the Netherlands?")).toMatch(/currency: euro\./);
+    expect(text("What currency does Zimbabwe use?")).toBeNull();
+  });
+});
