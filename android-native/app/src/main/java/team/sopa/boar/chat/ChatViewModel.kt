@@ -132,18 +132,28 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
      */
     private var ideaPool: List<String> = emptyList()
 
+    private var preloading: Job? = null
+    /** For Free memory when I leave BOAR: the model isn't unloaded while an answer, title, summary or preload runs. */
+    private val busy: () -> Boolean = { job?.isActive == true || background?.isActive == true || preloading?.isActive == true }
+
     init {
         refreshModel()
         refreshTone()
         watchConnectivity(app)
         preload()
+        services.addBusyCheck(busy)
+    }
+
+    override fun onCleared() {
+        services.removeBusyCheck(busy)
+        super.onCleared()
     }
 
     /** Loads the model when the chat opens, as the Expo app does, so the first answer doesn't wait for it. */
     private fun preload() {
         if (services.activeModel() == null) return
         _state.update { it.copy(loadingKey = "chatScreen.mountingWeights") }
-        safeScope.launch(Dispatchers.Default) {
+        preloading = safeScope.launch(Dispatchers.Default) {
             runCatching { services.activeSession() }
             val crash = services.loadGuard.consume()
             _state.update { it.copy(loadingKey = null, loadCrash = crash) }

@@ -1,6 +1,7 @@
 package team.sopa.boar.app
 
 import android.content.Context
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -184,7 +185,7 @@ class BoarServices private constructor(private val context: Context) {
 
     inner class SessionHost : ModelHost {
         private val lock = Mutex()
-        private var session: LlamaSession? = null
+        @Volatile private var session: LlamaSession? = null
         private var filename: String? = null
         private var residentId: String? = null
         private var residentRepacked = false
@@ -240,6 +241,52 @@ class BoarServices private constructor(private val context: Context) {
             filename = null
             residentId = null
         }
+    }
+
+    // --- Free memory when I leave BOAR -------------------------------------------------------------------------
+
+    private val lifeScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+    private var backgroundRelease: kotlinx.coroutines.Job? = null
+    @Volatile private var inForeground = true
+    /** What uses the model besides a single generation: the chat's answer, its title or summary job, its preload. */
+    private val busyChecks = java.util.concurrent.CopyOnWriteArrayList<() -> Boolean>()
+
+    fun addBusyCheck(check: () -> Boolean) { busyChecks += check }
+    fun removeBusyCheck(check: () -> Boolean) { busyChecks -= check }
+    private fun modelBusy(): Boolean = busyChecks.any { runCatching { it() }.getOrDefault(false) }
+
+    /**
+     * BOAR left the screen: with Settings → Free memory when I leave BOAR on, the model is unloaded after the chosen
+     * delay (Auto 5 min). An answer, title or summary still running is waited for; coming back first cancels it. The
+     * chat stays as it is and the next question loads the model again.
+     */
+    @Synchronized fun onBackground() {
+        inForeground = false
+        backgroundRelease?.cancel()
+        backgroundRelease = null
+        if (!settings.freeMemoryInBackground) return
+        val wait = team.sopa.boar.engine.settings.FreeMemory.delayMs(settings.freeMemoryAfterMinutes)
+        backgroundRelease = lifeScope.launch {
+            kotlinx.coroutines.delay(wait)
+            while (true) {
+                val d = team.sopa.boar.engine.settings.FreeMemory.decide(settings.freeMemoryInBackground, inForeground, host.current() != null, modelBusy())
+                when (d) {
+                    team.sopa.boar.engine.settings.FreeMemory.Decision.SKIP -> return@launch
+                    team.sopa.boar.engine.settings.FreeMemory.Decision.WAIT -> kotlinx.coroutines.delay(team.sopa.boar.engine.settings.FreeMemory.BUSY_POLL_MS)
+                    team.sopa.boar.engine.settings.FreeMemory.Decision.UNLOAD -> {
+                        host.unload()
+                        android.util.Log.i("BOAR", "model unloaded after ${wait / 1000} s in the background")
+                        return@launch
+                    }
+                }
+            }
+        }
+    }
+
+    @Synchronized fun onForeground() {
+        inForeground = true
+        backgroundRelease?.cancel()
+        backgroundRelease = null
     }
 
     /** Loads the active model if it isn't resident; null when no model is installed or it fails to load. */

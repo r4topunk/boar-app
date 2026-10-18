@@ -267,4 +267,9 @@
     <string name="native_download_errorNetwork" formatted="false">Sem conexão com o servidor de download. Verifique a conexão e tente de novo.</string>
     <string name="native_download_errorGeneric" formatted="false">O download parou. Tente de novo.</string>
     <string name="native_common_ok" formatted="false">OK</string>
+    <string name="native_settings_freeMemory" formatted="false">Liberar memória quando eu sair do BOAR</string>
+    <string name="native_settings_freeMemoryNote" formatted="false">Depois de alguns minutos fora, o BOAR descarrega o modelo para liberar memória. A próxima resposta demora alguns segundos a mais para começar.</string>
+    <string name="native_tweaks_freeMemoryAfter" formatted="false">Liberar memória depois de</string>
+    <string name="native_tweaks_freeMemoryAfterNote" formatted="false">Quanto tempo o BOAR espera em segundo plano antes de descarregar o modelo, quando Liberar memória quando eu sair do BOAR está ligado.</string>
+    <string name="native_tweaks_immediately" formatted="false">Na hora</string>
 </resources>

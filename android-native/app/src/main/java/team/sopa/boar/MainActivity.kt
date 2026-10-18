@@ -80,11 +80,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // A rotation or font change stops and starts the activity: that isn't leaving BOAR.
+        if (!isChangingConfigurations) BoarServices.get(this).onBackground()
         stoppedAt = android.os.SystemClock.elapsedRealtime() // not the wall clock: changing the time can't skip the lock
     }
 
     override fun onStart() {
         super.onStart()
+        BoarServices.get(this).onForeground()
         if (stoppedAt > 0 && BoarServices.get(this).pinLock.isSet && android.os.SystemClock.elapsedRealtime() - stoppedAt > RELOCK_AFTER_MS) locked.value = true
     }
 
