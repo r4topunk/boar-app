@@ -167,6 +167,20 @@
     <string name="native_tweaks_presetCustom" formatted="false">Custom: your own settings below. Pick a preset to start over from it.</string>
     <string name="native_browse_discoverTitle" formatted="false">Discover GGUF models</string>
     <string name="native_models_cancelDownload" formatted="false">Cancel</string>
+    <string name="native_models_sort" formatted="false">Sort</string>
+    <string name="native_models_sortSmart" formatted="false">Smart</string>
+    <string name="native_models_sortLastUsed" formatted="false">Last used</string>
+    <string name="native_models_sortAdded" formatted="false">Recently added</string>
+    <string name="native_models_show" formatted="false">Show</string>
+    <string name="native_models_filterAll" formatted="false">All</string>
+    <string name="native_models_filterOnPhone" formatted="false">On this phone</string>
+    <string name="native_models_filterDownloading" formatted="false">Downloading</string>
+    <string name="native_models_filterMine" formatted="false">Added by you</string>
+    <string name="native_models_emptyFilter" formatted="false">No models here. Pick All to see every model.</string>
+    <string name="native_models_nowUsing" formatted="false">Now answering with {{model}}</string>
+    <string name="native_models_addedToast" formatted="false">Added to your models. Download it here or in Model Catalog.</string>
+    <string name="native_models_inYourModels" formatted="false">In your models</string>
+    <string name="native_models_useNow" formatted="false">Use now</string>
     <string name="native_settings_embeddingOk" formatted="false">Search model (for packs and documents): {{model}} ✓</string>
     <string name="native_settings_embeddingMissing" formatted="false">Search model (for packs and documents): {{model}}, not on the phone. Run setup again from Recovery.</string>
     <string name="native_browse_discoverSubtitle" formatted="false">Browse Hugging Face models</string>

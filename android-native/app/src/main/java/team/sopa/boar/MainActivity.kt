@@ -152,9 +152,9 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
         val setupModels: ModelsViewModel = viewModel()
         if (browsing) {
             val modelsState by setupModels.state.collectAsState()
-            LaunchedEffect(modelsState.hfAddedId) { modelsState.hfAddedId?.let { id -> setup.pickDiscovered(id); browsing = false } }
+            LaunchedEffect(modelsState.hfAddedId) { modelsState.hfAddedId?.let { id -> setupModels.toastShown(); setup.pickDiscovered(id); browsing = false } }
             BackHandler { browsing = false }
-            BrowseScreen(modelsState, setupModels) { browsing = false }
+            BrowseScreen(modelsState, setupModels, rowActions = false) { browsing = false }
             return
         }
         SetupScreen(setupState, setup, team.sopa.boar.ui.setup.currentLanguage(services.settings.languageId),

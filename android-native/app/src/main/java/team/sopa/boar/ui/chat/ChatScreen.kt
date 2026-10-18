@@ -350,9 +350,9 @@ private fun MicButton(text: String, onText: (String) -> Unit, enabled: Boolean, 
     }
 }
 
-/** Toast.tsx: below the header, fades in, gone after 1.8 s. */
+/** Toast.tsx: below the header, fades in, gone after 1.8 s. Also on the Models and Hugging Face pages. */
 @Composable
-private fun Toast(message: String, onHide: () -> Unit) {
+internal fun Toast(message: String, onHide: () -> Unit) {
     val alpha = remember(message) { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(message) {
         alpha.animateTo(1f, androidx.compose.animation.core.tween(150))

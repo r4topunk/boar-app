@@ -19,6 +19,8 @@ import team.sopa.boar.engine.models.AssetKind
 import team.sopa.boar.engine.models.AssetStore
 import team.sopa.boar.engine.models.HfQuery
 import team.sopa.boar.engine.models.CatalogAsset
+import team.sopa.boar.engine.models.ModelOrder
+import team.sopa.boar.engine.settings.AppSettings
 import team.sopa.boar.engine.rag.SeedCorpus
 
 /** One catalog row (CatalogRowState): on disk, downloading with progress, speed and ETA, or failed. */
@@ -56,6 +58,12 @@ data class ModelsState(
     val hfSearching: Boolean = false,
     val hfNext: String? = null,
     val hfSearched: Boolean = false,
+    /** The Models screen's sort and filter, and what they sort by. */
+    val sort: ModelOrder.Sort = ModelOrder.Sort.SMART,
+    val filter: ModelOrder.Filter = ModelOrder.Filter.ALL,
+    val lastUsed: Map<String, Long> = emptyMap(),
+    val added: Map<String, Long> = emptyMap(),
+    val mine: Set<String> = emptySet(),
 )
 
 /** The models and knowledge catalog (port of ModelCatalogScreen.tsx): download, use, remove. */
@@ -68,7 +76,9 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     init {
         val ram = runCatching { ActivityManager.MemoryInfo().also { app.getSystemService(ActivityManager::class.java).getMemoryInfo(it) }.totalMem }.getOrDefault(0L)
         // Answer models first, then the embedding model, then knowledge, as the catalog lists them.
-        _state.update { it.copy(items = sortedItems(), totalRamBytes = ram) }
+        val sort = services.settings.modelSort?.let { runCatching { ModelOrder.Sort.valueOf(it) }.getOrNull() } ?: ModelOrder.Sort.SMART
+        val filter = services.settings.modelFilter?.let { runCatching { ModelOrder.Filter.valueOf(it) }.getOrNull() } ?: ModelOrder.Filter.ALL
+        _state.update { it.copy(items = sortedItems(), totalRamBytes = ram, sort = sort, filter = filter) }
         refresh()
     }
 
@@ -128,7 +138,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
             val asset = runCatching { HfBrowser.toAsset(repo, f) }.getOrElse { e -> _state.update { it.copy(hfError = e.message) }; return@launch }
             services.addDiscovered(asset)
             store = AssetStore(getApplication<Application>().filesDir, services.catalog)
-            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label, hfAddedId = asset.id) }
+            _state.update { it.copy(items = sortedItems(), hfAdded = asset.label, hfAddedId = asset.id, toast = text("native.models.addedToast")) }
             refresh()
         }
     }
@@ -136,8 +146,14 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         // The list itself too: a hidden model drops out once it's removed.
         val items = sortedItems()
+        val lastUsed = services.settings.modelTimes(AppSettings.MODEL_LAST_USED)
+        // Models from before these times were kept: the file's date stands in for when it was added.
+        val stamped = services.settings.modelTimes(AppSettings.MODEL_ADDED)
+        val added = items.associate { a -> a.id to (stamped[a.id] ?: services.fileOf(a).takeIf { it.isFile }?.lastModified()) }
+            .mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
+        val mine = services.discovered().map { it.id }.toSet()
         _state.update { s ->
-            s.copy(items = items, activeLlm = services.activeModel()?.id, rows = items.associate { a ->
+            s.copy(items = items, activeLlm = services.activeModel()?.id, lastUsed = lastUsed, added = added, mine = mine, rows = items.associate { a ->
                 val prev = s.rows[a.id] ?: Row()
                 a.id to prev.copy(present = store.status(a).present)
             })
@@ -169,6 +185,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
                     row(a.id) { it.copy(progress = if (p.bytesTotal > 0) p.bytesDone.toDouble() / p.bytesTotal else 0.0, bytesWritten = p.bytesDone, speedBytesPerSec = speed, etaSeconds = eta) }
                 }
                 row(a.id) { Row(present = true) }
+                services.settings.stampModel(AppSettings.MODEL_ADDED, a.id)
                 if (a.kind == AssetKind.CORPUS && a.format != "sqlite-pack") index(a)
                 if (a.kind == AssetKind.CORPUS) services.reloadPacks()
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -233,7 +250,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
             // Picked again after it closed the app: the user's call (CR-2's confirmation).
             if (a.kind == AssetKind.LLM) services.loadGuard.confirm(a.id)
             if (a.kind == AssetKind.LLM) runCatching { services.host.unload(); services.activeSession() }
-            _state.update { it.copy(activating = null, toast = a.label) }
+            _state.update { it.copy(activating = null, toast = text("native.models.nowUsing", "model" to a.shortName)) }
             refresh()
         }
     }
@@ -250,4 +267,9 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toastShown() = _state.update { it.copy(toast = null) }
+
+    fun setSort(sort: ModelOrder.Sort) { services.settings.modelSort = sort.name; _state.update { it.copy(sort = sort) } }
+    fun setFilter(filter: ModelOrder.Filter) { services.settings.modelFilter = filter.name; _state.update { it.copy(filter = filter) } }
+
+    private fun text(key: String, vararg args: Pair<String, Any?>) = team.sopa.boar.ui.I18n.t(getApplication(), key, *args)
 }

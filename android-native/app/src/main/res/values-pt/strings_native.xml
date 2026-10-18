@@ -167,6 +167,20 @@
     <string name="native_tweaks_presetCustom" formatted="false">Personalizado: seus próprios ajustes abaixo. Escolha uma predefinição para recomeçar a partir dela.</string>
     <string name="native_browse_discoverTitle" formatted="false">Descobrir modelos GGUF</string>
     <string name="native_models_cancelDownload" formatted="false">Cancelar</string>
+    <string name="native_models_sort" formatted="false">Ordem</string>
+    <string name="native_models_sortSmart" formatted="false">Inteligente</string>
+    <string name="native_models_sortLastUsed" formatted="false">Usados por último</string>
+    <string name="native_models_sortAdded" formatted="false">Adicionados por último</string>
+    <string name="native_models_show" formatted="false">Mostrar</string>
+    <string name="native_models_filterAll" formatted="false">Todos</string>
+    <string name="native_models_filterOnPhone" formatted="false">Neste celular</string>
+    <string name="native_models_filterDownloading" formatted="false">Baixando</string>
+    <string name="native_models_filterMine" formatted="false">Adicionados por você</string>
+    <string name="native_models_emptyFilter" formatted="false">Nenhum modelo aqui. Escolha Todos para ver todos.</string>
+    <string name="native_models_nowUsing" formatted="false">Agora respondendo com {{model}}</string>
+    <string name="native_models_addedToast" formatted="false">Adicionado aos seus modelos. Baixe aqui ou no Catálogo de Modelos.</string>
+    <string name="native_models_inYourModels" formatted="false">Nos seus modelos</string>
+    <string name="native_models_useNow" formatted="false">Usar agora</string>
     <string name="native_settings_embeddingOk" formatted="false">Modelo de busca (pacotes e documentos): {{model}} ✓</string>
     <string name="native_settings_embeddingMissing" formatted="false">Modelo de busca (pacotes e documentos): {{model}}, não está no celular. Rode a configuração de novo em Recuperação.</string>
     <string name="native_browse_discoverSubtitle" formatted="false">Explorar modelos do Hugging Face</string>

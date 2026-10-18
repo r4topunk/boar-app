@@ -70,7 +70,7 @@ class BoarServices private constructor(private val context: Context) {
 
     fun addDiscovered(asset: CatalogAsset) = synchronized(this) {
         val all = discovered()
-        if (all.none { it.id == asset.id }) writeDiscovered(all + asset)
+        if (all.none { it.id == asset.id }) { writeDiscovered(all + asset); settings.stampModel(AppSettings.MODEL_ADDED, asset.id) }
         catalog = withDiscovered()
     }
 
@@ -225,6 +225,7 @@ class BoarServices private constructor(private val context: Context) {
                         android.util.Log.w("BOAR", "${asset.id} stalled with repacked weights (${m.generatedTokens} tokens in ${m.decodeMs.toInt()} ms): mapped from the next answer")
                 }
                 settings.lastLoadedModelId = asset.id
+                settings.stampModel(AppSettings.MODEL_LAST_USED, asset.id)
             }
             SessionEngine(session!!, tweaks.thinkingEnabled)
         }
