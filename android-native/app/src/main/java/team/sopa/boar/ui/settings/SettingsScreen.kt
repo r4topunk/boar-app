@@ -259,7 +259,7 @@ private fun RecoverySection(services: BoarServices, prefs: DisplayPrefs, onSetup
             services.settings.resetPreferences()
             prefs.setTheme(team.sopa.boar.ui.theme.ThemeTokens.DEFAULT_ID)
             prefs.setFontScale("standard")
-            prefs.setOrientation("auto")
+            prefs.setOrientation(team.sopa.boar.engine.settings.AppSettings.DEFAULT_ORIENTATION)
             onSetup()
         }) { Text(t("native.settings.resetConfirmButton"), color = Boar.colors.crimson400) } },
         dismissButton = { androidx.compose.material3.TextButton({ resetting = false }) { Text(t("common.cancel")) } })
