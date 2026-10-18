@@ -1,5 +1,7 @@
 package team.sopa.boar.chat
 
+import kotlinx.coroutines.plus
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -108,6 +110,13 @@ data class ChatState(
  */
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val services = BoarServices.get(app)
+    /**
+     * Background work runs here: an unexpected error ends that job with a toast instead of closing the app, and an
+     * answer it cut short is closed with the generic error line (layer 1 of the error handler, [team.sopa.boar.app.Safe]).
+     */
+    private val safeScope = viewModelScope + team.sopa.boar.app.Safe.handler(app) { _ ->
+        _state.update { it.copy(answeringId = null, activity = null, stopping = false, error = "generic") }
+    }
     private val _state = MutableStateFlow(ChatState(deepResearch = services.settings.deepResearchMode, technicalDetails = services.settings.showLiveStats))
     val state: StateFlow<ChatState> = _state
     private var job: Job? = null
@@ -134,7 +143,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private fun preload() {
         if (services.activeModel() == null) return
         _state.update { it.copy(loadingKey = "chatScreen.mountingWeights") }
-        viewModelScope.launch(Dispatchers.Default) {
+        safeScope.launch(Dispatchers.Default) {
             runCatching { services.activeSession() }
             val crash = services.loadGuard.consume()
             _state.update { it.copy(loadingKey = null, loadCrash = crash) }
@@ -226,13 +235,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         // Not the chat still being answered: its answer would be saved into a deleted session.
         if (job?.isActive == true && _state.value.sessionId == id) return
         // A database error (disk full, a damaged file) is told in a toast; uncaught here it would close the app.
-        viewModelScope.launch(Dispatchers.IO) { runCatching { services.chats.deleteSession(id) }.onFailure { showToast("native.chat.dbFailed") } }
+        safeScope.launch(Dispatchers.IO) { runCatching { services.chats.deleteSession(id) }.onFailure { showToast("native.chat.dbFailed") } }
         if (_state.value.sessionId == id) newChat()
     }
 
     fun openSession(id: String) {
         if (job?.isActive == true) return
-        viewModelScope.launch {
+        safeScope.launch {
             val msgs = runCatching {
                 withContext(Dispatchers.IO) { services.chats.messages(id) }.map { r ->
                     UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback, receipt = receiptFromMeta(r.meta))
@@ -248,7 +257,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { s -> s.copy(messages = s.messages.map { if (it.id == messageId) it.copy(feedback = next) else it }) }
         // Once, on the first rating: ratings stay on the phone and nothing uses them yet.
         if (next != null && !services.settings.ratingNoteShown) { services.settings.ratingNoteShown = true; showToast("native.chat.ratingNote") }
-        viewModelScope.launch(Dispatchers.IO) {
+        safeScope.launch(Dispatchers.IO) {
             runCatching { services.chats.setFeedback(messageId, next) }.onFailure {
                 _state.update { s -> s.copy(messages = s.messages.map { if (it.id == messageId) it.copy(feedback = current) else it }) }
                 showToast("native.chat.dbFailed")
@@ -276,7 +285,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (q.isEmpty() || job?.isActive == true) return
         team.sopa.boar.app.Haptics.sent(getApplication())
         stopRequested = false
-        job = viewModelScope.launch(Dispatchers.Default) {
+        job = safeScope.launch(Dispatchers.Default) {
             stopBackground()
             val chats = services.chats
             val isNewSession = _state.value.sessionId == null
@@ -434,7 +443,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         // Reads the model's info: throws once the model was unloaded (switched in Models or Settings) after the answer.
         val gen = runCatching { SessionEngine(session) }.getOrNull() ?: return
         if (isNewSession && s.autoGenerateTitles) {
-            background = viewModelScope.launch(Dispatchers.Default) {
+            background = safeScope.launch(Dispatchers.Default) {
                 runCatching { services.chats.setTitle(sessionId, Summarize.title(gen, all.first { it.role == "user" }.text)) }
                 runCatching { warmPrefix(session, systemPrompt, hadSources) }
             }
@@ -442,7 +451,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val older = all.dropLast(VERBATIM_MESSAGE_COUNT)
             if (older.isEmpty()) return
             val previous = services.chats.listSessions().firstOrNull { it.id == sessionId }?.summary
-            background = viewModelScope.launch(Dispatchers.Default) {
+            background = safeScope.launch(Dispatchers.Default) {
                 runCatching {
                     // Bounded like the answer's history: a whole detailed chat (thousands of tokens) took tens of seconds to read.
                     val turns = HistoryBudget.budget(older.map { ConversationTurn(it.role, if (it.role == "assistant") AnswerText.stripThinking(it.text) else it.text) })

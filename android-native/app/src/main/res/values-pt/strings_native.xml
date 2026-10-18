@@ -169,6 +169,7 @@
     <string name="native_settings_embeddingMissing" formatted="false">Modelo de busca (pacotes e documentos): {{model}}, não está no celular. Rode a configuração de novo em Recuperação.</string>
     <string name="native_browse_discoverSubtitle" formatted="false">Explorar modelos do Hugging Face</string>
     <string name="native_chat_errorNoModel" formatted="false">Nenhum modelo de resposta está carregado. Abra o Catálogo de Modelos para escolher um.</string>
+    <string name="native_common_somethingWrong" formatted="false">Algo deu errado. Tente de novo.</string>
     <string name="native_chat_dbFailed" formatted="false">Não deu certo. Tente de novo.</string>
     <string name="native_chat_ratingNote" formatted="false">Salvo só neste celular. Nada é enviado. O BOAR ainda não aprende com isso.</string>
     <string name="native_chat_errorGeneric" formatted="false">Algo deu errado ao responder. Tente de novo.</string>

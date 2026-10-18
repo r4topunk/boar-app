@@ -1,5 +1,7 @@
 package team.sopa.boar.setup
 
+import team.sopa.boar.app.safeScope
+
 import android.app.ActivityManager
 import android.app.Application
 import android.os.StatFs
@@ -235,7 +237,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         save()
         rateStart = null
         lastMove = Pair(_state.value.doneBytes, System.currentTimeMillis())
-        job = viewModelScope.launch(Dispatchers.IO) {
+        job = safeScope.launch(Dispatchers.IO) {
             for (a in assets) {
                 if (store.status(a).present) { update(a) { it.copy(done = true, bytesDone = a.sizeBytes) }; continue }
                 if (!fetch(a)) return@launch
@@ -288,7 +290,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** No byte for a minute while a download runs: offer to restart (the Expo wizard's STALL_MS). */
-    private fun watchStall() = viewModelScope.launch(Dispatchers.Default) {
+    private fun watchStall() = safeScope.launch(Dispatchers.Default) {
         while (isActive) {
             delay(5_000)
             val s = _state.value
@@ -319,7 +321,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
     /** Runs the index again after it failed (the embedder didn't load, or seeding stopped). */
     fun retryIndex() {
         if (job?.isActive == true) return
-        job = viewModelScope.launch(Dispatchers.IO) { index() }
+        job = safeScope.launch(Dispatchers.IO) { index() }
     }
 
     private suspend fun index() {

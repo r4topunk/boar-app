@@ -169,6 +169,7 @@
     <string name="native_settings_embeddingMissing" formatted="false">Search model (for packs and documents): {{model}}, not on the phone. Run setup again from Recovery.</string>
     <string name="native_browse_discoverSubtitle" formatted="false">Browse Hugging Face models</string>
     <string name="native_chat_errorNoModel" formatted="false">No answer model is loaded. Open the Model Catalog to pick one.</string>
+    <string name="native_common_somethingWrong" formatted="false">Something went wrong. Try again.</string>
     <string name="native_chat_dbFailed" formatted="false">Couldn\'t do that. Try again.</string>
     <string name="native_chat_ratingNote" formatted="false">Saved on this phone only. Nothing is sent. BOAR doesn\'t learn from it yet.</string>
     <string name="native_chat_errorGeneric" formatted="false">Something went wrong while answering. Try again.</string>

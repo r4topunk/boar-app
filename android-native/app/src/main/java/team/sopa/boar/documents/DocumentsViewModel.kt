@@ -1,5 +1,7 @@
 package team.sopa.boar.documents
 
+import team.sopa.boar.app.safeScope
+
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -36,7 +38,7 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
     fun import(uris: List<Uri>, name: String) {
         if (uris.isEmpty() || _state.value.stage != null) return
         _state.update { it.copy(stage = "reading", error = null, done = 0, total = 0) }
-        viewModelScope.launch(Dispatchers.IO) {
+        safeScope.launch(Dispatchers.IO) {
             try {
                 val resolver = getApplication<Application>().contentResolver
                 val files = uris.map { uri ->
@@ -120,7 +122,7 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun remove(id: String) {
-        viewModelScope.launch(Dispatchers.IO) { services.knowledgeBase.deleteCollection(id); refresh() }
+        safeScope.launch(Dispatchers.IO) { services.knowledgeBase.deleteCollection(id); refresh() }
     }
 
     /** Reads at most [DocumentImport.READ_LIMIT] bytes; null as soon as the file is longer (its size wasn't known up front). */
