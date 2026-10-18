@@ -126,7 +126,8 @@ data class BenchResult(val pp: BenchStats?, val tg: BenchStats?, val nPp: Int, v
 class LlamaSession private constructor(@Volatile private var handle: Long, val params: EngineParams) : Closeable {
     private val lock = Mutex()
 
-    val info: JSONObject get() = JSONObject(BoarNative.modelInfo(live()))
+    /** The model's metadata, read once at load: it never changes, and a later read could race [close] freeing the session. */
+    val info: JSONObject = JSONObject(BoarNative.modelInfo(handle))
 
     /** The native handle, or a catchable error once [close] freed it: native code would crash on a 0 handle. */
     private fun live(): Long = handle.takeIf { it != 0L } ?: throw IllegalStateException("model unloaded")

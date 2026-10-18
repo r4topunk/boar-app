@@ -49,7 +49,7 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
                     if (DocumentImport.tooLargeToRead(size)) throw TooLarge(fileName)
                     val text = try {
                         if (fileName.lowercase().endsWith(".pdf")) pdfText(uri, fileName)
-                        else resolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: throw Failed(text("native.documents.unreadable", fileName))
+                        else resolver.openInputStream(uri)?.use { readCapped(it) ?: throw TooLarge(fileName) }?.toString(Charsets.UTF_8) ?: throw Failed(text("native.documents.unreadable", fileName))
                     } catch (e: OutOfMemoryError) {
                         // Not an Exception: uncaught, it closes the app. The file's text is dropped with the frame.
                         throw TooLarge(fileName)
@@ -121,5 +121,17 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun remove(id: String) {
         viewModelScope.launch(Dispatchers.IO) { services.knowledgeBase.deleteCollection(id); refresh() }
+    }
+
+    /** Reads at most [DocumentImport.READ_LIMIT] bytes; null as soon as the file is longer (its size wasn't known up front). */
+    private fun readCapped(input: java.io.InputStream): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) return out.toByteArray()
+            if (out.size() + n > DocumentImport.READ_LIMIT) return null
+            out.write(buf, 0, n)
+        }
     }
 }
