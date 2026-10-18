@@ -264,7 +264,7 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
                     ),
                     lastTokPerSec = state.liveTokPerSec.takeIf { state.answeringId == null },
                     storageUsed = { services.storageUsedBytes() },
-                    ramBudgetBytes = services.catalog.ramBudgetBytes,
+                    downloading = { team.sopa.boar.engine.models.AssetStore.downloadingBytes(services.filesDir) },
                     storageBudgetBytes = services.catalog.storageBudgetBytes,
                     showStats = state.technicalDetails,
                     answering = state.answeringId != null,

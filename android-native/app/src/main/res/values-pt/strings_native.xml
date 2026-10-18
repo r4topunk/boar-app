@@ -130,6 +130,8 @@
     <string name="native_telemetry_build" formatted="false">Build de CPU do motor</string>
     <string name="native_telemetry_appMemory" formatted="false">Memória do app agora</string>
     <string name="native_telemetry_storage" formatted="false">Armazenamento do BOAR</string>
+    <string name="native_telemetry_storageValue" formatted="false">{{used}} de {{limit}} do limite do BOAR</string>
+    <string name="native_telemetry_ramValue" formatted="false">{{total}} · {{used}} em uso agora</string>
     <string name="native_telemetry_chats" formatted="false">Conversas salvas</string>
     <string name="native_telemetry_evals" formatted="false">Avaliações neste celular</string>
     <string name="native_telemetry_lastEval" formatted="false">Última avaliação</string>
@@ -259,7 +261,12 @@
     <string name="native_setup_indexFailed" formatted="false">A criação do índice de busca parou. Tente de novo.</string>
     <string name="native_download_errorNoSource" formatted="false">Ainda não disponível para download. Importe o arquivo.</string>
     <string name="native_download_errorOffline" formatted="false">Esta versão do BOAR não tem acesso à rede. Importe o arquivo.</string>
-    <string name="native_download_errorStorage" formatted="false">Espaço livre insuficiente no celular. Libere espaço e tente de novo.</string>
+    <string name="native_download_errorStorage" formatted="false">O celular tem só {{free}} livres e o download precisa de {{needed}}. Libere espaço e tente de novo.</string>
+    <string name="native_download_errorBudget" formatted="false">O limite de {{budget}} do BOAR foi atingido: já são {{used}} em modelos. Remova um modelo primeiro. O celular ainda pode ter espaço.</string>
+    <string name="native_download_errorBudgetDownloading" formatted="false">O limite de {{budget}} do BOAR foi atingido: {{used}} em modelos e {{downloading}} baixando. Remova um modelo ou cancele um download. O celular ainda pode ter espaço.</string>
+    <string name="native_drawerStats_ramBoar" formatted="false">O BOAR usa {{app}} da memória do celular</string>
+    <string name="native_drawerStats_diskLimit" formatted="false">Limite do BOAR, não do celular</string>
+    <string name="native_drawerStats_diskDownloading" formatted="false">Limite do BOAR · {{size}} baixando</string>
     <string name="native_download_errorSizeChanged" formatted="false">O servidor agora tem um arquivo diferente do que esta versão do BOAR espera. Importe o arquivo ou atualize o app.</string>
     <string name="native_download_errorPaused" formatted="false">O download pausou (sem dados). Verifique a conexão e tente de novo.</string>
     <string name="native_download_errorChecksum" formatted="false">O arquivo não bateu com o checksum e foi removido. Tente o download de novo.</string>

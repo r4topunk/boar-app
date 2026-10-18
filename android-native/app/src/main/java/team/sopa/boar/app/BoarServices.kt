@@ -37,6 +37,8 @@ import java.io.File
  */
 class BoarServices private constructor(private val context: Context) {
     private val files = context.filesDir
+    /** The app's files dir, where models, packs and the chat database live. */
+    val filesDir: java.io.File get() = files
     val settings = AppSettings(File(files, "settings.json"))
     private val baseCatalog: Catalog = Catalog.parse(asset("boar-data/catalog.json"))
     private val discoveredFile = File(files, "discovered_models.json")
