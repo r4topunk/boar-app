@@ -225,16 +225,19 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteSession(id: String) {
         // Not the chat still being answered: its answer would be saved into a deleted session.
         if (job?.isActive == true && _state.value.sessionId == id) return
-        viewModelScope.launch(Dispatchers.IO) { services.chats.deleteSession(id) }
+        // A database error (disk full, a damaged file) is told in a toast; uncaught here it would close the app.
+        viewModelScope.launch(Dispatchers.IO) { runCatching { services.chats.deleteSession(id) }.onFailure { showToast("native.chat.dbFailed") } }
         if (_state.value.sessionId == id) newChat()
     }
 
     fun openSession(id: String) {
         if (job?.isActive == true) return
         viewModelScope.launch {
-            val msgs = withContext(Dispatchers.IO) { services.chats.messages(id) }.map { r ->
-                UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback, receipt = receiptFromMeta(r.meta))
-            }
+            val msgs = runCatching {
+                withContext(Dispatchers.IO) { services.chats.messages(id) }.map { r ->
+                    UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback, receipt = receiptFromMeta(r.meta))
+                }
+            }.getOrElse { showToast("native.chat.dbFailed"); return@launch }
             _state.update { it.copy(sessionId = id, messages = msgs, error = null) }
         }
     }
@@ -243,7 +246,14 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val current = _state.value.messages.firstOrNull { it.id == messageId }?.feedback
         val next = if (current == rating) null else rating
         _state.update { s -> s.copy(messages = s.messages.map { if (it.id == messageId) it.copy(feedback = next) else it }) }
-        viewModelScope.launch(Dispatchers.IO) { services.chats.setFeedback(messageId, next) }
+        // Once, on the first rating: ratings stay on the phone and nothing uses them yet.
+        if (next != null && !services.settings.ratingNoteShown) { services.settings.ratingNoteShown = true; showToast("native.chat.ratingNote") }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { services.chats.setFeedback(messageId, next) }.onFailure {
+                _state.update { s -> s.copy(messages = s.messages.map { if (it.id == messageId) it.copy(feedback = current) else it }) }
+                showToast("native.chat.dbFailed")
+            }
+        }
     }
 
     fun stop() {

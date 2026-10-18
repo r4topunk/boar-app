@@ -106,6 +106,8 @@ class AppSettings(private val file: File) {
     var deepResearchMode: Boolean get() = bool("deepResearchMode") ?: false; set(v) = set("deepResearchMode", JsonPrimitive(v))
     /** The user closed the "Mixture of agents" line under the header (it stays closed). */
     var researchBannerHidden: Boolean get() = bool("researchBannerHidden") ?: false; set(v) = set("researchBannerHidden", JsonPrimitive(v))
+    /** The one-time note on the first 👍/👎 (kept on the phone, not used yet) was shown. Not a preference: Reset keeps it. */
+    var ratingNoteShown: Boolean get() = bool("ratingNoteShown") ?: false; set(v) = set("ratingNoteShown", JsonPrimitive(v))
     /** Run Boar Run's heat and battery card was shown and accepted once: picking it again doesn't ask. */
     var runPresetWarned: Boolean get() = bool("runPresetWarned") ?: false; set(v) = set("runPresetWarned", JsonPrimitive(v))
     var adaptiveRoutingEnabled: Boolean get() = bool("adaptiveRoutingEnabled") ?: false; set(v) = set("adaptiveRoutingEnabled", JsonPrimitive(v))
