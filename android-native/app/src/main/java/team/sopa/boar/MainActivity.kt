@@ -257,11 +257,12 @@ private fun App(services: BoarServices, prefs: DisplayPrefs, vm: ChatViewModel =
                     items = listOf(
                         DrawerItem("knowledge", t("nav.knowledge")) { go { screen = "documents" } },
                         DrawerItem("models", t("modelCatalogScreen.title")) { go { screen = "models" } },
-                        DrawerItem("settings", t("chatScreen.drawerItems.settings")) { go { screen = "settings" } },
                         DrawerItem("evaluation", t("evaluation.title")) { go { screen = "evaluation" } },
+                        // Settings, then Close BOAR last (Oct 18); About opens from the BOAR mark at the top.
+                        DrawerItem("settings", t("chatScreen.drawerItems.settings")) { go { screen = "settings" } },
                         DrawerItem("close", t("native.drawer.close")) { go { if (state.answeringId != null) confirmClose = true else closeBoar() } },
-                        DrawerItem("about", t("chatScreen.drawerItems.about")) { go { screen = "about" } },
                     ),
+                    onAbout = { go { screen = "about" } },
                     lastTokPerSec = state.liveTokPerSec.takeIf { state.answeringId == null },
                     storageUsed = { services.storageUsedBytes() },
                     downloading = { team.sopa.boar.engine.models.AssetStore.downloadingBytes(services.filesDir) },
