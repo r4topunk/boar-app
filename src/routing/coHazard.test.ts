@@ -163,3 +163,20 @@ describe("coHazardAnswer", () => {
     expect(coHazardAnswer("Where should I put the generator, garage or outside?")).toMatch(/^Carbon monoxide/);
   });
 });
+
+describe("vehicle cabins (native app suite, 2026-10-18)", () => {
+  it("a fuel heater or stove in a car, SUV or truck cab fires; car questions without a burner do not", () => {
+    for (const q of [
+      "Can I run a propane heater in the car?",
+      "Can I sleep in my SUV with a small gas heater on?",
+      "Can I cook with a camping stove inside my truck cab when it rains?",
+    ])
+      expect(isCoHazardQuestion(q), q).toBe(true);
+    for (const q of [
+      "How long does a car battery last?",
+      "Can I charge my phone in the car?",
+      "Is it okay to bring a propane tank in the car to the campsite?",
+    ])
+      expect(isCoHazardQuestion(q), q).toBe(false);
+  });
+});

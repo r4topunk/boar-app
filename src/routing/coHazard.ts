@@ -87,7 +87,7 @@ const RUNNING = re(`${B}(?:run|running|use|using|operate|operating|start|startin
 const SPACE = re(
   [
     `${B}indoors?${E}`,
-    `${B}(?:inside|in|into) (?:the |my |our |a |your |an |his |her |their )?(?:[\\p{L}-]+ ){0,2}(?:house|home|bedroom|living room|apartment|flat|cabin|room|tent|camper|garage|basement|shed|van|rv|caravan|trailer|motorhome|boat|yurt|hut|shelter|dorm|condo|workshop|barn|porch|sunroom|conservatory)${E}`,
+    `${B}(?:inside|in|into) (?:the |my |our |a |your |an |his |her |their )?(?:[\\p{L}-]+ ){0,2}(?:house|home|bedroom|living room|apartment|flat|cabin|room|tent|camper|garage|basement|shed|van|minivan|car|suv|truck|truck cab|vehicle|rv|caravan|trailer|motorhome|boat|yurt|hut|shelter|dorm|condo|workshop|barn|porch|sunroom|conservatory)${E}`,
     `${B}garages?${E}(?! (?:sale|band|door opener))`,
     `${B}carports?${E}`,
     `${B}on (?:the |my |our |a )?(?:enclosed |screened |screened-in |covered |closed-in )?(?:porch|sunroom|veranda)${E}`,
