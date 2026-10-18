@@ -208,6 +208,8 @@ class BoarServices private constructor(private val context: Context) {
         private var filename: String? = null
         private var residentId: String? = null
         private var residentRepacked = false
+        /** The minute-later settle of the current load (LoadGuard.settled), cancelled when that load goes. */
+        private var settleJob: kotlinx.coroutines.Job? = null
         /** Models that stalled with repacked weights in this process: mapped from storage until the app restarts (#73). */
         private val keepMapped = java.util.Collections.synchronizedSet(HashSet<String>())
 
@@ -221,6 +223,7 @@ class BoarServices private constructor(private val context: Context) {
             val reloadMapped = filename == asset.filename && residentRepacked && asset.id in keepMapped && tweaks.weightRepack != true
             if (filename != asset.filename || session == null || reloadMapped) {
                 val previous = (residentId ?: settings.lastLoadedModelId)?.let(catalog::byId)?.let { LoadGuard.Meta(it.filename, it.id, it.label) }
+                settleJob?.cancel(); settleJob = null
                 session?.close()
                 session = null
                 filename = null
@@ -244,7 +247,13 @@ class BoarServices private constructor(private val context: Context) {
                         android.util.Log.w("BOAR", "${asset.id} stalled with repacked weights (${m.generatedTokens} tokens in ${m.decodeMs.toInt()} ms): mapped from the next answer")
                 }
                 // Or a minute loaded without being killed: Android kills an app whose model doesn't fit within seconds.
-                lifeScope.launch { kotlinx.coroutines.delay(LOAD_SETTLE_MS); if (residentId == asset.id) loadGuard.settled(asset.id) }
+                settleJob?.cancel()
+                val loaded = s
+                settleJob = lifeScope.launch {
+                    kotlinx.coroutines.delay(LOAD_SETTLE_MS)
+                    // Only for this very load: a model unloaded and loaded again since has its own marker and timer.
+                    lock.withLock { if (session === loaded) loadGuard.settled(asset.id) }
+                }
                 settings.lastLoadedModelId = asset.id
                 settings.stampModel(AppSettings.MODEL_LAST_USED, asset.id)
             }
@@ -259,8 +268,12 @@ class BoarServices private constructor(private val context: Context) {
         fun current(): LlamaSession? = session
 
         /** Frees the model; the next answer loads it again (with changed Advanced tweaks, or another model). */
+        /** BOAR left the foreground: a kill from now on is Android reclaiming a background app, not the model's load. */
+        fun settleResident() { residentId?.let(loadGuard::settled) }
+
         suspend fun unload() = lock.withLock {
             // Unloaded on purpose (free memory, Close BOAR): the model didn't kill the app, so its load marker goes.
+            settleJob?.cancel(); settleJob = null
             residentId?.let(loadGuard::settled)
             session?.close()
             session = null
@@ -288,6 +301,7 @@ class BoarServices private constructor(private val context: Context) {
      */
     @Synchronized fun onBackground() {
         inForeground = false
+        host.settleResident()
         backgroundRelease?.cancel()
         backgroundRelease = null
         if (!settings.freeMemoryInBackground) return
