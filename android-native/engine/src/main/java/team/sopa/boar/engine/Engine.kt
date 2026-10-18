@@ -126,12 +126,16 @@ data class BenchResult(val pp: BenchStats?, val tg: BenchStats?, val nPp: Int, v
 class LlamaSession private constructor(@Volatile private var handle: Long, val params: EngineParams) : Closeable {
     private val lock = Mutex()
 
-    val info: JSONObject get() = JSONObject(BoarNative.modelInfo(handle))
+    val info: JSONObject get() = JSONObject(BoarNative.modelInfo(live()))
+
+    /** The native handle, or a catchable error once [close] freed it: native code would crash on a 0 handle. */
+    private fun live(): Long = handle.takeIf { it != 0L } ?: throw IllegalStateException("model unloaded")
 
     suspend fun formatChat(messages: List<ChatMessage>, enableThinking: Boolean = false): FormattedPrompt = lock.withLock {
+        val h = live()
         withContext(Dispatchers.Default) {
             val arr = JSONArray().apply { messages.forEach { put(JSONObject().put("role", it.role).put("content", it.content)) } }
-            val o = JSONObject(String(BoarNative.formatChat(handle, arr.toString(), enableThinking), Charsets.UTF_8))
+            val o = JSONObject(String(BoarNative.formatChat(h, arr.toString(), enableThinking), Charsets.UTF_8))
             o.optString("error").takeIf { it.isNotEmpty() }?.let { throw IllegalStateException("chat template: $it") }
             FormattedPrompt(
                 prompt = o.getString("prompt"),
@@ -146,7 +150,7 @@ class LlamaSession private constructor(@Volatile private var handle: Long, val p
     /** Streams the answer piece by piece, then one [GenerationEvent.Done] with the measurements. */
     fun generate(prompt: String, sampling: Sampling = Sampling()): Flow<GenerationEvent> = callbackFlow {
         lock.withLock {
-            val metrics = BoarNative.generate(handle, prompt.toByteArray(Charsets.UTF_8), sampling.toJson()) { bytes ->
+            val metrics = BoarNative.generate(live(), prompt.toByteArray(Charsets.UTF_8), sampling.toJson()) { bytes ->
                 trySend(GenerationEvent.Piece(String(bytes, Charsets.UTF_8))).isSuccess
             }
             val m = GenerationMetrics.parse(String(metrics, Charsets.UTF_8))
@@ -158,12 +162,14 @@ class LlamaSession private constructor(@Volatile private var handle: Long, val p
     }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.Default)
 
     suspend fun embed(text: String, normalize: Boolean = true): FloatArray = lock.withLock {
-        withContext(Dispatchers.Default) { BoarNative.embed(handle, text.toByteArray(Charsets.UTF_8), normalize) }
+        val h = live()
+        withContext(Dispatchers.Default) { BoarNative.embed(h, text.toByteArray(Charsets.UTF_8), normalize) }
     }
 
     suspend fun bench(nPp: Int = 512, nTg: Int = 128, reps: Int = 3): BenchResult = lock.withLock {
+        val h = live()
         withContext(Dispatchers.Default) {
-            val o = JSONObject(BoarNative.bench(handle, nPp, nTg, reps))
+            val o = JSONObject(BoarNative.bench(h, nPp, nTg, reps))
             fun stats(k: String) = o.optJSONObject(k)?.takeIf { it.has("mean") }?.let { BenchStats(it.getDouble("mean"), it.optDouble("sd"), it.optInt("runs")) }
             BenchResult(stats("pp"), stats("tg"), o.optInt("nPp"), o.optInt("nTg"), o.optInt("threads"))
         }

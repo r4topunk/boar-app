@@ -408,7 +408,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         if (stopped) return
         val s = services.settings
         val session = services.host.current() ?: return
-        val gen = SessionEngine(session)
+        // Reads the model's info: throws once the model was unloaded (switched in Models or Settings) after the answer.
+        val gen = runCatching { SessionEngine(session) }.getOrNull() ?: return
         if (isNewSession && s.autoGenerateTitles) {
             background = viewModelScope.launch(Dispatchers.Default) {
                 runCatching { services.chats.setTitle(sessionId, Summarize.title(gen, all.first { it.role == "user" }.text)) }
