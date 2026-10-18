@@ -77,7 +77,7 @@
     <string name="native_about_creditsAll" formatted="false">Mostrar todos ({{n}})</string>
     <string name="native_about_creditsLess" formatted="false">Mostrar menos</string>
     <string name="native_about_packsTitle" formatted="false">Pacotes de conhecimento</string>
-    <string name="native_about_packsBody" formatted="false">Pacotes do R&amp;D Lab do R4to!</string>
+    <string name="native_about_packsBody" formatted="false">Pacotes do R&amp;D Lab do R4to.</string>
     <string name="native_about_teamTitle" formatted="false">Equipe principal</string>
     <string name="native_about_teamBody" formatted="false">No X:</string>
     <string name="native_drawer_evaluation" formatted="false">🧪 Avaliação</string>
