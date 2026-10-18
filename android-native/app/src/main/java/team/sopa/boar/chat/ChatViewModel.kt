@@ -307,7 +307,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                     messages = it.messages + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", ""))
             }
             val settings = services.settings
-            val (systemPrompt, styleReminder) = services.personalities.promptFor(settings.personalityId, settings.customSystemPrompt)
+            // Health and first aid answer in Succinct even when Detailed is picked: a sentence-level audit of 15 Detailed
+            // answers (r4to, Oct 17) found 20 % of claims wrong, 5 of them safety errors ("a first-degree burn is painless").
+            val chosenStyle = settings.personalityId ?: services.personalities.defaultId
+            val style = if (chosenStyle == "detailed" && team.sopa.boar.engine.routing.QueryContext.isHealthQuestion(q)) "succinct" else chosenStyle
+            val (systemPrompt, styleReminder) = services.personalities.promptFor(style, settings.customSystemPrompt)
             val history = ConversationHistory(
                 summary = runCatching { chats.listSessions().firstOrNull { it.id == sessionId }?.summary }.getOrNull(),
                 // Within a token budget: earlier answers cut to their opening sentences (HistoryBudget).
@@ -396,7 +400,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val stopped = stopRequested
             val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)?.let { r ->
                 val (task, checked) = if (path == "adaptive") (lastAdaptive ?: (null to false)) else (null to false)
-                r.copy(style = settings.personalityId ?: services.personalities.defaultId, path = path, task = task, checked = checked)
+                r.copy(style = style, path = path, task = task, checked = checked)
             }
             val cutAt = limited?.takeIf { !stopped && !timedOut && text.isNotBlank() && AnswerLimit.reached(metrics?.generatedTokens ?: tokens, it) }
             val nextLimit = cutAt?.let { AnswerLimit.next(it, services.personalities.maxTokensOptions, services.host.openedContext) }
