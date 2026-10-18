@@ -20,7 +20,7 @@ const BODY_TEMP = /\b(?:3\d|4[0-5])(?:[.,]\d+)?\s?(?:°\s?|degrees? )?c(?:elsius
 // Accented Latin letters (not × ÷): not an English message.
 const NON_EN = /[À-ÖØ-öø-ɏ]/;
 
-const NUM = String.raw`\d[\d,]*(?:\.\d+)?`;
+const NUM = String.raw`(?<!\d)(?<!\d,)\d[\d,]*(?:\.\d+)?`;
 // A number followed by a unit, a currency or a percent.
 const UNIT = new RegExp(
   String.raw`(?:[$€£¥]\s?${NUM}|${NUM}\s?(?:%|°\s?[cf]?\b|degrees?\b|(?:k?m|cm|mm|km\/h|kph|mph|mi|miles?|ft|feet|foot|inch(?:es)?|yards?|metres?|meters?|kilomet(?:re|er)s?|kg|g|lbs?|pounds?|ounces?|oz|tons?|tonnes?|l|litres?|liters?|gallons?|gal|pints?|cups?|bar|psi|kpa|hpa|mah|wh|kwh|w|watts?|v|volts?|amps?|hz|ghz|mhz|gb|mb|kb|tb|tokens?|bytes?|bits?|sec(?:ond)?s?|min(?:ute)?s?|h|hrs?|hours?|days?|weeks?|dollars?|euros?|usd|eur|gbp|cents?|btc|eth|sats?|gwei|coins?|million|billion|thousand)\b))`,
