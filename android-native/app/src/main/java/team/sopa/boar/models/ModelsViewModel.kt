@@ -175,7 +175,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
                 row(a.id) { Row() }
                 throw e
             } catch (e: Exception) {
-                row(a.id) { Row(error = e.message ?: e.toString()) }
+                row(a.id) { Row(error = team.sopa.boar.ui.I18n.t(getApplication(), team.sopa.boar.engine.UserErrors.downloadKey(e))) }
             } finally {
                 // Only this job's entry: a retry started right after a cancel has already registered its own.
                 coroutineContext[kotlinx.coroutines.Job]?.let { downloads.remove(a.id, it) }

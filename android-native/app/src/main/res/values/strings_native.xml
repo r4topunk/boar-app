@@ -246,4 +246,22 @@
     <string name="native_sourceFootnotes_yourDocuments" formatted="false">Your documents</string>
     <string name="native_drawer_answeringHint" formatted="false">Answering… stop it to switch chats.</string>
     <string name="native_documents_tooLarge" formatted="false">Too large: {{name}} (over {{mb}} MB).</string>
+    <string name="native_documents_unreadable" formatted="false">Couldn\'t read {{name}}.</string>
+    <string name="native_documents_passwordProtected" formatted="false">{{name}} is password-protected. BOAR can\'t open protected PDFs.</string>
+    <string name="native_documents_noText" formatted="false">{{name}} has no selectable text. Scanned pages need OCR, which BOAR doesn\'t do.</string>
+    <string name="native_documents_failed" formatted="false">Couldn\'t import these files. Try again.</string>
+    <string name="native_documents_shareTitle" formatted="false">Share the {{name}} knowledge base</string>
+    <string name="native_setup_indexNoEmbedder" formatted="false">The search model is missing. Retry the download.</string>
+    <string name="native_setup_indexEmbedderFailed" formatted="false">The search model didn\'t load. Try again.</string>
+    <string name="native_setup_indexFailed" formatted="false">Building the search index stopped. Try again.</string>
+    <string name="native_download_errorNoSource" formatted="false">Not available for download yet. Import the file instead.</string>
+    <string name="native_download_errorOffline" formatted="false">This build of BOAR has no network access. Import the file instead.</string>
+    <string name="native_download_errorStorage" formatted="false">Not enough free space on the phone. Free some space and retry.</string>
+    <string name="native_download_errorSizeChanged" formatted="false">The server now has a different file than this version of BOAR expects. Import the file or update the app.</string>
+    <string name="native_download_errorPaused" formatted="false">The download paused (no data). Check your connection and try again.</string>
+    <string name="native_download_errorChecksum" formatted="false">The file didn\'t match its checksum and was removed. Retry the download.</string>
+    <string name="native_download_errorServer" formatted="false">The download server didn\'t answer. Retry later.</string>
+    <string name="native_download_errorNetwork" formatted="false">No connection to the download server. Check your connection and retry.</string>
+    <string name="native_download_errorGeneric" formatted="false">The download stopped. Retry.</string>
+    <string name="native_common_ok" formatted="false">OK</string>
 </resources>

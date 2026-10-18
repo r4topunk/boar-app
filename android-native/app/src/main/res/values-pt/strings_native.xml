@@ -246,4 +246,22 @@
     <string name="native_sourceFootnotes_yourDocuments" formatted="false">Seus documentos</string>
     <string name="native_drawer_answeringHint" formatted="false">Respondendo… pare a resposta para trocar de conversa.</string>
     <string name="native_documents_tooLarge" formatted="false">Grande demais: {{name}} (mais de {{mb}} MB).</string>
+    <string name="native_documents_unreadable" formatted="false">Não foi possível ler {{name}}.</string>
+    <string name="native_documents_passwordProtected" formatted="false">{{name}} é protegido por senha. O BOAR não abre PDFs protegidos.</string>
+    <string name="native_documents_noText" formatted="false">{{name}} não tem texto selecionável. Páginas escaneadas precisam de OCR, que o BOAR não faz.</string>
+    <string name="native_documents_failed" formatted="false">Não foi possível importar estes arquivos. Tente de novo.</string>
+    <string name="native_documents_shareTitle" formatted="false">Compartilhar a base de conhecimento {{name}}</string>
+    <string name="native_setup_indexNoEmbedder" formatted="false">O modelo de busca está faltando. Tente o download de novo.</string>
+    <string name="native_setup_indexEmbedderFailed" formatted="false">O modelo de busca não carregou. Tente de novo.</string>
+    <string name="native_setup_indexFailed" formatted="false">A criação do índice de busca parou. Tente de novo.</string>
+    <string name="native_download_errorNoSource" formatted="false">Ainda não disponível para download. Importe o arquivo.</string>
+    <string name="native_download_errorOffline" formatted="false">Esta versão do BOAR não tem acesso à rede. Importe o arquivo.</string>
+    <string name="native_download_errorStorage" formatted="false">Espaço livre insuficiente no celular. Libere espaço e tente de novo.</string>
+    <string name="native_download_errorSizeChanged" formatted="false">O servidor agora tem um arquivo diferente do que esta versão do BOAR espera. Importe o arquivo ou atualize o app.</string>
+    <string name="native_download_errorPaused" formatted="false">O download pausou (sem dados). Verifique a conexão e tente de novo.</string>
+    <string name="native_download_errorChecksum" formatted="false">O arquivo não bateu com o checksum e foi removido. Tente o download de novo.</string>
+    <string name="native_download_errorServer" formatted="false">O servidor de download não respondeu. Tente mais tarde.</string>
+    <string name="native_download_errorNetwork" formatted="false">Sem conexão com o servidor de download. Verifique a conexão e tente de novo.</string>
+    <string name="native_download_errorGeneric" formatted="false">O download parou. Tente de novo.</string>
+    <string name="native_common_ok" formatted="false">OK</string>
 </resources>

@@ -269,7 +269,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 val transient = e is AssetStore.DownloadException.Paused || (e is IOException && e !is AssetStore.DownloadException)
                 if (transient && attempt++ < 3) { delay(5_000L * attempt); continue }
-                update(a) { it.copy(error = e.message ?: e.toString(), verifying = false, storage = e is AssetStore.DownloadException.Storage) }
+                update(a) { it.copy(error = team.sopa.boar.ui.I18n.t(getApplication(), team.sopa.boar.engine.UserErrors.downloadKey(e)), verifying = false, storage = e is AssetStore.DownloadException.Storage) }
                 return false
             }
         }
@@ -326,9 +326,9 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(indexPhase = IndexPhase.BUILDING, indexError = null) }
         indexStart = null
         val app = getApplication<Application>()
-        val emb = services.installed(AssetKind.EMBEDDING).firstOrNull() ?: run { indexFailed("embedding model missing"); return }
+        val emb = services.installed(AssetKind.EMBEDDING).firstOrNull() ?: run { indexFailed(team.sopa.boar.ui.I18n.t(getApplication(), "native.setup.indexNoEmbedder")); return }
         val embedder = LlamaSession.load(services.fileOf(emb).path, EngineParams(nCtx = 512, threads = 2, embeddings = true))
-            ?: run { indexFailed("embedding model failed to load"); return }
+            ?: run { indexFailed(team.sopa.boar.ui.I18n.t(getApplication(), "native.setup.indexEmbedderFailed")); return }
         try {
             val builtin = app.assets.open("corpus/corpus.json").bufferedReader().use { it.readText() }
             val collections = listOf(SeedCorpus.Collection(SeedCorpus.BUILTIN, SeedCorpus.docs(SeedCorpus.BUILTIN, builtin))) +
@@ -353,7 +353,7 @@ class SetupViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            indexFailed(e.message ?: e.toString())
+            indexFailed(team.sopa.boar.ui.I18n.t(getApplication(), "native.setup.indexFailed"))
         } finally {
             // Also after a cancel (Restart, Recovery): the native session must not leak.
             withContext(NonCancellable + Dispatchers.IO) { embedder.close() }
