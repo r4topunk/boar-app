@@ -45,14 +45,25 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
                     resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
                         if (c.moveToFirst()) { fileName = c.getString(0) ?: fileName; size = c.getLong(1) }
                     }
-                    val text = if (fileName.lowercase().endsWith(".pdf")) pdfText(uri, fileName)
-                    else resolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("Couldn't read \"$fileName\"")
+                    if (size <= 0) size = runCatching { resolver.openFileDescriptor(uri, "r")?.use { it.statSize } }.getOrNull() ?: 0L
+                    if (DocumentImport.tooLargeToRead(size)) throw TooLarge(fileName)
+                    val text = try {
+                        if (fileName.lowercase().endsWith(".pdf")) pdfText(uri, fileName)
+                        else resolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: error("Couldn't read \"$fileName\"")
+                    } catch (e: OutOfMemoryError) {
+                        // Not an Exception: uncaught, it closes the app. The file's text is dropped with the frame.
+                        throw TooLarge(fileName)
+                    }
                     DocumentImport.File(fileName, if (size > 0) size else text.toByteArray().size.toLong(), text)
                 }
                 _state.update { it.copy(stage = "chunking") }
                 DocumentImport.import(services.knowledgeBase, services::embed, files, name, onProgress = { d, t ->
                     _state.update { it.copy(stage = "embedding", done = d, total = t) }
                 })
+            } catch (e: TooLarge) {
+                _state.update { it.copy(error = tooLarge(e.fileName)) }
+            } catch (e: DocumentImport.TooLarge) {
+                _state.update { it.copy(error = tooLarge(e.fileName)) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message ?: e.toString()) }
             }
@@ -60,6 +71,11 @@ class DocumentsViewModel(app: Application) : AndroidViewModel(app) {
             refresh()
         }
     }
+
+    private class TooLarge(val fileName: String) : Exception()
+
+    private fun tooLarge(fileName: String) =
+        team.sopa.boar.ui.I18n.t(getApplication(), "native.documents.tooLarge", "name" to fileName, "mb" to DocumentImport.READ_LIMIT / 1_000_000)
 
     /** The PDF's selectable text (no OCR); password-protected PDFs aren't supported, as in the Expo app. */
     private fun pdfText(uri: Uri, fileName: String): String {

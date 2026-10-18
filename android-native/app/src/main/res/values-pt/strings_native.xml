@@ -245,4 +245,5 @@
     <string name="native_sourceFootnotes_localIndex" formatted="false">FONTE</string>
     <string name="native_sourceFootnotes_yourDocuments" formatted="false">Seus documentos</string>
     <string name="native_drawer_answeringHint" formatted="false">Respondendo… pare a resposta para trocar de conversa.</string>
+    <string name="native_documents_tooLarge" formatted="false">Grande demais: {{name}} (mais de {{mb}} MB).</string>
 </resources>
