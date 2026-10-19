@@ -411,7 +411,6 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         services.host.current()?.cancel()
     }
 
-    /** Asks [answerId]'s question again with a higher token limit, for this answer only (the setting stays as it is). */
     /** Asks the question of [answerId] again (an answer that came back empty). */
     fun retry(answerId: String) {
         val messages = _state.value.messages
@@ -420,6 +419,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         send(q)
     }
 
+    /** Asks [answerId]'s question again with a higher token limit, for this answer only (the setting stays as it is). */
     fun redoWithLimit(answerId: String, limit: Int) {
         val messages = _state.value.messages
         val i = messages.indexOfFirst { it.id == answerId }
