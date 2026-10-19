@@ -111,7 +111,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         safeScope.launch(Dispatchers.IO) {
             runCatching { HfBrowser.browse(url) }
                 .onSuccess { p -> _state.update { if (hfSearch.get() != request) it else it.copy(hfResults = ((if (append) it.hfResults else emptyList()) + p.repos).distinctBy { r -> r.id }, hfNext = p.next, hfSearching = false) } }
-                .onFailure { e -> _state.update { if (hfSearch.get() != request) it else it.copy(hfError = e.message ?: e.toString(), hfSearching = false) } }
+                .onFailure { e -> _state.update { if (hfSearch.get() != request) it else it.copy(hfError = team.sopa.boar.engine.UserErrors.browseKey(e), hfSearching = false) } }
         }
     }
 
@@ -125,7 +125,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
         safeScope.launch(Dispatchers.IO) {
             runCatching { HfBrowser.files(repo) }
                 .onSuccess { f -> _state.update { if (hfRequest.get() != request) it else it.copy(hfFiles = f, hfBusy = false) } }
-                .onFailure { e -> _state.update { if (hfRequest.get() != request) it else it.copy(hfError = e.message ?: e.toString(), hfBusy = false) } }
+                .onFailure { e -> _state.update { if (hfRequest.get() != request) it else it.copy(hfError = team.sopa.boar.engine.UserErrors.browseKey(e), hfBusy = false) } }
         }
     }
 
@@ -135,7 +135,7 @@ class ModelsViewModel(app: Application) : AndroidViewModel(app) {
     /** Adds the file to the list above as a downloadable model (not downloaded yet). */
     fun hfAdd(repo: String, f: HfBrowser.GgufFile) {
         safeScope.launch(Dispatchers.IO) {
-            val asset = runCatching { HfBrowser.toAsset(repo, f) }.getOrElse { e -> _state.update { it.copy(hfError = e.message) }; return@launch }
+            val asset = runCatching { HfBrowser.toAsset(repo, f) }.getOrElse { e -> _state.update { it.copy(hfError = team.sopa.boar.engine.UserErrors.browseKey(e)) }; return@launch }
             services.addDiscovered(asset)
             store = AssetStore(getApplication<Application>().filesDir, services.catalog)
             _state.update { it.copy(items = sortedItems(), hfAdded = asset.label, hfAddedId = asset.id, toast = text("native.models.addedToast")) }
