@@ -10,7 +10,8 @@
  * waits for it to settle, and LlamaEngine itself serializes completions, so
  * a double send can never run two completions on one context.
  */
-import { classifyTask } from "./classify";
+import { classifyTask, classifyTaskInContext } from "./classify";
+import { followUpSearch, searchWithFollowUp } from "./followUp";
 import { gatedTaskType, routeGateSkip, routeGateMessages, routeGateVerdict, ROUTE_GATE_CONFIG, ROUTE_GATE_MODEL_IDS, ROUTE_GATE_N_PROBS, type GateMessage, type TokenProb } from "./routeGate";
 import {
   compressContext,
@@ -875,8 +876,17 @@ export function createAnswerer(deps: AnswerDeps) {
       const depthModels = deepCandidates.map((m) => toDepth(m, fits.get(m.id)));
       const deepModel = resolveDeepModel(depthModels, fastLlm?.id, settings.deepModelId);
       // Route gate (4B only): the loaded model decides whether to search; the rules stay the fallback.
-      const ruleTaskType = classifyTask(req.query);
+      // CHATFAIL L2: a chat follow-up that asks for code ("can you write it?", "show me the code", "not even an example?" after a
+      // smart-contract question) is a code request: no retrieval, no 2-3 sentence lookup answer. Never in a health or emergency
+      // conversation (a detector fire, health or safety words or a card condition in this or any earlier user turn, a health
+      // follow-up): a first-aid chat keeps exactly the route it had.
+      const lexicalHealthTurn = (t: string) => isHealthQuestion(t) || isSafetyQuery(t) || isCardEmergency(t);
+      const healthChat = !!learned?.fire || lexicalHealthTurn(req.query) || isHealthFollowUp(req.query, userTurns) || userTurns.some(lexicalHealthTurn);
+      const plainTaskType = classifyTask(req.query);
+      const ruleTaskType = healthChat ? plainTaskType : classifyTaskInContext(req.query, userTurns);
+      const codeInChat = ruleTaskType !== plainTaskType;
       const gateCodes: string[] = [];
+      if (codeInChat) gateCodes.push("route-gate:skip-code-request");
       let gateLoadMs = 0;
       let taskType = ruleTaskType;
       let gateSkip = false;
@@ -888,6 +898,8 @@ export function createAnswerer(deps: AnswerDeps) {
         (req.tier ?? "auto") === "auto" &&
         !req.reuseSources &&
         !req.answerAnyway &&
+        // The code rule decided: a SEARCH verdict would turn the request back into a chat with retrieval.
+        !codeInChat &&
         // CUT5-SPEED: the rules decide (lookup/research/compare, no detector fire, no history, not about BOAR): no gate pass.
         !(gateSkip = routeGateSkip({
           ruleTaskType,
@@ -1141,7 +1153,19 @@ export function createAnswerer(deps: AnswerDeps) {
           const indexed = deps.knowledgeReady().catch(() => {});
           if ((await Promise.race([indexed, stopSignal])) === "stopped") return finish(genTier, "stopped", "", [], receipt({}));
         }
-        raw = await deps.retrieve(searchQuery, gen?.retrieveK ?? 6).catch((e) => {
+        // CHATFAIL L3: a follow-up with no subject of its own ("what does it look like?") is searched together with the
+        // conversation's subject (followUp.ts). Not in a health conversation (healthChat above): that path has its own follow-up
+        // rule (isHealthFollowUp, conversationCondition) and searches by the condition's name, unchanged.
+        const k = gen?.retrieveK ?? 6;
+        const followUp = !health && !healthChat && !history && (ctx.history?.turns?.length ?? 0) > 0;
+        const fuPlan = followUp ? followUpSearch(searchQuery, ctx.history) : {};
+        raw = await (followUp
+          ? searchWithFollowUp(searchQuery, ctx.history, (text) => deps.retrieve(text, k), (c) => `${c.title} ${c.body}`).then((r) => {
+              if (r.searchedFor !== searchQuery) reasonCodes.push(fuPlan.direct ? "retrieve:follow-up-direct" : "retrieve:follow-up-fallback");
+              return r.chunks;
+            })
+          : deps.retrieve(searchQuery, k)
+        ).catch((e) => {
           console.warn("[answer] retrieval failed, answering without sources:", e?.message ?? e);
           return [] as RetrievedChunk[];
         });

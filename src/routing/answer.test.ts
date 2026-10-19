@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import type { RetrievedChunk } from "../rag/retrieve.types";
 import { answerPromptPrefix, assemblePrompt, assembleChatMessages } from "../rag/pure";
 import { AnswerDeps, createAnswerer, InstalledLlm } from "./answer";
+import { classifyTask } from "./classify";
 import type { AnswerEvent } from "./events";
 import type { AnswerSettings } from "../models/settings";
 import type { GenerateOptions } from "../inference/LlamaEngine";
@@ -2703,5 +2704,59 @@ describe("WARN (deps.warn): the health caution", () => {
     expect(warnEvents(events).map((e) => e.tier)).toEqual(["no-source"]);
     expect(done.cited?.length).toBeGreaterThan(0);
     expect(done.warn?.tier).not.toBe("no-source");
+  });
+});
+
+describe("answer(): CHATFAIL code requests in a chat (L2) and the follow-up anchor (L3)", () => {
+  const qwen4: InstalledLlm = { id: "qwen3-4b-instruct-2507-q4km", label: "Qwen3 4B", filename: "models/q4b.gguf", sizeBytes: 2.5 * GB, roles: ["general", "fast"], isDefault: true };
+  const chat = (...u: string[]) => ({ ...ctx, history: { turns: u.flatMap((text) => [{ role: "user", text }, { role: "assistant", text: "An answer." }]) } });
+  const searched = () => {
+    const q: string[] = [];
+    f.deps.retrieve = async (text: string) => (q.push(text), f.retrieved);
+    return q;
+  };
+  const task = (r: { receipt: { reasonCodes: string[] } }) => r.receipt.reasonCodes.find((c) => c.startsWith("task:"));
+
+  it("'can you write it?' after a smart-contract question is a code request: no search, no gate, the model answers", async () => {
+    f.installed = [qwen4];
+    f.activeId = qwen4.id;
+    let gateCalls = 0;
+    f.deps.engine.nextTokenProbs = async () => (gateCalls++, [{ token: "SEARCH", prob: 0.99 }]);
+    const q = searched();
+    const { result } = await collect("can you write it?", undefined, chat("What can a smart contract do?", "what it look like?"));
+    expect(task(result)).toBe("task:code");
+    expect(result.receipt.reasonCodes).toContain("route-gate:skip-code-request");
+    expect(gateCalls).toBe(0);
+    expect(q).toEqual([]);
+    expect(f.generations).toHaveLength(1);
+  });
+
+  it("'show me the code' and 'write it in Python' after a technical turn are code; with no earlier turn 'can you write it?' is unchanged", async () => {
+    expect(task((await collect("i want to see the code", undefined, chat("What can a smart contract do?"))).result)).toBe("task:code");
+    expect(task((await collect("write it in Python", undefined, chat("How does gradient descent work in a neural network?"))).result)).toBe("task:code");
+    expect(task((await collect("can you write it?")).result)).toBe("task:lookup");
+  });
+
+  it("a follow-up that points back is searched with the conversation's subject, not the subjectless turn before it", async () => {
+    const q = searched();
+    const { result } = await collect("how hot does it get?", undefined, chat("How long is a day on Venus?", "and the year?"));
+    expect(q[0]).toBe("How long is a day on Venus? how hot does it get?");
+    expect(result.receipt.reasonCodes).toContain("retrieve:follow-up-direct");
+  });
+
+  it("a first-aid chat keeps its route: no code rule, no follow-up search", async () => {
+    for (const [first, next] of [
+      ["How do I help a choking adult?", "what about a baby?"],
+      ["How do I help a choking adult?", "compare the two in a table"],
+      ["What should I do for a minor burn?", "how long should I cool it?"],
+      ["What do I do if someone has a nosebleed?", "should I tilt their head back?"],
+      ["How do I do CPR on an adult?", "can you write it as a simple program?"],
+    ]) {
+      const q = searched();
+      const { result } = await collect(next, undefined, chat(first));
+      expect(task(result), next).toBe(`task:${classifyTask(next)}`);
+      expect(result.receipt.reasonCodes.filter((c) => c.startsWith("retrieve:follow-up")), next).toEqual([]);
+      expect(q.some((t) => t.startsWith(first)), next).toBe(false);
+    }
   });
 });
