@@ -497,10 +497,24 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             var tokens = 0
             // The limit the answer could hit, set once the model is loaded; the adaptive router picks its own.
             var limited: Int? = null
+            // Saved as it's written, marked interrupted until it ends: if Android closes BOAR mid-answer (Xiaomi did 10-35 s
+            // after leaving, Oct 19), the chat reopens with what was written and the note, not an empty bubble.
+            var savedAt = 0L
+            fun savePartial(force: Boolean = false) {
+                val now = System.nanoTime()
+                if (!force && now - savedAt < PARTIAL_SAVE_NS) return
+                savedAt = now
+                runCatching {
+                    chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
+                    chats.setMessageMeta(answerId, metaOf(emptyList(), null, team.sopa.boar.engine.UserErrors.INTERRUPTED_KEY))
+                }
+            }
+            savePartial(force = true)
             fun onPiece(piece: String) {
                 tokens++
                 if (firstAt == 0L) firstAt = System.nanoTime()
                 text.append(piece)
+                savePartial()
                 val elapsed = (System.nanoTime() - firstAt) / 1e9
                 _state.update { s ->
                     s.copy(activity = Activity.Generating, liveTokPerSec = if (elapsed > 0.5) tokens / elapsed else s.liveTokPerSec,
@@ -576,7 +590,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val nextLimit = cutAt?.let { AnswerLimit.next(it, services.personalities.maxTokensOptions, services.host.openedContext) }
             try {
                 chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
-                if (shown.isNotEmpty() || receipt != null || errorKey != null) chats.setMessageMeta(answerId, metaOf(shown, receipt, errorKey))
+                // Always written: it replaces the interrupted mark of the partial saves.
+                chats.setMessageMeta(answerId, metaOf(shown, receipt, errorKey))
                 afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
                 chats.prune(settings.maxSavedSessions)
             } catch (e: Exception) {
@@ -726,6 +741,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Messages sent verbatim as history (ChatScreen.tsx VERBATIM_MESSAGE_COUNT). */
         const val VERBATIM_MESSAGE_COUNT = 6
+        /** How often an answer being written is saved (savePartial). */
+        const val PARTIAL_SAVE_NS = 3_000_000_000L
         /** Close BOAR waits this long for a stopped answer to save what it wrote. */
         const val CLOSE_WAIT_MS = 15_000L
 
