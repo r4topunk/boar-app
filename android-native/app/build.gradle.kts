@@ -18,10 +18,14 @@ android {
     // Uncensored and adult models (HfQuery.uncensored) are hidden from Discover GGUF models unless ALLOW_UNCENSORED_MODELS=true
     // (.env, the environment, or -Pboar.allowUncensoredModels=true).
     val allowUncensored = (providers.gradleProperty("boar.allowUncensoredModels").orNull ?: env["ALLOW_UNCENSORED_MODELS"] ?: System.getenv("ALLOW_UNCENSORED_MODELS"))?.trim()?.toBoolean() ?: false
+    // Sharing evaluation results with BOAR's server is off unless EVAL_SHARING=true (.env, the environment, or
+    // -Pboar.evalSharing=true). Off, the server's address and key aren't built in at all: no Share button, and runs and
+    // their files stay on the phone. In two weeks after launch only the team shared a run (Oct 19).
+    val evalSharing = (providers.gradleProperty("boar.evalSharing").orNull ?: env["EVAL_SHARING"] ?: System.getenv("EVAL_SHARING"))?.trim()?.toBoolean() ?: false
     defaultConfig {
         buildConfigField("boolean", "ALLOW_UNCENSORED_MODELS", "$allowUncensored")
-        buildConfigField("String", "SUPABASE_URL", "\"${env["EXPO_PUBLIC_SUPABASE_URL"] ?: ""}\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${env["EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ?: ""}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${if (evalSharing) env["EXPO_PUBLIC_SUPABASE_URL"] ?: "" else ""}\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${if (evalSharing) env["EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ?: "" else ""}\"")
         // The release keeps the Expo app's id and key, so it installs over v1.1.x with its models.
         applicationId = "team.sopa.aoair"
         minSdk = 26
