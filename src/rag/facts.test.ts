@@ -245,3 +245,17 @@ describe("FACTS asset r7: labels and currencies (native app report, 2026-10-18)"
     expect(text("What currency does Zimbabwe use?")).toBeNull();
   });
 });
+
+describe("FACTS asset r8: emergency numbers and snapshot-year population fix (2026-10-19)", () => {
+  const text = (q: string) => factsAnswer(q)?.text ?? null;
+  it("answers a country's emergency numbers with their service", () => {
+    expect(text("What is the emergency number in Thailand?")).toMatch(/^Emergency numbers in Thailand: police 191, fire department 199 and emergency medical services 1669\./);
+    expect(text("What is the police number in Japan?")).toMatch(/police 110/);
+    expect(text("Is there an emergency exit in the Burj Khalifa?")).toBeNull();
+  });
+  it("drops round snapshot-year population figures and fixes misleading areas", () => {
+    expect(text("What is the population of Tunisia?")).toMatch(/population 12 million \(2024\)/);
+    expect(text("How big is Denmark?")).toMatch(/area 42,933 km²/);
+    expect(text("How big is Yemen?")).toMatch(/area 527,968 km²/);
+  });
+});

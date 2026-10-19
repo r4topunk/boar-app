@@ -58,13 +58,14 @@ export interface FactEntity {
   win?: Record<string, string[]>; // year → winners
   ctry?: string[]; // country (P17) of a place
   t?: string[]; // instance of (P31), mountains only
+  emerg?: [string, string][]; // r8: emergency phone numbers (P2852) and their service (P366), countries only
 }
 interface Table { snapshot: string; entities: FactEntity[] }
 const T = table as unknown as Table;
 
 export type FactTemplate =
   | "population" | "area" | "capital" | "currency" | "languages" | "continent" | "borders"
-  | "height" | "length" | "depth" | "dates" | "electricity" | "host" | "winner";
+  | "height" | "length" | "depth" | "dates" | "electricity" | "host" | "winner" | "emergency";
 
 /** Property lexicon: the wording that asks for each template (lowercase; whole words/phrases). */
 export const FACT_LEXICON: Record<FactTemplate, string[]> = {
@@ -79,6 +80,7 @@ export const FACT_LEXICON: Record<FactTemplate, string[]> = {
   length: ["how long is", "how long are", "length", "longer", "longest", "km long", "miles long"],
   depth: ["how deep", "depth", "deepest", "deeper", "deep"],
   dates: ["built", "founded", "established", "constructed", "erected", "inception", "came down", "come down", "fell", "fall of", "torn down", "demolished", "dissolved"],
+  emergency: ["emergency number", "emergency numbers", "emergency phone number", "emergency telephone number", "emergency services number", "ambulance number", "police number", "fire brigade number", "fire department number", "number for an ambulance", "number for the police", "number for emergencies", "number to call in an emergency"],
   electricity: ["plug", "plugs", "plug type", "socket", "sockets", "outlet", "outlets", "voltage", "volts", "mains", "adapter", "adaptor"],
   host: ["host", "hosted", "hosting", "held"],
   winner: ["won", "win", "winner", "winners", "received", "awarded", "laureate"],
@@ -428,6 +430,11 @@ function single(t: FactTemplate, e: FactEntity, query: string): string | null {
         e.hz?.length ? `${e.hz.map((v) => `${v} Hz`).join(" / ")}` : "",
       ].filter(Boolean);
       return `${name}: ${parts.join(", ")}. Where two voltages are listed, it differs by region: check the socket or ask locally.${source(null)}`;
+    }
+    case "emergency": {
+      if (!e.emerg?.length) return null;
+      const nums = e.emerg.map(([n, use]) => (use ? `${use} ${n}` : n));
+      return `Emergency numbers in ${name}: ${list(nums)}. In a life-threatening emergency, call now.${source(null)}`;
     }
     case "host":
       return e.loc?.length ? `${name}: held in ${list(e.loc)}.${source(null)}` : null;
