@@ -62,6 +62,8 @@ data class UiMessage(
     /** It ended at this token limit, not by itself (shown as a note with a redo at [nextLimit]). */
     val cutAt: Int? = null,
     val nextLimit: Int? = null,
+    /** Why it failed (a native.chat.error* key): stays under the answer after the next question and in the saved chat. */
+    val error: String? = null,
 )
 
 /** What the assistant is doing for the message being answered. */
@@ -384,7 +386,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         safeScope.launch {
             val msgs = runCatching {
                 withContext(Dispatchers.IO) { services.chats.messages(id) }.map { r ->
-                    UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback, receipt = receiptFromMeta(r.meta))
+                    UiMessage(r.id, r.role, r.text, sourcesFromMeta(r.meta), r.feedback, receipt = receiptFromMeta(r.meta), error = errorFromMeta(r.meta))
                 }
             }.getOrElse { showToast("native.chat.dbFailed"); return@launch }
             _state.update { it.copy(sessionId = id, messages = msgs, error = null) }
@@ -564,6 +566,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val shown = reusedSources ?: grouped.items
             if (reusedSources == null) SourceGroups.renumber(text.toString(), grouped.renumber).let { if (it != text.toString()) { text.setLength(0); text.append(it) } }
             val stopped = stopRequested
+            // The failure line goes with this answer, so it's still there after the next question and when the chat opens again.
+            val errorKey = _state.value.error?.takeIf { !stopped }?.let(team.sopa.boar.engine.UserErrors::chatKey)
             val receipt = receiptOf(startAt, firstAt, tokens, metrics, retrievalMs)?.let { r ->
                 val (task, checked) = if (path == "adaptive") (lastAdaptive ?: (null to false)) else (null to false)
                 r.copy(style = style, path = path, task = task, checked = checked, styleNote = shortReason?.takeIf { it != team.sopa.boar.engine.routing.ShortAnswer.SMALL_TALK })
@@ -572,7 +576,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             val nextLimit = cutAt?.let { AnswerLimit.next(it, services.personalities.maxTokensOptions, services.host.openedContext) }
             try {
                 chats.upsertMessage(sessionId, "assistant", text.toString(), answerId)
-                if (shown.isNotEmpty() || receipt != null) chats.setMessageMeta(answerId, metaOf(shown, receipt))
+                if (shown.isNotEmpty() || receipt != null || errorKey != null) chats.setMessageMeta(answerId, metaOf(shown, receipt, errorKey))
                 afterAnswer(sessionId, isNewSession, stopped, prior + UiMessage(userId, "user", q) + UiMessage(answerId, "assistant", text.toString()), systemPrompt, sources.isNotEmpty())
                 chats.prune(settings.maxSavedSessions)
             } catch (e: Exception) {
@@ -583,7 +587,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             if (!stopped && text.isNotEmpty()) team.sopa.boar.app.Haptics.finished(getApplication())
             _state.update { s ->
                 s.copy(answeringId = null, answeringModel = null, activity = null, stopping = false,
-                    messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt, cutAt = cutAt, nextLimit = nextLimit) else it })
+                    messages = s.messages.map { if (it.id == answerId) it.copy(text = text.toString(), sources = shown, stopped = stopped, timedOut = timedOut, receipt = receipt, cutAt = cutAt, nextLimit = nextLimit, error = errorKey) else it })
             }
         }
     }
@@ -698,12 +702,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         Json.parseToJsonElement(meta ?: return null).jsonObject["receipt"]?.jsonObject?.let(Receipt::fromJson)
     }.getOrNull()
 
-    private fun metaOf(sources: List<Source>, receipt: Receipt?): String = JsonObject(listOfNotNull("sources" to JsonArray(sources.map { s ->
+    private fun metaOf(sources: List<Source>, receipt: Receipt?, errorKey: String? = null): String = JsonObject(listOfNotNull("sources" to JsonArray(sources.map { s ->
         JsonObject(listOfNotNull(
             "title" to JsonPrimitive(s.title), s.source?.let { "source" to JsonPrimitive(it) }, s.relevance?.let { "relevance" to JsonPrimitive(it) },
             s.similarity?.let { "similarity" to JsonPrimitive(it) }, s.docId?.let { "docId" to JsonPrimitive(it) }, "body" to JsonPrimitive(s.body),
         ).toMap())
-    }), receipt?.let { "receipt" to it.toJson() }).toMap()).toString()
+    }), receipt?.let { "receipt" to it.toJson() }, errorKey?.let { "error" to JsonPrimitive(it) }).toMap()).toString()
+
+    private fun errorFromMeta(meta: String?): String? = runCatching {
+        Json.parseToJsonElement(meta ?: return null).jsonObject["error"]?.jsonPrimitive?.content
+    }.getOrNull()
 
     private fun sourcesFromMeta(meta: String?): List<Source> = runCatching {
         Json.parseToJsonElement(meta ?: return emptyList()).jsonObject["sources"]!!.jsonArray.map { e ->
