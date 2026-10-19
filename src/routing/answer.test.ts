@@ -2417,6 +2417,7 @@ describe("WARN (deps.warn): the health caution", () => {
   type Done = Extract<AnswerEvent, { type: "done" }>;
   const ask = async (query: string, req: Record<string, unknown> = {}, onEvent?: (e: AnswerEvent, h: { stop(): Promise<void> }) => void) => {
     const events: AnswerEvent[] = [];
+    f.deps.warnRendered ??= true; // these cases model a client that renders the caution
     const a = createAnswerer(f.deps);
     let h: ReturnType<typeof a.answer>;
     h = a.answer({ query, ...req }, (e) => {
@@ -2458,11 +2459,12 @@ describe("WARN (deps.warn): the health caution", () => {
     expect(w).toBeGreaterThanOrEqual(0);
     expect(w).toBeLessThan(events.findIndex((e) => e.type === "token"));
     expect(events[w]).toMatchObject({ type: "warn", tier: "beyond-source" });
-    expect(done.warn).toEqual({ tier: "sourced", message: expect.stringMatching(/^Health caution: AI answer drawn from an offline source/) });
+    expect(done.warn).toEqual({ tier: "sourced", rendered: true, message: expect.stringMatching(/^Health caution: AI answer drawn from an offline source/) });
     expect(result.receipt.reasonCodes).toContain("warn:sourced");
     expect(state.warn?.tier).toBe("sourced");
     f = makeFake();
     lowP();
+    f.deps.warn = false;
     const off = await ask("What is the capital of Australia?", { answerAnyway: true });
     expect(warnEvents(off.events)).toEqual([]);
     expect(off.done.warn).toBeUndefined();
@@ -2474,7 +2476,7 @@ describe("WARN (deps.warn): the health caution", () => {
       f = makeFake();
       f.retrieved = [];
       f.deps.emergencyScore = async () => ({ p: 0.001, fire: false });
-      if (warn) f.deps.warn = true;
+      f.deps.warn = warn;
       // "symptoms": a WARN_LEX word that is no health route (no detector evidence), so the model answers from memory.
       return ask("Which symptoms did the Roman historians describe for the plague of Athens?", { answerAnyway: true });
     };
@@ -2516,8 +2518,50 @@ describe("WARN (deps.warn): the health caution", () => {
     expect(state.weakSources).toBeFalsy();
   });
 
-  it("off: a health-shaped turn keeps weak_sources and gets no warn event, field or code", async () => {
+  it("default: with deps.warn unset the caution is on", async () => {
     lowP();
+    expect(f.deps.warn).toBeUndefined();
+    const { events, done, result } = await ask("What is the capital of Australia?", { answerAnyway: true });
+    expect(warnEvents(events)).toHaveLength(1);
+    expect(done.warn?.tier).toBeDefined();
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("warn:"))).toBe(true);
+  });
+
+  it("no renderer (warnRendered unset/false): warn events still go out, weak_sources and the preface stay as before", async () => {
+    const run = async (warn: boolean) => {
+      f = makeFake();
+      f.retrieved = [];
+      f.deps.emergencyScore = async () => ({ p: 0.001, fire: false });
+      f.deps.warn = warn;
+      f.deps.warnRendered = false;
+      return ask("Which symptoms did the Roman historians describe for the plague of Athens?", { answerAnyway: true });
+    };
+    const on = await run(true);
+    const off = await run(false);
+    expect(warnEvents(on.events).map((e) => e.tier)).toEqual(["no-source"]);
+    expect(on.done.warn?.tier).toBe("no-source");
+    expect(weak(on.events)).toHaveLength(1);
+    expect(on.result.text).toMatch(/^This answer is not from an offline source/);
+    expect(on.result.text).toBe(off.result.text);
+    expect(warnEvents(on.events)[0].rendered).toBe(false);
+    expect(on.done.warn?.rendered).toBe(false);
+    expect(on.state.weakSources).toBe(true); // the reducer keeps the notice: the caution is not shown
+    expect(on.state.warn?.tier).toBe("no-source");
+  });
+
+  it("reducer: weakSources is cleared by a rendered caution only", () => {
+    const base = (): any => events0.reduce(answerReducer, initialAnswer("a"));
+    const events0: AnswerEvent[] = [{ type: "warning", answerId: "a", code: "weak_sources", message: "x" } as AnswerEvent];
+    const warn = (rendered?: boolean): AnswerEvent => ({ type: "warn", answerId: "a", tier: "no-source", message: "m", ...(rendered === undefined ? {} : { rendered }) }) as AnswerEvent;
+    expect(answerReducer(base(), warn(true)).weakSources).toBeUndefined();
+    expect(answerReducer(base(), warn()).weakSources).toBeUndefined();
+    expect(answerReducer(base(), warn(false)).weakSources).toBe(true);
+    expect(answerReducer(base(), warn(false)).warn).toMatchObject({ tier: "no-source", rendered: false });
+  });
+
+  it("off: deps.warn = false keeps weak_sources and gets no warn event, field or code", async () => {
+    lowP();
+    f.deps.warn = false;
     f.installed = [{ ...qwen15, sizeBytes: 3 * GB }];
     say("The city was picked as a compromise between two rivals.");
     const { events, done, result } = await ask("Why was Canberra chosen as the capital of Australia?", { answerAnyway: true });
@@ -2590,6 +2634,7 @@ describe("WARN (deps.warn): the health caution", () => {
     const MLP = chunk("pack:boar-medlineplus-en:7", "Dehydration", "Dehydration happens when the body loses more water than it takes in. Drink fluids often.");
     f.deps.emergencyScore = async () => ({ p: 0.0, fire: false });
     f.deps.warn = true;
+    f.deps.warnRendered = true;
     f.deps.runMultipass = async (_q, _s, _h, _m, onProgress, onToken, _stop, options) => {
       options.onSources?.([MLP]);
       onProgress({ stage: "synthesizing" });

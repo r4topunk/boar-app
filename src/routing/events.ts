@@ -212,7 +212,7 @@ export type AnswerEvent =
        * empty; any weak_sources the caution held back is sent before this done.
        * The chat stores it with the message and never recomputes it.
        */
-      warn?: { tier: WarnTier; message: string };
+      warn?: { tier: WarnTier; message: string; /** deps.warnRendered: false = the client does not render it, the old notices stay. */ rendered?: boolean };
     })
   | (Base & {
       /** Emitted only after a fast-tier done: a deeper answer is possible for this question. */
@@ -268,6 +268,8 @@ export type AnswerEvent =
       type: "warn";
       tier: WarnTier;
       message: string;
+      /** deps.warnRendered: false = the client does not render the caution, so weak_sources and the preface were not held back. */
+      rendered?: boolean;
     })
   | (Base & {
       /** A model loaded but its weights stream from storage (see src/inference/memoryFit.ts). */

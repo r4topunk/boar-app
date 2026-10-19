@@ -260,9 +260,15 @@ export interface AnswerDeps {
    * WARN (src/routing/warn.ts): a turn a model answers about something health-shaped (detector fire or p >= 0.05, HEALTHGAP,
    * the health grounding, the safety or WARN lexicon, a kept health-pack source) gets a health caution in three tiers by
    * grounding: a warn event before generation, receipt code warn:<tier> and done.warn at the end. On that turn the caution
-   * replaces the weak_sources seal and the uncited preface. Default off; true = on. Off, every event and text is unchanged.
+   * replaces the weak_sources seal and the uncited preface. Default ON (absent = on); false turns it off, and then every event and text is unchanged.
    */
   warn?: boolean;
+  /**
+   * WARN: the client renders the warn event / done.warn. Only then does the caution replace the weak_sources notice and the
+   * uncited preface on a caution turn. Default false: warn events and codes are still sent, but the old notices stay exactly as
+   * before, so a client with no renderer never loses its only notice. The chat bridge sets it when it renders the caution.
+   */
+  warnRendered?: boolean;
   /**
    * English article names a Portuguese question mentions (Bramble's lexicon, src/rag/ptLexicon.ts
    * englishNamesIn): "Por que existem as estações do ano?" -> ["Season"]. The grounding guard matches
@@ -414,6 +420,10 @@ export function createAnswerer(deps: AnswerDeps) {
     const safety = isSafetyQuery(req.query) || isCoHazardQuestion(req.query);
     /** Whether the chat was already told that no strong source backs this answer. */
     let weakSourcesSent = false;
+    /** WARN: on unless deps.warn is explicitly false. */
+    const warnOn = deps.warn !== false;
+    /** WARN: the caution stands in for the older notices only when the client renders it. */
+    const warnReplaces = warnOn && deps.warnRendered === true;
     /** WARN (deps.warn): the caution tier shown since generation started; null = none. */
     let warnShown: WarnTier | null = null;
     /** WARN: a caution is (or will be) this turn's notice, so a non-declined weak_sources is held back (kept here). */
@@ -710,7 +720,7 @@ export function createAnswerer(deps: AnswerDeps) {
       // WARN (deps.warn): health evidence the routing above did not record, for the caution only (never routing, never the receipt):
       // the detector on a "Deeper answer" (reuseSources skips it) and the HEALTHGAP class when the layer is off or skipped.
       const warnEvidence: string[] = [];
-      if (deps.warn === true) {
+      if (warnOn) {
         if (req.reuseSources && deps.emergencyScore) {
           const s = await deps.emergencyScore(req.query, userTurns).catch(() => null);
           if (s) warnEvidence.push(`detector:p=${s.p.toFixed(3)}`, ...(s.fire ? ["detector:fire"] : []));
@@ -1019,16 +1029,16 @@ export function createAnswerer(deps: AnswerDeps) {
         // decided before the seal below so a turn never carries both notices. A stopped, timed-out or failed turn that shows model
         // text keeps the tier it showed. Multi-pass finds its sources while it runs: it may leave no-source.
         const warnFinal =
-          deps.warn === true
+          warnOn
             ? warnOf({ query: req.query, codes: [...r.reasonCodes, ...warnEvidence], modelId: r.modelId, outcome, text, kept: sources, cited })
             : null;
         const warnTier =
-          deps.warn !== true
+          !warnOn
             ? null
             : warnFinal === null && warnShown && outcome !== "success" && text.trim()
               ? warnShown
               : settleTier(warnShown, warnFinal, gen?.mode === "multipass");
-        if (warnTier) warnHold = true;
+        if (warnTier && warnReplaces) warnHold = true;
         if (!weakSourcesSent && outcome === "success" && text.trim() && cited.length === 0 && !NOT_A_MODEL.has(r.modelId)) {
           reasonCodes.push("grounding:uncited-warning");
           emit({ type: "warning", answerId, code: "weak_sources", message: "No offline source backs this answer." });
@@ -1049,7 +1059,7 @@ export function createAnswerer(deps: AnswerDeps) {
           error,
           cited,
           ...(finalText !== undefined ? { finalText } : {}),
-          ...(warnTier ? { warn: { tier: warnTier, message: warnCopy(warnTier, warnLang(req.query)) } } : {}),
+          ...(warnTier ? { warn: { tier: warnTier, message: warnCopy(warnTier, warnLang(req.query)), rendered: warnReplaces } } : {}),
         });
         if (DEV_LOG) console.log(`[ANSWER] done ${JSON.stringify({ q: req.query.slice(0, 80), tier, outcome, codes: reasonCodes, text: text.slice(0, 200) })}`);
         record(outcome, r, error);
@@ -1371,10 +1381,10 @@ export function createAnswerer(deps: AnswerDeps) {
         return finish(genTier, "success", message, [], receipt({ retrievalMs }));
       }
       // WARN (deps.warn): a model answers next; a health-shaped turn shows its caution from here, before any token.
-      if (deps.warn === true && gen && genLlm && healthReasons({ query: req.query, codes: [...reasonCodes, ...warnEvidence], kept: sources }).length) {
+      if (warnOn && gen && genLlm && healthReasons({ query: req.query, codes: [...reasonCodes, ...warnEvidence], kept: sources }).length) {
         warnShown = streamStartTier(sources.length);
-        warnHold = true;
-        emit({ type: "warn", answerId, tier: warnShown, message: warnCopy(warnShown, warnLang(req.query)) });
+        if (warnReplaces) warnHold = true;
+        emit({ type: "warn", answerId, tier: warnShown, message: warnCopy(warnShown, warnLang(req.query)), rendered: warnReplaces });
       }
       if (fromMemory) {
         reasonCodes.push("grounding:no-source-memory");
@@ -1695,7 +1705,7 @@ export function createAnswerer(deps: AnswerDeps) {
           // No source: the weak_sources warning already went out before generation.
           if (sources.length) emit({ type: "warning", answerId, code: "weak_sources", message: "No offline source covers this question." });
           // WARN: the caution already says the answer is from memory; no second notice in the text.
-          if (!warnShown) {
+          if (!(warnShown && warnReplaces)) {
             text = `${uncitedPreface(pt)}\n\n${text.trim()}`;
             finalText = text;
           }

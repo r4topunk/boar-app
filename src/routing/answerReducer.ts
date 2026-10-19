@@ -64,7 +64,7 @@ export interface AnswerState {
   /** The engine classified the question as health/safety (done.safety): literal passage, emergency note. */
   safety?: boolean;
   /** WARN (deps.warn): the health caution shown above the answer, from the warn event, settled by done.warn. */
-  warn?: { tier: WarnTier; message: string };
+  warn?: { tier: WarnTier; message: string; rendered?: boolean };
 }
 
 export function initialAnswer(answerId: string): AnswerState {
@@ -127,7 +127,8 @@ export function answerReducer(state: AnswerState, event: AnswerEvent): AnswerSta
 
     case "warn":
       // One notice: the caution wins over an earlier weak-sources notice on this message (a decline still shows).
-      return { ...state, warn: { tier: event.tier, message: event.message }, ...(state.weakDeclined ? {} : { weakSources: undefined }) };
+      // Only when the caution is rendered (rendered: false = the old notice stays).
+      return { ...state, warn: { tier: event.tier, message: event.message, rendered: event.rendered }, ...(state.weakDeclined || event.rendered === false ? {} : { weakSources: undefined }) };
 
     case "stage":
       if (event.tier === "instant" || state[event.tier]?.outcome) return state;
@@ -141,7 +142,7 @@ export function answerReducer(state: AnswerState, event: AnswerEvent): AnswerSta
     case "done":
       if (event.safety) state = { ...state, safety: true };
       // WARN: done settles the caution (absent = the model did not write this text: no caution).
-      if (state.warn || event.warn) state = { ...state, warn: event.warn, ...(event.warn && !state.weakDeclined ? { weakSources: undefined } : {}) };
+      if (state.warn || event.warn) state = { ...state, warn: event.warn, ...(event.warn && !state.weakDeclined && event.warn.rendered !== false ? { weakSources: undefined } : {}) };
       if (event.tier === "instant") {
         if (state.instantDone) return state;
         state = withCited(state, (event as { cited?: unknown }).cited);
