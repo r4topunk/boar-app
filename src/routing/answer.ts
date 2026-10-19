@@ -83,6 +83,7 @@ import { healthReasons, settleTier, streamStartTier, warnCopy, warnLang, warnOf 
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
 import { factsAnswer } from "../rag/facts";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
+import { isWaterSafetyQuestion, waterSafetyAnswer } from "./waterSafety";
 import { isSnakebiteFirstAid, snakebiteFirstAidCard as cut2SnakebiteCard } from "./firstAidCards";
 import { DETECTOR_FLOOR } from "./emergencyHead";
 import type { LoadFailureKind } from "../inference/loadError";
@@ -753,6 +754,16 @@ export function createAnswerer(deps: AnswerDeps) {
           const text = coHazardAnswer(req.query);
           markVisible();
           const r: AnswerReceipt = { modelId: "grounding-guard", modelLabel: "Safety facts (CDC)", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: [...detectorCodes, "answer:safety-fact-co-hazard"] };
+          emit({ type: "token", answerId, tier: "instant", text });
+          emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
+          return { answerId, tier: "instant", outcome: "success", text, sources: [], receipt: r, cited: [] };
+        }
+        // Drinking water in an emergency (EN): making it safe after a flood, an outage or a boil-water notice gets the CDC/EPA
+        // card, never a pack passage or a model answer (dng-005 got a travel guide's "tap water is not safe to drink").
+        if (!isPortugueseQuestion(req.query) && !isSpanishQuestion(req.query) && isWaterSafetyQuestion(req.query)) {
+          const text = waterSafetyAnswer();
+          markVisible();
+          const r: AnswerReceipt = { modelId: "grounding-guard", modelLabel: "Safety facts (CDC, EPA)", tokens: 0, tokPerSec: 0, ttftMs: deps.now() - t0, totalMs: deps.now() - t0, reasonCodes: [...detectorCodes, "answer:safety-fact-water"] };
           emit({ type: "token", answerId, tier: "instant", text });
           emit({ type: "done", answerId, tier: "instant", outcome: "success", receipt: r, cited: [] });
           return { answerId, tier: "instant", outcome: "success", text, sources: [], receipt: r, cited: [] };

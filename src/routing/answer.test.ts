@@ -349,12 +349,12 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
     const contamination = { ...chunk("wc", "Wikivoyage: Water", "Water contamination: boil water for one minute at a rolling boil before you drink it."), action: true };
     const stayHealthy = { ...chunk("sh", "Wikivoyage: Stay healthy", "During your trip > Precautions against disease > Water contamination: After a flood, boil water for one minute at a rolling boil before you drink it."), action: true };
     f.retrieved = [stayHealthy, quality] as any;
-    const first = await collect("After a flood the tap water might be contaminated. How do I make water safe to drink?");
+    const first = await collect("After a flood the tap water might be contaminated. What should I do about drinking water?");
     // Topic named by the section heading, not the article title (gate 5e70bbd, safety-005).
     expect(first.result.text).toMatch(/Water contamination: After a flood, boil water .* \[\d\]\n\nIn an emergency/);
     f = makeFake();
     f.retrieved = [quality, contamination] as any;
-    const { result } = await collect("After a flood the tap water might be contaminated. How do I make water safe to drink?");
+    const { result } = await collect("After a flood the tap water might be contaminated. What should I do about drinking water?");
     expect(result.text).toMatch(/^(?:The offline library has no guidance specific to a flood; the passage below is general advice on the subject\.\n\n)?From the offline source:\nWater contamination: boil water for one minute .* \[\d\]\n\nIn an emergency/);
   });
 
@@ -389,7 +389,7 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
       ["My friend was bitten by a snake on a hike. How do we treat the bite?", chunk("r", "Renealmia cernua", "Renealmia cernua is a plant. Its leaves are used against snakebite in folk medicine.")],
       ["My hiking partner is shivering, confused and slurring words in the cold. What should I do?", chunk("s", "Schroeder Pants Cave", "Schroeder Pants Cave is a cave. Cavers risk hypothermia when shivering in the cold water.")],
       ["An earthquake starts while I'm inside a hotel room. What should I do?", chunk("h", "Hotel Impossible", "Hotel Impossible is a TV show. One episode covered a hotel after an earthquake.")],
-      ["After a flood the tap water might be contaminated. How do I make water safe to drink?", chunk("a", "After-rust", "After-rust is a plant disease. Contaminated water after a flood spreads it; it is not safe to drink.")],
+      ["After a flood the tap water might be contaminated. What should I do about drinking water?", chunk("a", "After-rust", "After-rust is a plant disease. Contaminated water after a flood spreads it; it is not safe to drink.")],
       ["My child spilled boiling water on their arm. What do I do?", chunk("b", "Ethereum EIPs/ERCs: EIP-7775: BURN opcode", "Abstract: This EIP adds a BURN opcode that burns ether.")],
     ];
     for (const [q, off] of cases) {
@@ -405,7 +405,7 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
   it("…and still quotes the on-topic ones", async () => {
     for (const [q, on] of [
       ["My friend was bitten by a snake on a hike. How do we treat the bite?", chunk("sb", "Snakebite", "Treatment > First aid: Keep the person calm and still, remove rings and watches, and get to a hospital for antivenom.")],
-      ["After a flood the tap water might be contaminated. How do I make water safe to drink?", chunk("w", "Wikivoyage: Stay healthy", "During your trip > Water contamination: After a flood, boil water for one minute at a rolling boil before you drink it.")],
+      ["After a flood the tap water might be contaminated. What should I do about drinking water?", chunk("w", "Wikivoyage: Stay healthy", "During your trip > Water contamination: After a flood, boil water for one minute at a rolling boil before you drink it.")],
       ["An earthquake starts while I'm inside a hotel room. What should I do?", chunk("e", "Earthquakes (Ready.gov)", "During an Earthquake: Drop, cover, and hold on. Stay inside until the shaking stops.")],
     ] as const) {
       f = makeFake();
@@ -596,6 +596,24 @@ describe("answer(): grounding guard (Prism Q-1, E-1)", () => {
     f = makeFake();
     const pt = await collect("Posso ligar o gerador na garagem com a porta aberta?");
     expect(pt.result.receipt.reasonCodes).not.toContain("answer:safety-fact-co-hazard");
+  });
+
+  it("drinking water in an emergency (EN) gets the CDC/EPA card, no model and no pack passage", async () => {
+    f = makeFake();
+    f.retrieved = [chunk("wq", "Wikivoyage: Water", "Quality by country or region: Tap water is not safe to drink in many countries.")];
+    const { result } = await collect("After a flood the tap water might be contaminated. How do I make water safe to drink?");
+    expect(f.generations).toHaveLength(0);
+    expect(result.receipt.reasonCodes).toContain("answer:safety-fact-water");
+    expect(result.receipt.modelLabel).toBe("Safety facts (CDC, EPA)");
+    expect(result.sources).toEqual([]);
+    expect(result.text).toMatch(/^Use bottled water, or water you stored safely/);
+    expect(result.text).toMatch(/rolling boil for 1 minute/);
+    f = makeFake();
+    const pt = await collect("Depois de uma enchente, a água da torneira pode estar contaminada. Como deixo a água segura para beber?");
+    expect(pt.result.receipt.reasonCodes).not.toContain("answer:safety-fact-water");
+    f = makeFake();
+    const travel = await collect("Is it safe to drink tap water in Mexico City?");
+    expect(travel.result.receipt.reasonCodes).not.toContain("answer:safety-fact-water");
   });
 
   it("CO exposure with symptoms (generator in the garage + dizzy, no 'carbon monoxide') gets the CO card, not the generic line", async () => {
