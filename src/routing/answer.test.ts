@@ -2412,3 +2412,233 @@ describe("answer(): HEALTHGAP dose with a kept source (rule v1.2 §2.5)", () => 
     f.deps.healthgap = undefined;
   });
 });
+
+describe("WARN (deps.warn): the health caution", () => {
+  type Done = Extract<AnswerEvent, { type: "done" }>;
+  const ask = async (query: string, req: Record<string, unknown> = {}, onEvent?: (e: AnswerEvent, h: { stop(): Promise<void> }) => void) => {
+    const events: AnswerEvent[] = [];
+    const a = createAnswerer(f.deps);
+    let h: ReturnType<typeof a.answer>;
+    h = a.answer({ query, ...req }, (e) => {
+      events.push(e);
+      onEvent?.(e, h);
+    }, ctx);
+    const result = await h.done;
+    return { events, result, done: events.find((e) => e.type === "done") as Done, state: events.reduce(answerReducer, initialAnswer(result.answerId)) };
+  };
+  /** The model streams this text, word by word, and stops when asked. */
+  const say = (text: string) => {
+    let stopped = false;
+    f.deps.engine.stop = async () => {
+      stopped = true;
+    };
+    f.deps.engine.generate = async (o) => {
+      stopped = false;
+      const out: string[] = [];
+      for (const piece of text.split(/(?<= )/)) {
+        if (stopped) break;
+        o.onToken?.(piece);
+        out.push(piece);
+        await new Promise((r) => setTimeout(r, 1));
+      }
+      return out.join("");
+    };
+  };
+  const warnEvents = (es: AnswerEvent[]) => es.filter((e) => e.type === "warn") as Extract<AnswerEvent, { type: "warn" }>[];
+  const weak = (es: AnswerEvent[]) => es.filter((e) => e.type === "warning" && e.code === "weak_sources");
+  /** Detector p 0.08: below the fire threshold and the floor (no health route), at or above WARN's 0.05. */
+  const lowP = () => (f.deps.emergencyScore = async () => ({ p: 0.08, fire: false }));
+
+  it("sourced: beyond-source before the first token, settled to sourced at done; off, no caution", async () => {
+    lowP();
+    f.deps.warn = true;
+    const { events, result, done, state } = await ask("What is the capital of Australia?", { answerAnyway: true });
+    expect(result.receipt.modelId).toBe("qwen1.5");
+    const w = events.findIndex((e) => e.type === "warn");
+    expect(w).toBeGreaterThanOrEqual(0);
+    expect(w).toBeLessThan(events.findIndex((e) => e.type === "token"));
+    expect(events[w]).toMatchObject({ type: "warn", tier: "beyond-source" });
+    expect(done.warn).toEqual({ tier: "sourced", message: expect.stringMatching(/^Health caution: AI answer drawn from an offline source/) });
+    expect(result.receipt.reasonCodes).toContain("warn:sourced");
+    expect(state.warn?.tier).toBe("sourced");
+    f = makeFake();
+    lowP();
+    const off = await ask("What is the capital of Australia?", { answerAnyway: true });
+    expect(warnEvents(off.events)).toEqual([]);
+    expect(off.done.warn).toBeUndefined();
+    expect(off.result.receipt.reasonCodes.filter((c) => c.startsWith("warn:"))).toEqual([]);
+  });
+
+  it("no source: the no-source caution replaces weak_sources; off, the turn is byte for byte unchanged", async () => {
+    const run = async (warn: boolean) => {
+      f = makeFake();
+      f.retrieved = [];
+      f.deps.emergencyScore = async () => ({ p: 0.001, fire: false });
+      if (warn) f.deps.warn = true;
+      // "symptoms": a WARN_LEX word that is no health route (no detector evidence), so the model answers from memory.
+      return ask("Which symptoms did the Roman historians describe for the plague of Athens?", { answerAnyway: true });
+    };
+    const on = await run(true);
+    const off = await run(false);
+    expect(on.result.receipt.reasonCodes).toContain("grounding:no-source-memory");
+    expect(warnEvents(on.events).map((e) => e.tier)).toEqual(["no-source"]);
+    expect(on.done.warn?.tier).toBe("no-source");
+    expect(weak(on.events)).toEqual([]);
+    expect(weak(off.events)).toHaveLength(1);
+    expect(on.state.weakSources).toBeFalsy();
+    expect(off.state.weakSources).toBe(true);
+    expect(on.result.receipt.reasonCodes.filter((c) => c !== "warn:no-source")).toEqual(off.result.receipt.reasonCodes);
+    // The one difference in the text: off, the uncited preface; on, the caution says it instead.
+    const PREFACE = /^This answer is not from an offline source[^\n]*\n\n/;
+    expect(off.result.text).toMatch(PREFACE);
+    expect(on.result.text).toBe(off.result.text.replace(PREFACE, ""));
+    const strip = (es: AnswerEvent[]) =>
+      es
+        .filter((e) => e.type !== "warn" && !(e.type === "warning" && e.code === "weak_sources"))
+        .map(({ answerId: _a, ...e }: any) =>
+          e.type === "done"
+            ? { ...e, warn: undefined, finalText: e.finalText?.replace(PREFACE, ""), receipt: { ...e.receipt, reasonCodes: e.receipt.reasonCodes.filter((c: string) => !c.startsWith("warn:")) } }
+            : e
+        );
+    expect(JSON.stringify(strip(on.events))).toBe(JSON.stringify(strip(off.events)));
+  });
+
+  it("beyond-source: a kept source the answer does not cite", async () => {
+    lowP();
+    f.deps.warn = true;
+    f.installed = [{ ...qwen15, sizeBytes: 3 * GB }]; // not the compact model: it keeps an uncited answer
+    say("The city was picked as a compromise between two rivals.");
+    const { done, result, state } = await ask("Why was Canberra chosen as the capital of Australia?", { answerAnyway: true });
+    expect(result.sources.length).toBeGreaterThan(0);
+    expect(done.warn?.tier).toBe("beyond-source");
+    expect(result.receipt.reasonCodes).toContain("warn:beyond-source");
+    expect(state.warn?.tier).toBe("beyond-source");
+    expect(state.weakSources).toBeFalsy();
+  });
+
+  it("off: a health-shaped turn keeps weak_sources and gets no warn event, field or code", async () => {
+    lowP();
+    f.installed = [{ ...qwen15, sizeBytes: 3 * GB }];
+    say("The city was picked as a compromise between two rivals.");
+    const { events, done, result } = await ask("Why was Canberra chosen as the capital of Australia?", { answerAnyway: true });
+    expect(warnEvents(events)).toEqual([]);
+    expect("warn" in done).toBe(false);
+    expect(weak(events)).toHaveLength(1);
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("warn:"))).toBe(false);
+  });
+
+  it("a decline after the caution was shown clears it; the decline's notice stays", async () => {
+    lowP();
+    f.deps.warn = true;
+    say("Purple elephants dance at noon in the quiet valley today.");
+    const { events, done, state } = await ask("Why was Canberra chosen as the capital of Australia?");
+    expect(warnEvents(events).map((e) => e.tier)).toEqual(["beyond-source"]);
+    expect(done.receipt.reasonCodes.some((c) => c.includes("declined"))).toBe(true);
+    expect(done.warn).toBeUndefined();
+    expect(state.warn).toBeUndefined();
+    expect(state.weakDeclined).toBe(true);
+  });
+
+  it("deterministic answers are never warned (HEALTHGAP dose line)", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.0, fire: false });
+    f.deps.healthgap = true;
+    f.deps.warn = true;
+    f.retrieved = [];
+    const { events, done, result } = await ask("How many mg of ibuprofen for a 20 kg child?");
+    expect(result.receipt.modelId).toBe("grounding-guard");
+    expect(result.text).toBe(noDoseAnswer(false));
+    expect(warnEvents(events)).toEqual([]);
+    expect(done.warn).toBeUndefined();
+  });
+
+  it("MUST-FIX 1: a stopped model answer keeps the caution it showed", async () => {
+    lowP();
+    f.deps.warn = true;
+    f.installed = [{ ...qwen15, sizeBytes: 3 * GB }];
+    say("The city was picked as a compromise between two rivals.");
+    let stopped = false;
+    const { done, state } = await ask("Why was Canberra chosen as the capital of Australia?", { answerAnyway: true }, (e, h) => {
+      if (e.type === "token" && !stopped) {
+        stopped = true;
+        void h.stop();
+      }
+    });
+    expect(done.outcome).toBe("stopped");
+    expect(done.warn?.tier).toBe("beyond-source");
+    expect(state.warn?.tier).toBe("beyond-source");
+  });
+
+  it("MUST-FIX 1: a stopped answer from memory keeps a notice (the no-source caution)", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.001, fire: false });
+    f.deps.warn = true;
+    f.retrieved = [];
+    say("Thucydides described fever, redness of the eyes and a cough in detail.");
+    let stopped = false;
+    const { done, state, events } = await ask("Which symptoms did the Roman historians describe for the plague of Athens?", { answerAnyway: true }, (e, h) => {
+      if (e.type === "token" && !stopped) {
+        stopped = true;
+        void h.stop();
+      }
+    });
+    expect(done.outcome).toBe("stopped");
+    expect(done.warn?.tier).toBe("no-source");
+    expect(state.warn?.tier ?? (state.weakSources ? "weak" : null)).not.toBeNull();
+    expect(weak(events)).toEqual([]);
+  });
+
+  it("MUST-FIX 2: a health source that arrives only with the deeper answer gives one notice, the caution", async () => {
+    const MLP = chunk("pack:boar-medlineplus-en:7", "Dehydration", "Dehydration happens when the body loses more water than it takes in. Drink fluids often.");
+    f.deps.emergencyScore = async () => ({ p: 0.0, fire: false });
+    f.deps.warn = true;
+    f.deps.runMultipass = async (_q, _s, _h, _m, onProgress, onToken, _stop, options) => {
+      options.onSources?.([MLP]);
+      onProgress({ stage: "synthesizing" });
+      onToken("Sip water often and rest in a cool place for a while.");
+      return { answer: "Sip water often and rest in a cool place for a while.", subQuestions: ["a"], citations: [MLP] };
+    };
+    const events: AnswerEvent[] = [];
+    const result = await createAnswerer(f.deps).deepen("Compare the effects of a long run and a long hike on the body", [CANBERRA], (e) => events.push(e), ctx).done;
+    expect(f.multipassCalls).toBe(0);
+    const done = events.find((e) => e.type === "done") as Done;
+    expect(done.warn?.tier).toBe("beyond-source");
+    expect(weak(events)).toEqual([]);
+    const state = events.reduce(answerReducer, initialAnswer(result.answerId));
+    expect(state.weakSources).toBeFalsy();
+    expect(state.warn?.tier).toBe("beyond-source");
+  });
+
+  it("MUST-FIX 3: the source excerpt that replaced a risky model line is not warned", async () => {
+    f.installed = [qwen15, moe];
+    f.retrieved = [
+      chunk("nb", "Nosebleed", "A nosebleed is bleeding from the nose. Pinch the soft part of the nose and lean forward for ten minutes. At home, the head should not be tilted back."),
+    ];
+    f.deps.warn = true;
+    f.deps.engine.generate = async () => "Pinch the soft part of your nose and blow your nose gently [1].";
+    const { events, done, result } = await ask("How do I stop a nosebleed?", { tier: "deep" });
+    expect(result.receipt.reasonCodes).toContain("grounding:health-unsafe-blow-nose");
+    expect(result.text).toMatch(/^From the offline source:/);
+    expect(warnEvents(events).length).toBe(1); // shown while the model ran
+    expect(done.warn).toBeUndefined();
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("warn:"))).toBe(false);
+  });
+
+  it("the deeper answer keeps the detector's evidence", async () => {
+    lowP();
+    f.deps.warn = true;
+    const events: AnswerEvent[] = [];
+    const result = await createAnswerer(f.deps).deepen("Why was Canberra chosen as the capital of Australia?", [CANBERRA], (e) => events.push(e), ctx).done;
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("warn:"))).toBe(true);
+    // The evidence is for the caution only: the receipt gets no detector code from it.
+    expect(result.receipt.reasonCodes.some((c) => c.startsWith("detector:"))).toBe(false);
+  });
+
+  it("multi-pass: starts at no-source and may move to the tier its citations earn", async () => {
+    f.deps.emergencyScore = async () => ({ p: 0.0, fire: false });
+    f.deps.warn = true;
+    const { events, done } = await ask("Compare the caffeine in coffee and tea", { tier: "deep" });
+    expect(f.multipassCalls).toBe(1);
+    expect(warnEvents(events).map((e) => e.tier)).toEqual(["no-source"]);
+    expect(done.cited?.length).toBeGreaterThan(0);
+    expect(done.warn?.tier).not.toBe("no-source");
+  });
+});

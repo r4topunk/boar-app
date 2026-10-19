@@ -79,6 +79,7 @@ import { travelDistanceAnswer } from "./travelDistance";
 import { verdictGuard } from "./verdictGuard";
 import { arithmeticAnswer } from "./arithmetic";
 import { numericGuard } from "./numguard";
+import { healthReasons, settleTier, streamStartTier, warnCopy, warnLang, warnOf } from "./warn";
 import { emergencyNumbersAnswer } from "./emergencyNumbers";
 import { factsAnswer } from "../rag/facts";
 import { coHazardAnswer, isCoHazardQuestion } from "./coHazard";
@@ -117,6 +118,7 @@ import type {
   AnswerTier,
   SourceChunk,
   StageDetail,
+  WarnTier,
 } from "./events";
 import type { ModelRole } from "./types";
 import type { RetrievedChunk } from "../rag/retrieve.types";
@@ -254,6 +256,13 @@ export interface AnswerDeps {
    * answers a fired message. Default off; true = on.
    */
   numguard?: boolean;
+  /**
+   * WARN (src/routing/warn.ts): a turn a model answers about something health-shaped (detector fire or p >= 0.05, HEALTHGAP,
+   * the health grounding, the safety or WARN lexicon, a kept health-pack source) gets a health caution in three tiers by
+   * grounding: a warn event before generation, receipt code warn:<tier> and done.warn at the end. On that turn the caution
+   * replaces the weak_sources seal and the uncited preface. Default off; true = on. Off, every event and text is unchanged.
+   */
+  warn?: boolean;
   /**
    * English article names a Portuguese question mentions (Bramble's lexicon, src/rag/ptLexicon.ts
    * englishNamesIn): "Por que existem as estações do ano?" -> ["Season"]. The grounding guard matches
@@ -405,7 +414,19 @@ export function createAnswerer(deps: AnswerDeps) {
     const safety = isSafetyQuery(req.query) || isCoHazardQuestion(req.query);
     /** Whether the chat was already told that no strong source backs this answer. */
     let weakSourcesSent = false;
+    /** WARN (deps.warn): the caution tier shown since generation started; null = none. */
+    let warnShown: WarnTier | null = null;
+    /** WARN: a caution is (or will be) this turn's notice, so a non-declined weak_sources is held back (kept here). */
+    let warnHold = false;
+    let heldWeakSources: AnswerEvent | null = null;
     const emit = (e: AnswerEvent) => {
+      // WARN: the caution is this turn's one notice, so the weak_sources seal is held back (and counts as sent). A decline still goes.
+      // If the turn ends with no caution after all, finish() sends the held notice, as with WARN off.
+      if (warnHold && e.type === "warning" && e.code === "weak_sources" && !e.declined) {
+        weakSourcesSent = true;
+        heldWeakSources ??= e;
+        return;
+      }
       if (e.type === "warning" && e.code === "weak_sources") weakSourcesSent = true;
       try {
         onEvent(e.type === "done" && safety ? { ...e, safety: true } : e);
@@ -685,6 +706,17 @@ export function createAnswerer(deps: AnswerDeps) {
       if (healthGap) {
         learned = { p: learned?.p ?? 0, fire: true };
         detectorCodes.push(...healthGapCodes(healthGap));
+      }
+      // WARN (deps.warn): health evidence the routing above did not record, for the caution only (never routing, never the receipt):
+      // the detector on a "Deeper answer" (reuseSources skips it) and the HEALTHGAP class when the layer is off or skipped.
+      const warnEvidence: string[] = [];
+      if (deps.warn === true) {
+        if (req.reuseSources && deps.emergencyScore) {
+          const s = await deps.emergencyScore(req.query, userTurns).catch(() => null);
+          if (s) warnEvidence.push(`detector:p=${s.p.toFixed(3)}`, ...(s.fire ? ["detector:fire"] : []));
+        }
+        const gap = healthGap ?? classifyHealthGap(req.query, userTurns);
+        if (gap && !healthGap) warnEvidence.push(...healthGapCodes(gap));
       }
       // HEALTHGAP (rule v1.2 §2.5): a dose or survival turn keeps a source whose title names its medicine or condition.
       const gapTitle = healthGapTitle(healthGap, req.query, userTurns);
@@ -983,11 +1015,42 @@ export function createAnswerer(deps: AnswerDeps) {
         // One rule for the chat (Quill/Prism CT-5): a model's answer that cites nothing gets the
         // weak_sources warning (the "general knowledge" seal), on every path: deep, multipass, PT,
         // answer-anyway, and the 4B with an on-topic source that it didn't cite.
+        // WARN: the tier over the finished turn (a model wrote it, it is health-shaped; grounding by the kept and cited sources),
+        // decided before the seal below so a turn never carries both notices. A stopped, timed-out or failed turn that shows model
+        // text keeps the tier it showed. Multi-pass finds its sources while it runs: it may leave no-source.
+        const warnFinal =
+          deps.warn === true
+            ? warnOf({ query: req.query, codes: [...r.reasonCodes, ...warnEvidence], modelId: r.modelId, outcome, text, kept: sources, cited })
+            : null;
+        const warnTier =
+          deps.warn !== true
+            ? null
+            : warnFinal === null && warnShown && outcome !== "success" && text.trim()
+              ? warnShown
+              : settleTier(warnShown, warnFinal, gen?.mode === "multipass");
+        if (warnTier) warnHold = true;
         if (!weakSourcesSent && outcome === "success" && text.trim() && cited.length === 0 && !NOT_A_MODEL.has(r.modelId)) {
           reasonCodes.push("grounding:uncited-warning");
           emit({ type: "warning", answerId, code: "weak_sources", message: "No offline source backs this answer." });
         }
-        emit({ type: "done", answerId, tier, outcome, receipt: r, error, cited, ...(finalText !== undefined ? { finalText } : {}) });
+        // No caution after all (not a model's text at the end, or not health-shaped): the held notice goes out, as with WARN off.
+        if (!warnTier && heldWeakSources) {
+          warnHold = false;
+          emit(heldWeakSources);
+          heldWeakSources = null;
+        }
+        if (warnTier) r.reasonCodes.push(`warn:${warnTier}`);
+        emit({
+          type: "done",
+          answerId,
+          tier,
+          outcome,
+          receipt: r,
+          error,
+          cited,
+          ...(finalText !== undefined ? { finalText } : {}),
+          ...(warnTier ? { warn: { tier: warnTier, message: warnCopy(warnTier, warnLang(req.query)) } } : {}),
+        });
         if (DEV_LOG) console.log(`[ANSWER] done ${JSON.stringify({ q: req.query.slice(0, 80), tier, outcome, codes: reasonCodes, text: text.slice(0, 200) })}`);
         record(outcome, r, error);
         return { answerId, tier, outcome, text, sources, receipt: r, cited };
@@ -1307,6 +1370,12 @@ export function createAnswerer(deps: AnswerDeps) {
         finalText = message;
         return finish(genTier, "success", message, [], receipt({ retrievalMs }));
       }
+      // WARN (deps.warn): a model answers next; a health-shaped turn shows its caution from here, before any token.
+      if (deps.warn === true && gen && genLlm && healthReasons({ query: req.query, codes: [...reasonCodes, ...warnEvidence], kept: sources }).length) {
+        warnShown = streamStartTier(sources.length);
+        warnHold = true;
+        emit({ type: "warn", answerId, tier: warnShown, message: warnCopy(warnShown, warnLang(req.query)) });
+      }
       if (fromMemory) {
         reasonCodes.push("grounding:no-source-memory");
         emit({ type: "warning", answerId, code: "weak_sources", message: "No offline source covers this question." });
@@ -1625,8 +1694,11 @@ export function createAnswerer(deps: AnswerDeps) {
           reasonCodes.push("grounding:uncited-preface");
           // No source: the weak_sources warning already went out before generation.
           if (sources.length) emit({ type: "warning", answerId, code: "weak_sources", message: "No offline source covers this question." });
-          text = `${uncitedPreface(pt)}\n\n${text.trim()}`;
-          finalText = text;
+          // WARN: the caution already says the answer is from memory; no second notice in the text.
+          if (!warnShown) {
+            text = `${uncitedPreface(pt)}\n\n${text.trim()}`;
+            finalText = text;
+          }
         }
       }
 
