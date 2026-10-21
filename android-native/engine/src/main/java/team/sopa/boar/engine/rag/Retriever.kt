@@ -76,7 +76,9 @@ class Retriever(
         // A what-to-do question: up to three pack sections that say what to do, right after the named articles.
         val isAction = action ?: WikiPackText.ACTION_INTENT.containsMatchIn(query)
         val steps = if (isAction) chunks { it.via != "title" && it.action }.take(3) else emptyList()
-        val first = (named + steps).distinctBy { it.chunkId }
+        // A question about the user's own things: their best matching passages go first (RagPure.personalRescue).
+        val personal = if (RagPure.isPersonal(query)) RagPure.personalRescue(query, kb.userCollectionSearch(vec, RagPure.PERSONAL_MAX_CHUNKS)) else emptyList()
+        val first = (personal + named + steps).distinctBy { it.chunkId }
         val seen = first.map { it.chunkId }.toHashSet()
         // One copy per article passage across libraries, before the cut.
         val result = Dedupe.dedupeArticleCopies(first + fused.filter { it.chunkId !in seen }).take(maxOf(topK, named.size)).toMutableList()

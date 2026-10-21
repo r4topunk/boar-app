@@ -122,6 +122,18 @@ class KnowledgeBase(private val db: SqlDatabase) {
         return RagPure.filterByTermCoverage(rows, lq.terms).take(limit)
     }
 
+    /** The active user collections' passages by similarity, with no floor (RagPure.personalRescue decides). */
+    fun userCollectionSearch(queryVec: FloatArray, limit: Int): List<Chunk> = db.query(
+        """SELECT c.chunk_id, c.doc_id, c.title, c.body, e.embedding
+           FROM chunk_embeddings e
+           JOIN chunks c ON c.chunk_id = e.chunk_id
+           JOIN custom_collections cc ON cc.id = c.collection_id
+           WHERE cc.active = 1""",
+    ) {
+        val sim = RagPure.cosine(queryVec, fromBlob(it.blob("embedding")!!))
+        Chunk(it.string("chunk_id")!!, it.string("doc_id")!!, it.string("title") ?: "", it.string("body") ?: "", score = sim, similarity = sim, matchType = MatchType.SEMANTIC)
+    }.sortedByDescending { it.score }.take(limit)
+
     /** Brute-force cosine search over the stored embeddings, with the MIN_SEMANTIC_SIMILARITY floor. */
     fun semanticSearch(queryVec: FloatArray, limit: Int): List<Chunk> {
         val scored = db.query(

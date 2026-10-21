@@ -41,6 +41,33 @@ object RagPure {
     const val ANSWER_MIN_SIMILARITY = 0.7
     private const val MAX_LEXICAL_TERMS = 12
 
+    /**
+     * A question about the user's own things ("my", "I", "meu"…). The user's files fail the 0.7 gate on natural
+     * questions: a short medical record scored 0.54–0.60 against "what medication am I on?" while a Wikipedia keyword
+     * hit, which is never gated, filled the context (DOCS-RECALL, Pixel 8a, Oct 21).
+     */
+    private val PERSONAL = Regex("\\b(my|i|me|mine|i'm|meu|minha|meus|minhas|eu)\\b", RegexOption.IGNORE_CASE)
+    const val PERSONAL_MIN_SIMILARITY = 0.57
+    const val PERSONAL_LEXICAL_MIN_SIMILARITY = 0.50
+    const val PERSONAL_MAX_CHUNKS = 2
+
+    fun isPersonal(query: String): Boolean = PERSONAL.containsMatchIn(query)
+
+    /**
+     * The user's own passages a personal question keeps despite the 0.7 gate: of the [candidates] (the user
+     * collections' best by similarity), the first [PERSONAL_MAX_CHUNKS] at [PERSONAL_MIN_SIMILARITY], or at
+     * [PERSONAL_LEXICAL_MIN_SIMILARITY] when they also cover the question's terms. None for any other question.
+     */
+    fun personalRescue(query: String, candidates: List<Chunk>): List<Chunk> {
+        if (!isPersonal(query)) return emptyList()
+        val lq = buildLexicalQuery(query)
+        return candidates.sortedByDescending { it.similarity ?: 0.0 }.take(PERSONAL_MAX_CHUNKS).filter { c ->
+            val sim = c.similarity ?: return@filter false
+            sim >= PERSONAL_MIN_SIMILARITY ||
+                (sim >= PERSONAL_LEXICAL_MIN_SIMILARITY && lq != null && countMatchedTerms("${c.title} ${c.body}", lq.terms) >= requiredTermMatches(lq.terms.size))
+        }
+    }
+
     fun cosine(a: FloatArray, b: FloatArray): Double {
         var dot = 0.0; var na = 0.0; var nb = 0.0
         for (i in a.indices) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
